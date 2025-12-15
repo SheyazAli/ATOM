@@ -1,0 +1,23 @@
+const jwt = require('jsonwebtoken');
+
+exports.verifyAdmin = (req, res, next) => {
+  const token = req.cookies.adminToken;
+
+  if (!token) {
+    return res.redirect('/admin/login');
+  }
+
+  try {
+    const decoded = jwt.verify(token, 'ATOM_SECRET_KEY');
+    req.adminId = decoded.id;
+    next();
+  } catch (err) {
+    res.redirect('/admin/login');
+  }
+};
+
+exports.noCache = (req, res, next) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  next();
+};
+
