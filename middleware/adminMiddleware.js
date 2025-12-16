@@ -8,7 +8,7 @@ exports.verifyAdmin = (req, res, next) => {
   }
 
   try {
-    const decoded = jwt.verify(token, 'ATOM_SECRET_KEY');
+    const decoded = jwt.verify(token, process.env.SECRET_KEY);
     req.adminId = decoded.id;
     next();
   } catch (err) {

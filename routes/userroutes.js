@@ -11,6 +11,7 @@ router.get('/login',userController.getLogin)
 router.post('/login',userController.postLogin)
 
 router.get('/signup',userController.getSignup);
+router.post('/signup',userController.postSignup)
 
 router.get('/profile', verifyUser, userController.getProfile);
 
@@ -23,6 +24,6 @@ router.put('/address/:id', verifyUser, addressController.updateAddress);
 router.delete('/address/:id', verifyUser, addressController.deleteAddress);
 
 
-router.get('/logout',noCache,userController.logout);
+//router.get('/logout',noCache,userController.logout);
 
 module.exports = router;

@@ -7,7 +7,10 @@ const { verifyAdmin, noCache } = require('../middleware/adminMiddleware');
 router.get('/login', noCache, adminController.getLogin);
 router.post('/login', adminController.postLogin);
 
-router.get('/user', verifyAdmin, noCache, adminController.user);
+router.get('/user',verifyAdmin,noCache,adminController.getUsers);
+router.put('/users/:id/toggle-status',verifyAdmin,adminController.toggleUserStatus);
+
+
 router.get('/logout', adminController.logout);
 
 

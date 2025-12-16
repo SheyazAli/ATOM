@@ -8,9 +8,9 @@ const addressSchema = new mongoose.Schema(
       unique: true
     },
     user_id: {
-      type: String,
-      required: true
-    },
+  type: String,
+  required: true
+  },
     first_name: String,
     last_name: String,
     building_name: String,

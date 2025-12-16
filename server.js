@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 const express = require('express');
 const mongoose = require('mongoose');
 const cookieParser = require('cookie-parser');
@@ -7,7 +9,7 @@ const userRoutes = require('./routes/userroutes');
 const path = require('path');
 
 const app = express();
-const PORT = 3000;
+const port = process.env.PORT
 
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
@@ -20,21 +22,19 @@ app.use(express.static('uploads'));
 
 app.set('view engine', 'ejs');
 
-/* DEBUG LOGGER */
-// app.use((req, res, next) => {
-//   console.log(req.method, req.url);
-//   next();
-// });
 
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => console.log("✅ MongoDB connected"))
+  .catch(err => {
+    console.error("❌ MongoDB connection error:", err);
+    process.exit(1);
+  });
 
-mongoose.connect("mongodb://127.0.0.1:27017/ATOM")
-  .then(() => console.log("MongoDB connected successfully"))
-  .catch(err => console.log("MongoDB connection error:", err));
 
 
 app.use('/admin', adminRoutes);
 app.use('/user', userRoutes);
 
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+app.listen(port, () => {
+  console.log(`Server running on http://localhost:${port}`);
 });

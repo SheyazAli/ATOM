@@ -1,4 +1,5 @@
 const Admin = require('../db/adminmodel');
+const User = require('../db/user');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
@@ -64,8 +65,60 @@ exports.postLogin = async (req, res) => {
 
 
 /* DASHBOARD */
-exports.user = (req, res) => {
-  res.render('admin/user');
+exports.getUsers = async (req, res) => {
+  try {
+    const search = req.query.search || '';
+    const page = parseInt(req.query.page) || 1;
+    const limit = 5;
+
+    const query = {
+      $or: [
+        { first_name: { $regex: search, $options: 'i' } },
+        { last_name: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+        { phone_number: { $regex: search, $options: 'i' } }
+      ]
+    };
+
+    const users = await User.find(query)
+      .sort({ created_at: -1 }) // 🔽 latest first
+      .skip((page - 1) * limit)
+      .limit(limit);
+
+    const totalUsers = await User.countDocuments(query);
+
+    res.render('admin/user', {
+      users,
+      search,
+      currentPage: page,
+      totalPages: Math.ceil(totalUsers / limit)
+    });
+
+  } catch (err) {
+    res.status(500).send('Server Error');
+  }
+};
+
+
+exports.toggleUserStatus = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    user.status = user.status === 'active' ? 'blocked' : 'active';
+    await user.save();
+
+    res.json({
+      success: true,
+      status: user.status
+    });
+
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
 };
 
 /* LOGOUT */

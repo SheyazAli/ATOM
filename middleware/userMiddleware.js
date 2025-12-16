@@ -11,7 +11,7 @@ exports.verifyUser = async (req, res, next) => {
     }
 
     // 2️⃣ Verify token
-    const decoded = jwt.verify(token, 'ATOM_SECRET_KEY');
+    const decoded = jwt.verify(token, process.env.SECRET_KEY);
     console.log('JWT DECODED:', decoded);
 
     // 3️⃣ Fetch user from DB

@@ -1,17 +1,41 @@
 const User = require('../db/user');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-
-const auth = require('../middleware/userMiddleware');
-const Admin = require('../db/adminmodel');
-
-exports.getProfile = (req, res) => {
-  res.render('user/profile',{activePage: 'profile'}); // renders views/user/profile.ejs
-};
+const Address = require('../db/address');
 
 exports.getHome = (req, res) => {
   res.render('user/home'); // renders views/user/home.ejs
 };
+
+exports.getProfile = async (req, res) => {
+  try {
+    const user = req.user;
+
+    const defaultAddressDoc = await Address.findOne({
+      user_id: user._id,  
+      is_default: true
+    }).lean();
+
+    let defaultAddress = 'No default address set';
+
+    if (defaultAddressDoc) {
+      defaultAddress =
+        `${defaultAddressDoc.building_name}, ` +
+        `${defaultAddressDoc.city}, ` +
+        `${defaultAddressDoc.state}`;
+    }
+
+    res.render('user/profile', {
+      user,
+      defaultAddress,
+      activePage: 'profile'
+    });
+  } catch (error) {
+    console.error('PROFILE ERROR 👉', error);
+    res.redirect('/user/login');
+  }
+};
+
 
 exports.getSignup = (req, res) => {
   res.render('user/signup'); // renders views/user/signup.ejs
@@ -65,49 +89,63 @@ exports.getLogin = (req, res) => {
   res.render('user/login'); // renders views/user/login.ejs
 };
 
-exports.postLogin = async (req,res) => {
-  const {email, password} = req.body;
+exports.postLogin = async (req, res) => {
+  const { email, password } = req.body;
 
-    // CHECK EMPTY FIELDS
+  // 1️⃣ CHECK EMPTY FIELDS
   if (!email || !password) {
     return res.render('user/login', {
       error: 'Email and password are required'
     });
   }
-   // CHECK EMAIL FORMAT
+
+  // 2️⃣ CHECK EMAIL FORMAT
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(email)) {
     return res.render('user/login', {
       error: 'Please enter a valid email address'
     });
   }
-  //  CHECK ADMIN EXISTS
-  const user = await User.findOne({email});
-  if (!user){
-    return res.render('user/login',{
-      error: 'Invalid email'
+
+  // 3️⃣ FIND USER
+  const user = await User.findOne({ email });
+
+  if (!user) {
+    return res.render('user/login', {
+      error: 'Invalid email or password'
     });
   }
-  // CHECK PASSWORD
+
+  // 4️⃣ CHECK BLOCK STATUS ✅ (FIXED POSITION)
+  if (user.status === 'blocked') {
+    return res.render('user/login', {
+      error: 'Your account has been blocked. Please contact support.'
+    });
+  }
+
+  // 5️⃣ CHECK PASSWORD
   const isMatch = await bcrypt.compare(password, user.password);
-  if(!isMatch){
-    return res.render('user/login',{
-      error: 'Invalid password'
+  if (!isMatch) {
+    return res.render('user/login', {
+      error: 'Invalid email or password'
     });
   }
-  //CREATE JWT
+
+  // 6️⃣ CREATE JWT
   const token = jwt.sign(
-    {id: user._id},
+    { id: user._id },
     'ATOM_SECRET_KEY',
     { expiresIn: '1d' }
   );
-  // STORE TOKEN
-  res.cookie('userToken',token,{
+
+  // 7️⃣ STORE TOKEN
+  res.cookie('userToken', token, {
     httpOnly: true
   });
 
-  res.redirect('/user/profile')
-}
+  // 8️⃣ REDIRECT
+  res.redirect('/user/profile');
+};
 
 exports.logout = (req, res) => {
   res.clearCookie('userToken',{
@@ -116,7 +154,3 @@ exports.logout = (req, res) => {
   });
   res.redirect('/user/home')
 }
-
-// exports.getAddress = (req,res) => {
-//    res.render('user/address'); // renders views/user/address.ejs
-// }

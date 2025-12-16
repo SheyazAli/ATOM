@@ -1,75 +1,72 @@
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ATOM | Home</title>
+<%
+  // Fallback to prevent EJS errors if activePage is not passed
+  const page = typeof activePage !== 'undefined' ? activePage : '';
+%>
+
 <style>
   .promo-card {
-  background: #000;
-  color: #fff;
-  border-radius: 14px;
-  padding: 20px;
-  font-size: 14px;
-}
+    background: #000;
+    color: #fff;
+    border-radius: 14px;
+    padding: 20px;
+    font-size: 14px;
+  }
 
-.promo-card span {
-  color: #28a745;
-  font-weight: 600;
-}
+  .promo-card span {
+    color: #28a745;
+    font-weight: 600;
+  }
 
-/* ACCOUNT MENU */
-.account-menu {
-  display: flex;
-  flex-direction: column;
-}
+  /* ACCOUNT MENU */
+  .account-menu {
+    display: flex;
+    flex-direction: column;
+  }
 
-.account-menu a {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 14px 16px;
-  border-radius: 10px;
-  text-decoration: none;
-  color: #111;
-  margin-bottom: 6px;
-  font-size: 15px;
-  background: #fff;
-  border: 1px solid #eaeaea;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
+  .account-menu a {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 16px;
+    border-radius: 10px;
+    text-decoration: none;
+    color: #111;
+    margin-bottom: 6px;
+    font-size: 15px;
+    background: #fff;
+    border: 1px solid #eaeaea;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
 
-.account-menu a span {
-  display: flex;
-  align-items: center;
-}
+  .account-menu a span {
+    display: flex;
+    align-items: center;
+  }
 
-/* ACTIVE STATE */
-.account-menu a.active {
-  background: #f1faf4;
-  color: #198754;
-  font-weight: 600;
-  border-color: #cdebdc;
-}
+  /* ACTIVE STATE */
+  .account-menu a.active {
+    background: #f1faf4;
+    color: #198754;
+    font-weight: 600;
+    border-color: #cdebdc;
+  }
 
-/* HOVER */
-.account-menu a:hover {
-  background: #f7f7f7;
-}
+  /* HOVER */
+  .account-menu a:hover {
+    background: #f7f7f7;
+  }
 
-/* LOGOUT */
-.account-menu a.logout {
-  color: #dc3545;
-}
+  /* LOGOUT */
+  .account-menu a.logout {
+    color: #dc3545;
+  }
 
-.account-menu a.logout:hover {
-  background: #fff5f5;
-}
-
+  .account-menu a.logout:hover {
+    background: #fff5f5;
+  }
 </style>
-  <!-- Bootstrap -->
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 
-  <!-- Bootstrap Icons -->
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
 <!-- Sidebar Column -->
 <div class="col-lg-3 col-md-4">
 
@@ -83,22 +80,22 @@
   <!-- Account Menu -->
   <div class="account-menu">
 
-    <a href="/user/profile" class="<%= activePage === 'profile' ? 'active' : '' %>">
+    <a href="/user/profile" class="<%= page === 'profile' ? 'active' : '' %>">
       <span><i class="bi bi-person me-2"></i>Profile</span>
       <i class="bi bi-chevron-right"></i>
     </a>
 
-    <a href="/user/orders" class="<%= activePage === 'orders' ? 'active' : '' %>">
+    <a href="/user/orders" class="<%= page === 'orders' ? 'active' : '' %>">
       <span><i class="bi bi-box me-2"></i>Orders</span>
       <i class="bi bi-chevron-right"></i>
     </a>
 
-    <a href="/user/address" class="<%= activePage === 'address' ? 'active' : '' %>">
+    <a href="/user/address" class="<%= page === 'address' ? 'active' : '' %>">
       <span><i class="bi bi-geo-alt me-2"></i>Address</span>
       <i class="bi bi-chevron-right"></i>
     </a>
 
-    <a href="/user/wallet" class="<%= activePage === 'wallet' ? 'active' : '' %>">
+    <a href="/user/wallet" class="<%= page === 'wallet' ? 'active' : '' %>">
       <span><i class="bi bi-wallet2 me-2"></i>Wallet</span>
       <i class="bi bi-chevron-right"></i>
     </a>
