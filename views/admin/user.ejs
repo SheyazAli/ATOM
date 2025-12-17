@@ -18,45 +18,6 @@
       font-family: "Inter", sans-serif;
     }
 
-    /* Sidebar */
-    .sidebar {
-      width: 250px;
-      height: 100vh;
-      background: #ffffff;
-      padding: 25px;
-      border-right: 1px solid #e6e6e6;
-      position: fixed;
-      top: 0;
-      left: 0;
-    }
-
-    .sidebar .logo {
-      font-size: 26px;
-      font-weight: 700;
-      color: #6cb668;
-    }
-
-    .menu-item {
-      padding: 12px 15px;
-      border-radius: 8px;
-      margin-bottom: 10px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      color: #333;
-      transition: .2s;
-      text-decoration: none;
-    }
-
-    .menu-item:hover {
-      background: #f0f4e9;
-    }
-
-    .menu-item.active {
-      background: #eef3e3;
-    }
-
     /* Content */
     .content {
       margin-left: 250px;
@@ -97,24 +58,7 @@
 <body>
 
 <!-- SIDEBAR -->
-<div class="sidebar">
-  <div class="logo mb-2">ATOM</div>
-  <small class="text-muted">Admin Panel</small>
-
-  <div class="mt-4">
-    <div class="menu-item"><i class="bi bi-box"></i> Products</div>
-    <div class="menu-item"><i class="bi bi-cart"></i> Orders</div>
-    <div class="menu-item"><i class="bi bi-folder"></i> Categories</div>
-    <div class="menu-item"><i class="bi bi-bar-chart"></i> Inventory</div>
-    <div class="menu-item active"><i class="bi bi-people"></i> Users</div>
-    <div class="menu-item"><i class="bi bi-tag"></i> Coupons</div>
-    <div class="menu-item"><i class="bi bi-graph-up-arrow"></i> Revenue</div>
-  </div>
-
-  <a href="/admin/logout" class="menu-item mt-4">
-    <i class="bi bi-box-arrow-right"></i> Logout
-  </a>
-</div>
+ <%- include('./adminPartials/adminSidebar') %>
 
 <!-- MAIN CONTENT -->
 <div class="content">
@@ -122,9 +66,9 @@
   <!-- Header -->
   <div class="d-flex justify-content-between align-items-center pe-5">
     <h2 class="fw-bold">User Management</h2>
-    <button class="add-user-btn">
+    <!-- <button class="add-user-btn">
       <i class="bi bi-plus-lg"></i> Add User
-    </button>
+    </button> -->
   </div>
 
   <!-- Search -->

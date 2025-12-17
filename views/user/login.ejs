@@ -12,142 +12,145 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
 
   <style>
-  body {
-    font-family: 'Segoe UI', sans-serif;
-  }
-
-  /* DARKER BACKGROUND */
-  .login-wrapper {
-    min-height: 100vh;
-    background: url("/uploads/SALE.jpg") center / cover no-repeat;
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .login-wrapper::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.6); /* 👈 darker overlay */
-  }
-
-  /* SMALLER WHITE POPUP */
-  .login-card {
-    position: relative;
-    z-index: 2;
-    background: #fff;
-    width: 100%;
-    max-width: 360px; /* 👈 smaller box */
-    padding: 26px 24px;
-    border-radius: 12px;
-    box-shadow: 0 15px 50px rgba(0,0,0,0.35);
-    text-align: center;
-  }
-
-  .login-card img {
-    width: 42px;
-    margin-bottom: 8px;
-  }
-
-  .login-card h4 {
-    font-weight: 600;
-    margin-bottom: 18px;
-  }
-
-  .form-control {
-    height: 40px;
-    font-size: 13px;
-    border-radius: 6px;
-  }
-
-  .form-label {
-    font-size: 12px;
-    font-weight: 500;
-    text-align: left;
-    display: block;
-  }
-
-  /* SUBMIT BUTTON */
-  .btn-login {
-    background: #008060; /* ✅ exact HEX */
-    color: #fff;
-    border: none;
-    height: 42px;
-    font-weight: 500;
-    border-radius: 6px;
-  }
-
-  .btn-login:hover {
-    background: #006e52;
-  }
-
-  .terms {
-    font-size: 10.5px;
-    color: #666;
-    margin-top: 12px;
-    line-height: 1.4;
-  }
-  #google-login-link {
-        text-decoration: none ;
+    body {
+      font-family: 'Segoe UI', sans-serif;
     }
 
-  .terms a {
-    color: #0d6efd;
-    text-decoration: none;
-  }
+    .login-wrapper {
+      min-height: 100vh;
+      background: url("/uploads/SALE.jpg") center / cover no-repeat;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
 
-  .divider {
-    margin: 14px 0;
-    text-decoration: none;
-    font-size: 12px;
-    color: #555;
-  }
+    .login-wrapper::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+    }
 
-  .links a {
-    font-size: 12px;
-    text-decoration: none;
-    margin: 0 4px;
-  }
-</style>
+    .login-card {
+      position: relative;
+      z-index: 2;
+      background: #fff;
+      width: 100%;
+      max-width: 360px;
+      padding: 26px 24px;
+      border-radius: 12px;
+      box-shadow: 0 15px 50px rgba(0,0,0,0.35);
+      text-align: center;
+    }
 
+    .login-card img {
+      width: 42px;
+      margin-bottom: 8px;
+    }
+
+    .login-card h4 {
+      font-weight: 600;
+      margin-bottom: 18px;
+    }
+
+    .form-control {
+      height: 40px;
+      font-size: 13px;
+      border-radius: 6px;
+    }
+
+    .form-label {
+      font-size: 12px;
+      font-weight: 500;
+      text-align: left;
+      display: block;
+    }
+
+    .btn-login {
+      background: #008060;
+      color: #fff;
+      border: none;
+      height: 42px;
+      font-weight: 500;
+      border-radius: 6px;
+    }
+
+    .btn-login:hover {
+      background: #006e52;
+    }
+
+    .terms {
+      font-size: 10.5px;
+      color: #666;
+      margin-top: 12px;
+      line-height: 1.4;
+    }
+
+    .divider {
+      margin: 14px 0;
+      font-size: 12px;
+      color: #555;
+    }
+
+    .links a {
+      font-size: 12px;
+      text-decoration: none;
+      margin: 0 4px;
+    }
+
+    /* ✅ FORGOT PASSWORD */
+    .forgot-link {
+      font-size: 12px;
+      text-decoration: none;
+      color: #0d6efd;
+    }
+
+    .forgot-link:hover {
+      text-decoration: underline;
+    }
+  </style>
 </head>
+
 <body>
 
 <!-- NAVBAR -->
 <%- include('./userPartials/navbar') %>
 
-<!-- Login SECTION -->
 <section class="login-wrapper">
-
   <div class="login-card">
-    <!-- Logo -->
-    <img src="/uploads/Atom logo white bg.png" alt="ATOM">
 
+    <img src="/uploads/Atom logo white bg.png" alt="ATOM">
     <h4>Login</h4>
 
     <form action="/user/login" method="POST">
-<!-- validation -->
-          <% if (typeof error !== 'undefined') { %>
-      <div class="alert alert-danger text-center py-1">
-        <%= error %>
-      </div>
-    <% } %>
-    
-      <div class="mb-3 text-start">
-        <label class="form-label">Enter your email id <span class="text-danger">*</span></label>
-        <input type="email" name="email" class="form-control" >
-      </div>
+
+      <% if (typeof error !== 'undefined') { %>
+        <div class="alert alert-danger text-center py-1">
+          <%= error %>
+        </div>
+      <% } %>
 
       <div class="mb-3 text-start">
+        <label class="form-label">Enter your email id <span class="text-danger">*</span></label>
+        <input type="email" name="email" class="form-control" required>
+      </div>
+
+      <div class="mb-2 text-start">
         <label class="form-label">Enter your password <span class="text-danger">*</span></label>
-        <input type="password" name="password" class="form-control" >
+        <input type="password" name="password" class="form-control" required>
+      </div>
+
+      <!-- 👇 FORGOT PASSWORD -->
+      <div class="text-end mb-3">
+        <a href="/user/forgot-password" class="forgot-link">
+          Forgot Password?
+        </a>
       </div>
 
       <button type="submit" class="btn btn-success w-100">
-  Submit
-</button>
+        Submit
+      </button>
     </form>
 
     <p class="terms">
@@ -159,16 +162,18 @@
       <a href="#">Privacy Policy</a>.
     </p>
 
-<div class="divider">
-    <a href="/" id="google-login-link">Continue With Google</a>
-</div>
+    <div class="divider">
+      <a href="/user/google" class="btn btn-outline-dark w-100 mt-2">
+        Continue with Google
+      </a>
+    </div>
 
     <div class="links">
       <a href="/user/signup">Don't Have an Account?</a> |
       <a href="/">Go To Homepage</a>
     </div>
-  </div>
 
+  </div>
 </section>
 
 <!-- FOOTER -->

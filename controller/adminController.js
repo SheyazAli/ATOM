@@ -50,15 +50,17 @@ exports.postLogin = async (req, res) => {
 
   // 5️⃣ CREATE JWT
   const token = jwt.sign(
-    { id: admin._id },
-    'ATOM_SECRET_KEY',
-    { expiresIn: '1d' }
-  );
-
-  // 6️⃣ STORE TOKEN
+  { adminId: admin._id },
+  process.env.JWT_ADMIN_SECRET,
+  { expiresIn: '1d' }
+);
+  //  STORE COOKIE
   res.cookie('adminToken', token, {
-    httpOnly: true
+    httpOnly: true,
+    secure: false,
+    maxAge: 24 * 60 * 60 * 1000
   });
+
 
   res.redirect('/admin/user');
 };

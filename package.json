@@ -21,6 +21,9 @@
     "jsonwebtoken": "^9.0.3",
     "method-override": "^3.0.0",
     "mongoose": "^9.0.1",
+    "nodemailer": "^7.0.11",
+    "passport": "^0.7.0",
+    "passport-google-oauth20": "^2.0.0",
     "sweetalert2": "^11.26.10",
     "uuid": "^13.0.0"
   }
