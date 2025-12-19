@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Add Product | ATOM</title>
+
+  <!-- Bootstrap -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+
+  <style>
+    body {
+      background: #f6eeec;
+      font-family: "Inter", sans-serif;
+    }
+
+    .content {
+      margin-left: 250px;
+      padding: 40px;
+    }
+
+    .card-box {
+      background: #fff;
+      border-radius: 14px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    .variant-row {
+      background: #faf7f6;
+      padding: 12px;
+      border-radius: 10px;
+      margin-bottom: 10px;
+    }
+
+    .add-variant {
+      cursor: pointer;
+      color: #e0553f;
+      font-weight: 500;
+    }
+
+    .save-btn {
+      background: #e0553f;
+      color: white;
+      border: none;
+      padding: 10px;
+      border-radius: 10px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<%- include('./adminPartials/adminSidebar') %>
+
+<div class="content">
+
+  <h3 class="fw-bold mb-4">Add Product</h3>
+
+  <form action="/admin/products" method="POST" enctype="multipart/form-data">
+
+    <!-- BASIC INFO -->
+    <div class="card-box">
+      <h6 class="fw-semibold mb-3">Basic Information</h6>
+
+      <div class="mb-3">
+        <label class="form-label">Product Title</label>
+        <input type="text" name="title" class="form-control" required>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Description</label>
+        <textarea name="description" class="form-control"></textarea>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Category</label>
+        <select name="category_id" class="form-select" required>
+          <option value="">Select category</option>
+          <% categories.forEach(cat => { %>
+            <option value="<%= cat.category_id %>"><%= cat.name %></option>
+          <% }) %>
+        </select>
+      </div>
+    </div>
+
+    <!-- PRICING -->
+    <div class="card-box">
+      <h6 class="fw-semibold mb-3">Pricing</h6>
+      <div class="row">
+        <div class="col-md-6">
+          <label>Regular Price</label>
+          <input type="number" name="regular_price" class="form-control" required>
+        </div>
+        <div class="col-md-6">
+          <label>Sale Price (optional)</label>
+          <input type="number" name="sale_price" class="form-control">
+        </div>
+      </div>
+    </div>
+
+    <!-- VARIANTS -->
+    <div class="card-box">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h6 class="fw-semibold mb-0">Variants</h6>
+        <span class="add-variant" onclick="addVariant()">
+          <i class="bi bi-plus-circle"></i> Add more
+        </span>
+      </div>
+
+      <div id="variantContainer">
+
+        <!-- DEFAULT VARIANT ROW -->
+        <div class="row g-2 variant-row">
+          <div class="col-md-2">
+            <select name="variants[0][size]" class="form-select">
+              <option>Small</option>
+              <option>Medium</option>
+              <option>Large</option>
+            </select>
+          </div>
+
+          <div class="col-md-2">
+            <select name="variants[0][color]" class="form-select">
+              <option>Black</option>
+              <option>White</option>
+              <option>Red</option>
+            </select>
+          </div>
+
+          <div class="col-md-2">
+            <input type="number" name="variants[0][stock]" class="form-control" placeholder="Quantity" required>
+          </div>
+
+          <div class="col-md-3">
+            <input type="text" name="variants[0][sku]" class="form-control" placeholder="SKU" required>
+          </div>
+
+          <div class="col-md-3">
+            <input type="file" name="variants[0][images][]" class="form-control" multiple>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- STATUS & ACTIONS -->
+    <div class="card-box">
+      <div class="form-check mb-3">
+        <input type="checkbox" name="status" class="form-check-input" checked>
+        <label class="form-check-label">Set as Active</label>
+      </div>
+
+      <button type="submit" class="save-btn w-100">Save Product</button>
+    </div>
+
+  </form>
+</div>
+
+<script>
+let variantIndex = 1;
+
+function addVariant() {
+  const container = document.getElementById('variantContainer');
+
+  const row = document.createElement('div');
+  row.className = 'row g-2 variant-row';
+  row.innerHTML = `
+    <div class="col-md-2">
+      <select name="variants[${variantIndex}][size]" class="form-select">
+        <option>Small</option>
+        <option>Medium</option>
+        <option>Large</option>
+      </select>
+    </div>
+
+    <div class="col-md-2">
+      <select name="variants[${variantIndex}][color]" class="form-select">
+        <option>Black</option>
+        <option>White</option>
+        <option>Red</option>
+      </select>
+    </div>
+
+    <div class="col-md-2">
+      <input type="number" name="variants[${variantIndex}][stock]" class="form-control" placeholder="Quantity" required>
+    </div>
+
+    <div class="col-md-3">
+      <input type="text" name="variants[${variantIndex}][sku]" class="form-control" placeholder="SKU" required>
+    </div>
+
+    <div class="col-md-3">
+      <input type="file" name="variants[${variantIndex}][images][]" class="form-control" multiple>
+    </div>
+  `;
+
+  container.appendChild(row);
+  variantIndex++;
+}
+</script>
+
+</body>
+</html>
