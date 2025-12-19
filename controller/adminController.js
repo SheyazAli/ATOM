@@ -2,6 +2,7 @@ const Admin = require('../db/adminmodel');
 const User = require('../db/user');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const HttpStatus = require('../constants/httpStatus')
 
 /* SHOW LOGIN */
 exports.getLogin = (req, res) => {
@@ -17,14 +18,13 @@ exports.getLogin = (req, res) => {
 exports.postLogin = async (req, res) => {
   const { email, password } = req.body;
 
-  // 1️⃣ CHECK EMPTY FIELDS
+
   if (!email || !password) {
     return res.render('admin/login', {
       error: 'Email and password are required'
     });
   }
 
-  // 2️⃣ CHECK EMAIL FORMAT
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(email)) {
     return res.render('admin/login', {
@@ -32,7 +32,6 @@ exports.postLogin = async (req, res) => {
     });
   }
 
-  // 3️⃣ CHECK ADMIN EXISTS
   const admin = await Admin.findOne({ email });
   if (!admin) {
     return res.render('admin/login', {
@@ -40,7 +39,6 @@ exports.postLogin = async (req, res) => {
     });
   }
 
-  // 4️⃣ CHECK PASSWORD
   const isMatch = await bcrypt.compare(password, admin.password);
   if (!isMatch) {
     return res.render('admin/login', {
@@ -48,13 +46,12 @@ exports.postLogin = async (req, res) => {
     });
   }
 
-  // 5️⃣ CREATE JWT
   const token = jwt.sign(
   { adminId: admin._id },
   process.env.JWT_ADMIN_SECRET,
   { expiresIn: '1d' }
 );
-  //  STORE COOKIE
+
   res.cookie('adminToken', token, {
     httpOnly: true,
     secure: false,
@@ -64,7 +61,6 @@ exports.postLogin = async (req, res) => {
 
   res.redirect('/admin/user');
 };
-
 
 /* DASHBOARD */
 exports.getUsers = async (req, res) => {
@@ -83,7 +79,7 @@ exports.getUsers = async (req, res) => {
     };
 
     const users = await User.find(query)
-      .sort({ created_at: -1 }) // 🔽 latest first
+      .sort({ created_at: -1 }) // 
       .skip((page - 1) * limit)
       .limit(limit);
 
@@ -96,11 +92,12 @@ exports.getUsers = async (req, res) => {
       totalPages: Math.ceil(totalUsers / limit)
     });
 
-  } catch (err) {
-    res.status(500).send('Server Error');
-  }
+  } catch (error) {
+  error.statusCode =
+    error.statusCode || HttpStatus.INTERNAL_SERVER_ERROR;
+  next(error);
+}
 };
-
 
 exports.toggleUserStatus = async (req, res) => {
   try {
@@ -119,8 +116,10 @@ exports.toggleUserStatus = async (req, res) => {
     });
 
   } catch (error) {
-    res.status(500).json({ message: 'Server error' });
-  }
+  error.statusCode =
+    error.statusCode || HttpStatus.INTERNAL_SERVER_ERROR;
+  next(error);
+}
 };
 
 /* LOGOUT */

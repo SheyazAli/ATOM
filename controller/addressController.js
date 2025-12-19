@@ -1,41 +1,52 @@
 const Address = require('../db/address');
+const HttpStatus = require('../constants/httpStatus')
 
-/* ===========================
-   GET ALL ADDRESSES
-=========================== */
 exports.getAddressPage = async (req, res) => {
   try {
-    const addresses = await Address.find({ user_id: req.user._id });
+    const limit = 4;
+    const page = parseInt(req.query.page) || 1;
 
-    console.log('ADDRESSES FOUND 👉', addresses.length);
+    const query = { user_id: req.user._id };
+
+    // Fetch paginated addresses
+    const addresses = await Address.find(query)
+      .sort({ created_at: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit);
+
+    // Count ONLY this user's addresses
+    const totalAddresses = await Address.countDocuments(query);
 
     res.render('user/address', {
       addresses,
+      currentPage: page,
+      totalPages: Math.ceil(totalAddresses / limit),
       activePage: 'address'
     });
+
   } catch (error) {
-    console.error(error);
-    res.status(500).send('Server Error');
-  }
+  console.error('GET ADDRESS PAGE ERROR:', error);
+  error.statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
+  next(error);
+}
 };
 
 
-
-/* ===========================
-   SHOW ADD ADDRESS PAGE
-=========================== */
 exports.getAddAddress = (req, res) => {
-  res.render('user/address-add', {
+  try{
+res.render('user/address-add', {
     address: null,
     isEdit: false,
     activePage: 'address'
   });
+  } catch (error) {
+  error.statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
+  next(error);
+}
+  
 };
 
 
-/* ===========================
-   ADD NEW ADDRESS
-=========================== */
 exports.postAddAddress = async (req, res) => {
   try {
     const {
@@ -54,7 +65,7 @@ exports.postAddAddress = async (req, res) => {
     } = req.body;
 
     const userId = req.user._id; 
-    // If new address is marked default → remove old default
+
     if (is_default === 'on') {
       await Address.updateMany(
         { user_id: userId },
@@ -80,15 +91,13 @@ exports.postAddAddress = async (req, res) => {
 
     res.redirect('/user/address');
   } catch (error) {
-    console.error('ADD ADDRESS ERROR 👉', error);
-    res.status(500).send('Server Error');
-  }
+  console.error('ADD ADDRESS ERROR', error);
+  error.statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
+  next(error);
+}
 };
 
 
-/* ===========================
-   SHOW EDIT ADDRESS PAGE
-=========================== */
 exports.getEditAddress = async (req, res) => {
   try {
     const userId = req.user._id; 
@@ -112,17 +121,13 @@ exports.getEditAddress = async (req, res) => {
 };
 
 
-/* ===========================
-   UPDATE ADDRESS
-=========================== */
 exports.updateAddress = async (req, res) => {
   try {
-    const userId = req.user._id;     // ObjectId
+    const userId = req.user._id;   
     const addressId = req.params.id;
 
     const makeDefault = req.body.is_default === true;
 
-    // If making this address default, unset others
     if (makeDefault) {
       await Address.updateMany(
         { user_id: userId },
@@ -144,7 +149,7 @@ exports.updateAddress = async (req, res) => {
         postal_code: req.body.postal_code,
         email: req.body.email,
         phone_number: req.body.phone_number,
-        is_default: makeDefault   // ✅ THIS IS THE KEY
+        is_default: makeDefault  
       },
       { new: true }
     );
@@ -155,19 +160,18 @@ exports.updateAddress = async (req, res) => {
 
     return res.json({ success: true });
   } catch (error) {
-    console.error('UPDATE ADDRESS ERROR 👉', error);
-    return res.status(500).json({ success: false });
-  }
+  console.error('UPDATE ADDRESS ERROR', error);
+  return res
+    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+    .json({ success: false });
+}
 };
 
 
 
-/* ===========================
-   DELETE ADDRESS
-=========================== */
 exports.deleteAddress = async (req, res) => {
   try {
-    const userId = req.user._id; // ✅ STRING
+    const userId = req.user._id; 
     const addressId = req.params.id;
 
     const deleted = await Address.findOneAndDelete({
@@ -187,10 +191,10 @@ exports.deleteAddress = async (req, res) => {
       message: 'Address deleted successfully'
     });
   } catch (error) {
-    console.error('DELETE ADDRESS ERROR 👉', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error'
-    });
-  }
+  console.error('DELETE ADDRESS ERROR', error);
+  res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+    success: false,
+    message: 'Server error'
+  });
+}
 };

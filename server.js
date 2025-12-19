@@ -1,6 +1,5 @@
 require('dotenv').config();
 const express = require('express');
-const mongoose = require('mongoose');
 const session = require('express-session');
 const cookieParser = require('cookie-parser');
 const methodOverride = require('method-override');
@@ -9,8 +8,9 @@ const userRoutes = require('./routes/userroutes');
 const path = require('path');
 const passport = require('passport');
 require('./config/passport');
-
-
+require('./config/mongoose');
+const notFound = require('./middleware/notFound');
+const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
 const port = process.env.PORT
@@ -39,17 +39,11 @@ app.use(
   })
 );
 
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log("✅ MongoDB connected"))
-  .catch(err => {
-    console.error("❌ MongoDB connection error:", err);
-    process.exit(1);
-  });
-
-
-
 app.use('/admin', adminRoutes);
 app.use('/user', userRoutes);
+
+app.use(notFound);
+app.use(errorHandler);
 
 app.listen(port, () => {
   console.log(`Server running on http://localhost:${port}`);

@@ -30,7 +30,7 @@ router.post('/resend-otp', userController.resendOtp);
 router.get('/profile', verifyUser, userController.getProfile);
 
 router.get('/profile/edit', verifyUser, userController.getEditProfile);
-router.post('/profile/edit', verifyUser, userController.postEditProfile);
+router.post('/profile/edit', verifyUser, userController.postEditProfile); //
 
 router.get('/profile/verify-otp', verifyUser, userController.getProfileOtpPage);
 router.post('/profile/verify-otp', verifyUser, userController.postProfileOtp);
