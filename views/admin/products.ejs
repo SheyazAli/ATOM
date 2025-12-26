@@ -43,12 +43,7 @@
       border-radius: 10px;
       padding: 10px 18px;
       border: none;
-    }
-
-    .status-badge {
-      padding: 4px 12px;
-      border-radius: 20px;
-      font-size: 12px;
+      text-decoration: none;
     }
 
     .product-img {
@@ -56,23 +51,25 @@
       height: 42px;
       border-radius: 8px;
       object-fit: cover;
+      background: #f3f3f3;
     }
 
-    .action-icons i {
-      cursor: pointer;
-      margin: 0 6px;
+    .status-badge {
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
     }
   </style>
 </head>
+
 <body>
 
 <!-- SIDEBAR -->
 <%- include('./adminPartials/adminSidebar') %>
 
-<!-- CONTENT -->
 <div class="content">
 
-  <!-- Header -->
+  <!-- HEADER -->
   <div class="d-flex justify-content-between align-items-center mb-4">
     <h2 class="fw-bold">Products</h2>
     <a href="/admin/products/add" class="add-btn">
@@ -80,29 +77,22 @@
     </a>
   </div>
 
-  <!-- Search & Filter -->
+  <!-- SEARCH -->
   <div class="d-flex gap-3 mb-4">
     <input
       type="text"
       class="form-control search-box w-50"
       placeholder="🔍 Search products..."
       value="<%= search %>"
-    />
-
-    <select class="form-select w-25">
-      <option>All Categories</option>
-      <% categories.forEach(cat => { %>
-        <option value="<%= cat.category_id %>"><%= cat.name %></option>
-      <% }) %>
-    </select>
+    >
   </div>
 
-  <!-- Table -->
+  <!-- TABLE -->
   <div class="table-card">
     <table class="table table-borderless align-middle">
       <thead class="fw-semibold">
         <tr>
-          <th><input type="checkbox"></th>
+          <th>#</th>
           <th>Product</th>
           <th>Category</th>
           <th>Price</th>
@@ -115,57 +105,94 @@
       <tbody>
         <% if (products.length === 0) { %>
           <tr>
-            <td colspan="7" class="text-center text-muted">No products found</td>
+            <td colspan="7" class="text-center text-muted">
+              No products found
+            </td>
           </tr>
         <% } %>
 
-        <% products.forEach(product => { %>
+        <% products.forEach((product, index) => { %>
           <tr>
-            <td><input type="checkbox"></td>
 
+            <td><%= index + 1 %></td>
+
+            <!-- PRODUCT -->
             <td class="d-flex align-items-center gap-3">
-              <img src="<%= product.thumbnail %>" class="product-img">
-              <div>
-                <div class="fw-semibold"><%= product.title %></div>
-              </div>
+              <img
+                src="/uploads/<%= product.thumbnail %>"
+                class="product-img"
+                alt="<%= product.title %>"
+                onerror="this.onerror=null;this.src='/uploads/products/default-product.png';"
+              >
+              <span class="fw-semibold"><%= product.title %></span>
             </td>
 
+            <!-- CATEGORY -->
             <td><%= product.category_name %></td>
 
+            <!-- PRICE -->
             <td>₹ <%= product.sale_price || product.regular_price %></td>
 
+            <!-- STOCK -->
             <td><%= product.totalStock %></td>
 
+            <!-- STATUS BADGE -->
             <td>
-              <span class="status-badge
-                <%= product.status ? 'bg-success text-white' : 'bg-secondary text-white' %>">
+              <span class="status-badge <%= product.status ? 'bg-success text-white' : 'bg-secondary text-white' %>">
                 <%= product.status ? 'Active' : 'Unlisted' %>
               </span>
             </td>
 
-            <td class="text-center action-icons">
-              <i class="bi bi-eye" title="View"></i>
-              <i class="bi bi-pencil-square text-primary"
-                 onclick="editProduct('<%= product.product_id %>')"></i>
-              <i class="bi bi-trash text-danger"
-                 onclick="deleteProduct('<%= product.product_id %>')"></i>
+            <!-- ACTIONS -->
+            <td class="text-center d-flex gap-2 justify-content-center">
+
+              <!-- TOGGLE -->
+              <div class="form-check form-switch">
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  <%= product.status ? 'checked' : '' %>
+                  onchange="toggleProductStatus('<%= product.product_id %>', this.checked)"
+                >
+              </div>
+
+              <!-- EDIT -->
+              <a
+                href="/admin/products/<%= product.product_id %>/edit"
+                class="btn btn-sm btn-outline-primary"
+                title="Edit"
+              >
+                <i class="bi bi-pencil"></i>
+              </a>
+
+              <!-- DELETE -->
+              <button
+                class="btn btn-sm btn-outline-danger"
+                title="Delete"
+                onclick="deleteProduct('<%= product.product_id %>')"
+              >
+                <i class="bi bi-trash"></i>
+              </button>
+
             </td>
           </tr>
         <% }) %>
       </tbody>
     </table>
 
-    <!-- Pagination -->
+    <!-- PAGINATION -->
     <nav class="d-flex justify-content-between align-items-center mt-4">
-      <span class="text-muted">Page <%= currentPage %> of <%= totalPages %></span>
+      <span class="text-muted">
+        Page <%= currentPageNum %> of <%= totalPages %>
+      </span>
 
       <ul class="pagination mb-0">
-        <li class="page-item <%= currentPage === 1 ? 'disabled' : '' %>">
-          <a class="page-link" href="?page=<%= currentPage - 1 %>">Previous</a>
+        <li class="page-item <%= currentPageNum === 1 ? 'disabled' : '' %>">
+          <a class="page-link" href="?page=<%= currentPageNum - 1 %>">Previous</a>
         </li>
 
-        <li class="page-item <%= currentPage === totalPages ? 'disabled' : '' %>">
-          <a class="page-link" href="?page=<%= currentPage + 1 %>">Next</a>
+        <li class="page-item <%= currentPageNum === totalPages ? 'disabled' : '' %>">
+          <a class="page-link" href="?page=<%= currentPageNum + 1 %>">Next</a>
         </li>
       </ul>
     </nav>
@@ -173,24 +200,28 @@
   </div>
 </div>
 
-<!-- Scripts -->
 <script>
-function editProduct(id) {
-  window.location.href = `/admin/products/${id}/edit`;
+function toggleProductStatus(productId, status) {
+  fetch(`/admin/products/${productId}/status`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status })
+  });
 }
 
-function deleteProduct(id) {
+function deleteProduct(productId) {
   Swal.fire({
     title: 'Delete product?',
-    text: 'This action cannot be undone',
+    text: 'This will permanently delete the product',
     icon: 'warning',
     showCancelButton: true,
     confirmButtonColor: '#d33',
     confirmButtonText: 'Delete'
   }).then(result => {
     if (result.isConfirmed) {
-      fetch(`/admin/products/${id}`, { method: 'DELETE' })
-        .then(() => location.reload());
+      fetch(`/admin/products/${productId}`, {
+        method: 'DELETE'
+      }).then(() => location.reload());
     }
   });
 }

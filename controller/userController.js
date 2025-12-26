@@ -2,6 +2,9 @@ const User = require('../db/user');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const Address = require('../db/address');
+const Product = require('../db/productModel');
+const Category = require('../db/categoryModel');
+const Variant = require('../db/variantModel');
 const { sendOtpMail } = require('../Services/emailService')
 const { generateReferralCode } = require('../Services/referralService');
 
@@ -539,6 +542,91 @@ exports.postResetPassword = async (req, res) => {
   res.redirect('/user/profile');
 };
 
+//PRODUCTS
+exports.getProducts = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = 12;
+    const skip = (page - 1) * limit;
+
+    const {
+      search = '',
+      sort = '',
+      category = [],
+      size = [],
+      color = []
+    } = req.query;
+
+    /* ---------------------------
+       BASE QUERY
+    --------------------------- */
+    const productQuery = {
+      status: true,
+      title: { $regex: search, $options: 'i' }
+    };
+
+    if (category.length) {
+      productQuery.category_id = { $in: [].concat(category) };
+    }
+
+    /* ---------------------------
+       SORTING
+    --------------------------- */
+    let sortOption = {};
+    if (sort === 'priceLow') sortOption.sale_price = 1;
+    if (sort === 'priceHigh') sortOption.sale_price = -1;
+    if (sort === 'az') sortOption.title = 1;
+    if (sort === 'za') sortOption.title = -1;
+
+    /* ---------------------------
+       PRODUCTS
+    --------------------------- */
+    const products = await Product.find(productQuery)
+      .sort(sortOption)
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    for (const product of products) {
+      const categoryDoc = await Category.findOne({
+        category_id: product.category_id
+      }).lean();
+
+      product.category_name = categoryDoc ? categoryDoc.name : '—';
+
+      const variantQuery = { product_id: product.product_id };
+
+      if (size.length) variantQuery.size = { $in: [].concat(size) };
+      if (color.length) variantQuery.color = { $in: [].concat(color) };
+
+      const variants = await Variant.find(variantQuery).lean();
+
+      product.totalStock = variants.reduce((s, v) => s + v.stock, 0);
+      product.colorsCount = [...new Set(variants.map(v => v.color))].length;
+    }
+
+    const totalProducts = await Product.countDocuments(productQuery);
+    const totalPages = Math.ceil(totalProducts / limit);
+
+    const categories = await Category.find({ status: true }).lean();
+
+    res.render('user/products', {
+      products,
+      categories,
+      currentPageNum: page,
+      totalPages,
+      search,
+      sort,
+      category: [].concat(category),
+      size: [].concat(size),
+      color: [].concat(color)
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('Server error');
+  }
+};
 
 
 exports.logout = (req, res) => {

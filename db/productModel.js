@@ -38,9 +38,14 @@ const productSchema = new mongoose.Schema(
       default: 0
     },
 
+    thumbnail: {
+      type: String,
+      default: null
+    },
+
     status: {
       type: Boolean,
-      default: true // active / inactive
+      default: true
     }
   },
   {

@@ -6,6 +6,10 @@ const Category = require('../db/categoryModel');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const HttpStatus = require('../constants/httpStatus')
+const sharp = require('sharp');
+const fs = require('fs');
+const path = require('path');
+
 
 /* SHOW LOGIN */
 exports.getLogin = (req, res) => {
@@ -62,11 +66,12 @@ exports.postLogin = async (req, res) => {
   });
 
 
-  res.redirect('/admin/user');
+  res.redirect('/admin/products');
 };
 
 /*PRODUCT*/
-exports.getProducts = async (req, res, next) => {
+
+exports.getProducts = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = 8;
@@ -84,14 +89,15 @@ exports.getProducts = async (req, res, next) => {
       .lean();
 
     for (const product of products) {
-      // category
+
+      /* ✅ CORRECT CATEGORY LOOKUP */
       const category = await Category.findOne({
         category_id: product.category_id
       }).lean();
 
       product.category_name = category ? category.name : '—';
 
-      // variants
+      /* ✅ STOCK */
       const variants = await Variant.find({
         product_id: product.product_id
       }).lean();
@@ -101,39 +107,45 @@ exports.getProducts = async (req, res, next) => {
         0
       );
 
+      /* ✅ THUMBNAIL SAFETY */
       product.thumbnail =
-        variants[0]?.images?.[0] || '/images/placeholder.png';
+        product.thumbnail || 'products/default-product.png';
     }
 
     const totalProducts = await Product.countDocuments(query);
     const totalPages = Math.ceil(totalProducts / limit);
 
-    res.render('admin/products', {
+    return res.render('admin/products', {
       products,
-      currentPage: page,
+      currentPage: 'products',
+      currentPageNum: page,
       totalPages,
       search
     });
 
   } catch (error) {
-    error.statusCode = STATUS.INTERNAL_SERVER_ERROR;
-    next(error);
+    console.error('GET PRODUCTS ERROR:', error);
+    return res.redirect('/admin');
   }
 };
-exports.getAddProducts = async (req, res, next) => {
+
+
+exports.getAddProducts = async (req, res) => {
   try {
     const categories = await Category.find({ status: true }).lean();
 
     res.render('admin/add-product', {
-      categories,currentPage: 'products'
+      categories,
+      currentPage: 'products'
     });
 
   } catch (error) {
-    error.statusCode = STATUS.INTERNAL_SERVER_ERROR;
+    error.statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
     next(error);
   }
 };
-exports.postAddProduct = async (req, res, next) => {
+
+exports.postAddProduct = async (req, res) => {
   try {
     const {
       title,
@@ -145,6 +157,53 @@ exports.postAddProduct = async (req, res, next) => {
       variants
     } = req.body;
 
+    /* -------------------------------
+       THUMBNAIL (FROM BUFFER)
+    -------------------------------- */
+    let thumbnail = null;
+
+    if (req.files?.thumbnail?.[0]) {
+      const thumb = req.files.thumbnail[0];
+
+      const thumbName = `thumb-${Date.now()}.webp`;
+      const thumbPath = path.join('uploads/products', thumbName);
+
+      await sharp(thumb.buffer)
+        .resize(600, 600, { fit: 'cover' })
+        .toFormat('webp')
+        .toFile(thumbPath);
+
+      thumbnail = `products/${thumbName}`;
+    }
+
+    /* -------------------------------
+       VARIANT IMAGES (FROM BUFFER)
+    -------------------------------- */
+    const variantFiles = req.files?.variantImages || [];
+
+    if (variantFiles.length < 3) {
+      return res.status(400).render('admin/add-product', {
+        error: 'Each variant must have at least 3 images'
+      });
+    }
+
+    const processedVariantImages = [];
+
+    for (const file of variantFiles) {
+      const name = `var-${Date.now()}-${Math.round(Math.random() * 1e9)}.webp`;
+      const outPath = path.join('uploads/products', name);
+
+      await sharp(file.buffer)
+        .resize(800, 800, { fit: 'cover' })
+        .toFormat('webp')
+        .toFile(outPath);
+
+      processedVariantImages.push(`products/${name}`);
+    }
+
+    /* -------------------------------
+       CREATE PRODUCT
+    -------------------------------- */
     const product = await Product.create({
       title,
       description,
@@ -154,9 +213,13 @@ exports.postAddProduct = async (req, res, next) => {
       discount_percentage: sale_price
         ? Math.round(((regular_price - sale_price) / regular_price) * 100)
         : 0,
-      status: status === 'on'
+      status: status === 'on',
+      thumbnail
     });
 
+    /* -------------------------------
+       CREATE VARIANTS
+    -------------------------------- */
     if (variants && Array.isArray(variants)) {
       for (let i = 0; i < variants.length; i++) {
         const v = variants[i];
@@ -167,20 +230,20 @@ exports.postAddProduct = async (req, res, next) => {
           color: v.color,
           stock: Number(v.stock),
           sku: v.sku,
-          images:
-            req.files?.[`variants[${i}][images]`]?.map(f => f.filename) || []
+          images: processedVariantImages
         });
       }
     }
 
-    res.redirect('/admin/products',{currentPage: 'products'});
+    res.redirect('/admin/products');
 
   } catch (error) {
-    error.statusCode = STATUS.INTERNAL_SERVER_ERROR;
-    next(error);
+    console.error('ADD PRODUCT ERROR:', error);
+    res.status(500).redirect('/admin/products/add');
   }
 };
-exports.getEditProduct = async (req, res, next) => {
+
+exports.getEditProduct = async (req, res) => {
   try {
     const { productId } = req.params;
 
@@ -206,13 +269,14 @@ exports.getEditProduct = async (req, res, next) => {
     });
 
   } catch (error) {
-    error.statusCode = STATUS.INTERNAL_SERVER_ERROR;
+    error.statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
     next(error);
   }
 };
-exports.postEditProduct = async (req, res, next) => {
+exports.postEditProduct = async (req, res) => {
   try {
     const { productId } = req.params;
+
     const {
       title,
       description,
@@ -223,6 +287,9 @@ exports.postEditProduct = async (req, res, next) => {
       variants
     } = req.body;
 
+    /* -----------------------------
+       UPDATE PRODUCT
+    ------------------------------ */
     await Product.findOneAndUpdate(
       { product_id: productId },
       {
@@ -238,10 +305,14 @@ exports.postEditProduct = async (req, res, next) => {
       }
     );
 
-    // remove old variants
+    /* -----------------------------
+       REMOVE OLD VARIANTS
+    ------------------------------ */
     await Variant.deleteMany({ product_id: productId });
 
-    // re-create variants
+    /* -----------------------------
+       CREATE NEW VARIANTS
+    ------------------------------ */
     if (variants && Array.isArray(variants)) {
       for (let i = 0; i < variants.length; i++) {
         const v = variants[i];
@@ -252,46 +323,173 @@ exports.postEditProduct = async (req, res, next) => {
           color: v.color,
           stock: Number(v.stock),
           sku: v.sku,
-          images:
-            req.files?.[`variants[${i}][images]`]?.map(f => f.filename) || []
+          status: true,
+          images: req.files?.variantImages?.map(f => f.filename) || []
         });
       }
     }
 
-    res.redirect('/admin/products',{currentPage: 'products'});
+    /* -----------------------------
+       REDIRECT (NO OBJECT HERE)
+    ------------------------------ */
+    return res.redirect('/admin/products');
 
   } catch (error) {
-    error.statusCode = STATUS.INTERNAL_SERVER_ERROR;
-    next(error);
+    console.error('POST EDIT PRODUCT ERROR:', error);
+    return res.redirect('/admin/products');
   }
 };
-exports.deleteProduct = async (req, res, next) => {
+
+exports.deleteProduct = async (req, res) => {
   try {
     const { productId } = req.params;
 
-    const product = await Product.findOneAndUpdate(
-      { product_id: productId },
-      { status: false }
-    );
+    await Product.deleteOne({ product_id: productId });
+    await Variant.deleteMany({ product_id: productId });
 
-    if (!product) {
-      return res.status(STATUS.NOT_FOUND).json({
-        success: false,
-        message: 'Product not found'
-      });
-    }
+    return res.json({ success: true });
 
-    res.status(STATUS.OK).json({
-      success: true,
-      message: 'Product marked as unavailable'
-    });
-
-  } catch (error) {
-    error.statusCode = STATUS.INTERNAL_SERVER_ERROR;
-    next(error);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ success: false });
   }
 };
 
+exports.toggleVariantStatus = async (req, res) => {
+  try {
+    const variant = await Variant.findById(req.params.variantId);
+
+    variant.status = !variant.status;
+    await variant.save();
+
+    res.json({ success: true });
+
+  } catch (err) {
+    res.status(500).json({ success: false });
+  }
+};
+
+exports.toggleProductStatus = async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const { status } = req.body;
+
+    await Product.findOneAndUpdate(
+      { product_id: productId },
+      { status }
+    );
+
+    return res.json({ success: true });
+
+  } catch (error) {
+    console.error('TOGGLE PRODUCT STATUS ERROR:', error);
+    return res.status(500).json({ success: false });
+  }
+};
+
+exports.deleteVariant = async (req, res) => {
+  try {
+    await Variant.findByIdAndDelete(req.params.variantId);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false });
+  }
+};
+
+/*CAT*/
+exports.getCategories = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = 8;
+    const skip = (page - 1) * limit;
+    const search = req.query.search || '';
+
+    // 🔍 search by category name
+    const query = {
+      name: { $regex: search, $options: 'i' }
+    };
+
+    const categories = await Category.find(query)
+      .sort({ created_at: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    // 🧮 count products per category
+    for (const category of categories) {
+      category.productCount = await Product.countDocuments({
+        category_id: category.category_id
+      });
+    }
+
+    const totalCategories = await Category.countDocuments(query);
+    const totalPages = Math.ceil(totalCategories / limit);
+
+    return res.render('admin/categories', {
+      categories,
+      search,
+      currentPage: 'categories',
+      currentPageNum: page,
+      totalPages
+    });
+
+  } catch (error) {
+    console.error('GET CATEGORIES ERROR:', error);
+    return res.redirect('/admin');
+  }
+};
+exports.getEditCategory = async (req, res) => {
+  const { categoryId } = req.params;
+
+  const category = categoryId
+    ? await Category.findOne({ category_id: categoryId }).lean()
+    : null;
+
+  const products = await Product.find({ status: true }).lean();
+
+  const assignedProducts = category
+    ? products
+        .filter(p => p.category_id === category.category_id)
+        .map(p => p.product_id)
+    : [];
+
+  res.render('admin/edit-category', {
+    category,
+    products,
+    assignedProducts,
+    currentPage: 'categories'
+  });
+};
+exports.saveCategory = async (req, res) => {
+  const { name, products = [] } = req.body;
+  const { categoryId } = req.params;
+
+  let category;
+
+  if (categoryId) {
+    category = await Category.findOneAndUpdate(
+      { category_id: categoryId },
+      { name },
+      { new: true }
+    );
+  } else {
+    category = await Category.create({ name });
+  }
+
+  // Remove category from all products
+  await Product.updateMany(
+    { category_id: category.category_id },
+    { $set: { category_id: null } }
+  );
+
+  // Assign selected products
+  await Product.updateMany(
+    { product_id: { $in: products } },
+    { $set: { category_id: category.category_id } }
+  );
+
+  res.redirect('/admin/categories');
+};
 
 /*USER*/
 exports.getUsers = async (req, res) => {
