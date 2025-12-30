@@ -487,48 +487,45 @@ exports.getEditCategory = async (req, res) => {
     ? await Category.findOne({ category_id: categoryId }).lean()
     : null;
 
-  const products = await Product.find({ status: true }).lean();
-
-  const assignedProducts = category
-    ? products
-        .filter(p => p.category_id === category.category_id)
-        .map(p => p.product_id)
-    : [];
-
   res.render('admin/edit-category', {
     category,
-    products,
-    assignedProducts,
+    error: null,
     currentPage: 'categories'
   });
 };
 exports.saveCategory = async (req, res) => {
-  const { name, products = [] } = req.body;
+  const { name } = req.body;
   const { categoryId } = req.params;
 
-  let category;
+  // Normalize name
+  const trimmedName = name.trim();
 
-  if (categoryId) {
-    category = await Category.findOneAndUpdate(
-      { category_id: categoryId },
-      { name },
-      { new: true }
-    );
-  } else {
-    category = await Category.create({ name });
+  // Check duplicate (exclude self in edit)
+  const duplicate = await Category.findOne({
+    name: { $regex: `^${trimmedName}$`, $options: 'i' },
+    ...(categoryId && { category_id: { $ne: categoryId } })
+  });
+
+  if (duplicate) {
+    const category = categoryId
+      ? await Category.findOne({ category_id: categoryId }).lean()
+      : null;
+
+    return res.render('admin/edit-category', {
+      category,
+      error: 'Category name already exists',
+      currentPage: 'categories'
+    });
   }
 
-  // Remove category from all products
-  await Product.updateMany(
-    { category_id: category.category_id },
-    { $set: { category_id: null } }
-  );
-
-  // Assign selected products
-  await Product.updateMany(
-    { product_id: { $in: products } },
-    { $set: { category_id: category.category_id } }
-  );
+  if (categoryId) {
+    await Category.findOneAndUpdate(
+      { category_id: categoryId },
+      { name: trimmedName }
+    );
+  } else {
+    await Category.create({ name: trimmedName });
+  }
 
   res.redirect('/admin/categories');
 };
