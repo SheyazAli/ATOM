@@ -71,23 +71,28 @@ exports.postLogin = async (req, res) => {
 
 /*PRODUCT*/
 
-exports.getProducts = async (req, res) => {
+exports.getProducts = async (req, res, next) => {
   try {
-    const page = parseInt(req.query.page) || 1;
+    const page = parseInt(req.query.page, 10) || 1;
     const limit = 8;
     const skip = (page - 1) * limit;
-    const search = req.query.search || '';
+    const search = (req.query.search || '').trim();
 
-    const query = {
-      title: { $regex: search, $options: 'i' }
-    };
+    /*  Build query safely */
+    const query = {};
 
+    if (search) {
+      query.title = { $regex: search, $options: 'i' };
+    }
+
+    /*  Fetch products */
     const products = await Product.find(query)
       .sort({ created_at: -1 })
       .skip(skip)
       .limit(limit)
       .lean();
 
+    /*  Enrich products */
     for (const product of products) {
 
       const category = await Category.findOne({
@@ -109,8 +114,9 @@ exports.getProducts = async (req, res) => {
         product.thumbnail || 'products/default-product.png';
     }
 
+    /*  Pagination */
     const totalProducts = await Product.countDocuments(query);
-    const totalPages = Math.ceil(totalProducts / limit);
+    const totalPages = Math.ceil(totalProducts / limit) || 1;
 
     return res.render('admin/products', {
       products,
@@ -122,8 +128,8 @@ exports.getProducts = async (req, res) => {
 
   } catch (error) {
     error.statusCode =
-    error.statusCode || HttpStatus.INTERNAL_SERVER_ERROR;
-  next(error);
+      error.statusCode || HttpStatus.INTERNAL_SERVER_ERROR;
+    next(error);
   }
 };
 

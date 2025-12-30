@@ -64,7 +64,6 @@
 
 <body>
 
-<!-- SIDEBAR -->
 <%- include('./adminPartials/adminSidebar') %>
 
 <div class="content">
@@ -78,13 +77,29 @@
   </div>
 
   <!-- SEARCH -->
-  <div class="d-flex gap-3 mb-4">
+  <div class="d-flex gap-2 mb-4 w-75">
     <input
       type="text"
-      class="form-control search-box w-50"
+      id="searchInput"
+      class="form-control search-box"
       placeholder="🔍 Search products..."
       value="<%= search %>"
+      onkeydown="if(event.key==='Enter') searchProduct()"
     >
+
+    <button
+      class="btn btn-dark px-4"
+      onclick="searchProduct()"
+    >
+      Search
+    </button>
+
+    <button
+      class="btn btn-outline-secondary px-4"
+      onclick="clearSearch()"
+    >
+      Clear
+    </button>
   </div>
 
   <!-- TABLE -->
@@ -116,7 +131,6 @@
 
             <td><%= index + 1 %></td>
 
-            <!-- PRODUCT -->
             <td class="d-flex align-items-center gap-3">
               <img
                 src="/uploads/<%= product.thumbnail %>"
@@ -127,26 +141,20 @@
               <span class="fw-semibold"><%= product.title %></span>
             </td>
 
-            <!-- CATEGORY -->
             <td><%= product.category_name %></td>
 
-            <!-- PRICE -->
             <td>₹ <%= product.sale_price || product.regular_price %></td>
 
-            <!-- STOCK -->
             <td><%= product.totalStock %></td>
 
-            <!-- STATUS BADGE -->
             <td>
               <span class="status-badge <%= product.status ? 'bg-success text-white' : 'bg-secondary text-white' %>">
                 <%= product.status ? 'Active' : 'Unlisted' %>
               </span>
             </td>
 
-            <!-- ACTIONS -->
             <td class="text-center d-flex gap-2 justify-content-center">
 
-              <!-- TOGGLE -->
               <div class="form-check form-switch">
                 <input
                   class="form-check-input"
@@ -156,7 +164,6 @@
                 >
               </div>
 
-              <!-- EDIT -->
               <a
                 href="/admin/products/<%= product.product_id %>/edit"
                 class="btn btn-sm btn-outline-primary"
@@ -165,7 +172,6 @@
                 <i class="bi bi-pencil"></i>
               </a>
 
-              <!-- DELETE -->
               <button
                 class="btn btn-sm btn-outline-danger"
                 title="Delete"
@@ -188,11 +194,11 @@
 
       <ul class="pagination mb-0">
         <li class="page-item <%= currentPageNum === 1 ? 'disabled' : '' %>">
-          <a class="page-link" href="?page=<%= currentPageNum - 1 %>">Previous</a>
+          <a class="page-link" href="?page=<%= currentPageNum - 1 %>&search=<%= search %>">Previous</a>
         </li>
 
         <li class="page-item <%= currentPageNum === totalPages ? 'disabled' : '' %>">
-          <a class="page-link" href="?page=<%= currentPageNum + 1 %>">Next</a>
+          <a class="page-link" href="?page=<%= currentPageNum + 1 %>&search=<%= search %>">Next</a>
         </li>
       </ul>
     </nav>
@@ -201,6 +207,17 @@
 </div>
 
 <script>
+function searchProduct() {
+  const value = document.getElementById('searchInput').value.trim();
+  window.location.href = value
+    ? `/admin/products?search=${encodeURIComponent(value)}`
+    : '/admin/products';
+}
+
+function clearSearch() {
+  window.location.href = '/admin/products';
+}
+
 function toggleProductStatus(productId, newStatus) {
 
   Swal.fire({
@@ -255,9 +272,8 @@ function deleteProduct(productId) {
     confirmButtonText: 'Delete'
   }).then(result => {
     if (result.isConfirmed) {
-      fetch(`/admin/products/${productId}`, {
-        method: 'DELETE'
-      }).then(() => location.reload());
+      fetch(`/admin/products/${productId}`, { method: 'DELETE' })
+        .then(() => location.reload());
     }
   });
 }
