@@ -48,7 +48,7 @@ router.delete('/address/:id', verifyUser, addressController.deleteAddress);
 
 
 router.get('/products', userController.getProducts);
-
+router.get('/product/:id', userController.getProductDetails)
 
 router.get('/logout',userController.logout)
 

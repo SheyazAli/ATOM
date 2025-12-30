@@ -90,14 +90,12 @@ exports.getProducts = async (req, res) => {
 
     for (const product of products) {
 
-      /* ✅ CORRECT CATEGORY LOOKUP */
       const category = await Category.findOne({
         category_id: product.category_id
       }).lean();
 
       product.category_name = category ? category.name : '—';
 
-      /* ✅ STOCK */
       const variants = await Variant.find({
         product_id: product.product_id
       }).lean();
@@ -107,7 +105,6 @@ exports.getProducts = async (req, res) => {
         0
       );
 
-      /* ✅ THUMBNAIL SAFETY */
       product.thumbnail =
         product.thumbnail || 'products/default-product.png';
     }
@@ -124,8 +121,9 @@ exports.getProducts = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('GET PRODUCTS ERROR:', error);
-    return res.redirect('/admin');
+    error.statusCode =
+    error.statusCode || HttpStatus.INTERNAL_SERVER_ERROR;
+  next(error);
   }
 };
 
@@ -157,53 +155,21 @@ exports.postAddProduct = async (req, res) => {
       variants
     } = req.body;
 
-    /* -------------------------------
-       THUMBNAIL (FROM BUFFER)
-    -------------------------------- */
     let thumbnail = null;
 
-    if (req.files?.thumbnail?.[0]) {
-      const thumb = req.files.thumbnail[0];
+    const thumbFile = req.files.find(f => f.fieldname === 'thumbnail');
+    if (thumbFile) {
+      const name = `thumb-${Date.now()}.webp`;
 
-      const thumbName = `thumb-${Date.now()}.webp`;
-      const thumbPath = path.join('uploads/products', thumbName);
-
-      await sharp(thumb.buffer)
-        .resize(600, 600, { fit: 'cover' })
+      await sharp(thumbFile.buffer)
+        .resize(600, 600)     
         .toFormat('webp')
-        .toFile(thumbPath);
+        .toFile(path.join('uploads/products', name));
 
-      thumbnail = `products/${thumbName}`;
+      thumbnail = `products/${name}`;
     }
 
-    /* -------------------------------
-       VARIANT IMAGES (FROM BUFFER)
-    -------------------------------- */
-    const variantFiles = req.files?.variantImages || [];
-
-    if (variantFiles.length < 3) {
-      return res.status(400).render('admin/add-product', {
-        error: 'Each variant must have at least 3 images'
-      });
-    }
-
-    const processedVariantImages = [];
-
-    for (const file of variantFiles) {
-      const name = `var-${Date.now()}-${Math.round(Math.random() * 1e9)}.webp`;
-      const outPath = path.join('uploads/products', name);
-
-      await sharp(file.buffer)
-        .resize(800, 800, { fit: 'cover' })
-        .toFormat('webp')
-        .toFile(outPath);
-
-      processedVariantImages.push(`products/${name}`);
-    }
-
-    /* -------------------------------
-       CREATE PRODUCT
-    -------------------------------- */
+    /* CREATE PRODUCT */
     const product = await Product.create({
       title,
       description,
@@ -217,29 +183,55 @@ exports.postAddProduct = async (req, res) => {
       thumbnail
     });
 
-    /* -------------------------------
-       CREATE VARIANTS
-    -------------------------------- */
-    if (variants && Array.isArray(variants)) {
-      for (let i = 0; i < variants.length; i++) {
-        const v = variants[i];
+    /* VARIANTS */
+    for (const key in variants) {
+      const v = variants[key];
+
+      const imageFiles = req.files.filter(
+        f => f.fieldname === `variants[${key}][images]`
+      );
+
+      if (imageFiles.length < 3) {
+        throw new Error('Each color must have at least 3 images');
+      }
+
+      const images = [];
+
+      for (const file of imageFiles) {
+        const name = `var-${Date.now()}-${Math.round(Math.random() * 1e9)}.webp`;
+
+        await sharp(file.buffer)
+          .resize(800, 800, {
+            fit: 'inside',     
+            withoutEnlargement: true    
+          })
+          .toFormat('webp')
+          .toFile(path.join('uploads/products', name));
+
+        images.push(`products/${name}`);
+      }
+
+      /*  CREATE SIZE-LEVEL VARIANTS */
+      for (const sizeKey in v.sizes) {
+        const stock = Number(v.sizes[sizeKey].stock || 0);
 
         await Variant.create({
           product_id: product.product_id,
-          size: v.size,
           color: v.color,
-          stock: Number(v.stock),
-          sku: v.sku,
-          images: processedVariantImages
+          size: sizeKey,
+          stock,
+          sku: `${product.product_id}-${v.color}-${sizeKey}`,
+          images
         });
       }
     }
 
-    res.redirect('/admin/products');
+    /*  DONE */
+    return res.redirect('/admin/products');
 
   } catch (error) {
     console.error('ADD PRODUCT ERROR:', error);
-    res.status(500).redirect('/admin/products/add');
+    return res.redirect('/admin/products/add');
   }
 };
 
@@ -247,6 +239,7 @@ exports.getEditProduct = async (req, res) => {
   try {
     const { productId } = req.params;
 
+    /*  FETCH PRODUCT */
     const product = await Product.findOne({
       product_id: productId
     }).lean();
@@ -255,28 +248,46 @@ exports.getEditProduct = async (req, res) => {
       return res.redirect('/admin/products');
     }
 
+    /*  FETCH VARIANTS (SIZE LEVEL) */
     const variants = await Variant.find({
       product_id: productId
     }).lean();
 
+    /* FETCH CATEGORIES */
     const categories = await Category.find({ status: true }).lean();
 
+    /* GROUP VARIANTS BY COLOR*/
+    const colorVariants = {};
+
+    variants.forEach(v => {
+      if (!colorVariants[v.color]) {
+        colorVariants[v.color] = {
+          color: v.color,
+          images: v.images || [],
+          sizes: {}
+        };
+      }
+
+      // size → stock mapping
+      colorVariants[v.color].sizes[v.size] = v.stock;
+    });
+
+    /* RENDER EDIT PAGE */
     res.render('admin/edit-product', {
       product,
-      variants,
       categories,
+      colorVariants,          
       currentPage: 'products'
     });
 
   } catch (error) {
-    error.statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
-    next(error);
+    console.error('GET EDIT PRODUCT ERROR:', error);
+    return res.redirect('/admin/products');
   }
 };
 exports.postEditProduct = async (req, res) => {
   try {
     const { productId } = req.params;
-
     const {
       title,
       description,
@@ -287,9 +298,7 @@ exports.postEditProduct = async (req, res) => {
       variants
     } = req.body;
 
-    /* -----------------------------
-       UPDATE PRODUCT
-    ------------------------------ */
+    /* UPDATE PRODUCT */
     await Product.findOneAndUpdate(
       { product_id: productId },
       {
@@ -305,40 +314,67 @@ exports.postEditProduct = async (req, res) => {
       }
     );
 
-    /* -----------------------------
-       REMOVE OLD VARIANTS
-    ------------------------------ */
+    /* DELETE OLD VARIANTS */
     await Variant.deleteMany({ product_id: productId });
 
-    /* -----------------------------
-       CREATE NEW VARIANTS
-    ------------------------------ */
-    if (variants && Array.isArray(variants)) {
-      for (let i = 0; i < variants.length; i++) {
-        const v = variants[i];
+    /* RECREATE VARIANTS */
+    for (const key in variants) {
+      const v = variants[key];
+
+      /* NEW IMAGES (IF ANY) */
+      const imageFiles = req.files.filter(
+        f => f.fieldname === `variants[${key}][images]`
+      );
+
+      let images = [];
+      if (imageFiles.length) {
+        for (const file of imageFiles) {
+          const name = `var-${Date.now()}-${Math.round(Math.random() * 1e9)}.webp`;
+
+          await sharp(file.buffer)
+            .resize(800, 800, {
+              fit: 'inside',
+              withoutEnlargement: true
+            })
+            .toFormat('webp')
+            .toFile(path.join('uploads/products', name));
+
+          images.push(`products/${name}`);
+        }
+      }
+
+      else if (v.existingImages) {
+        images = Array.isArray(v.existingImages)
+          ? v.existingImages
+          : [v.existingImages];
+      }
+
+      else {
+        throw new Error(`Images missing for color ${v.color}`);
+      }
+      for (const sizeKey in v.sizes) {
+        const stock = Number(v.sizes[sizeKey].stock || 0);
 
         await Variant.create({
           product_id: productId,
-          size: v.size,
           color: v.color,
-          stock: Number(v.stock),
-          sku: v.sku,
-          status: true,
-          images: req.files?.variantImages?.map(f => f.filename) || []
+          size: sizeKey,
+          stock,
+          sku: `${productId}-${v.color}-${sizeKey}`,
+          images,
+          status: true
         });
       }
     }
 
-    /* -----------------------------
-       REDIRECT (NO OBJECT HERE)
-    ------------------------------ */
     return res.redirect('/admin/products');
 
   } catch (error) {
-    console.error('POST EDIT PRODUCT ERROR:', error);
+    console.error('EDIT PRODUCT ERROR:', error);
     return res.redirect('/admin/products');
   }
 };
+
 
 exports.deleteProduct = async (req, res) => {
   try {

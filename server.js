@@ -9,12 +9,13 @@ const path = require('path');
 const passport = require('passport');
 require('./config/passport');
 require('./config/mongoose');
-const notFound = require('./middleware/notFound');
 const errorHandler = require('./middleware/errorHandler');
+const navbarMiddleware = require('./middleware/navbarMiddleware');
+
 
 const app = express();
 const port = process.env.PORT
-
+app.use(navbarMiddleware);
 app.use(passport.initialize());
 
 app.use(express.urlencoded({ extended: true }));
@@ -41,9 +42,7 @@ app.use(
 
 app.use('/admin', adminRoutes);
 app.use('/user', userRoutes);
-
-app.use(notFound);
-app.use(errorHandler);
+app.use(require('./middleware/errorHandler'));
 
 app.listen(port, () => {
   console.log(`Server running on http://localhost:${port}`);

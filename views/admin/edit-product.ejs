@@ -4,68 +4,29 @@
   <meta charset="UTF-8" />
   <title>Edit Product | ATOM</title>
 
-  <!-- Bootstrap -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
   <style>
-    body {
-      background: #f6eeec;
-      font-family: "Inter", sans-serif;
-    }
-
-    .content {
-      margin-left: 250px;
-      padding: 40px;
-    }
-
-    .card-box {
-      background: #fff;
-      border-radius: 14px;
-      padding: 20px;
-      margin-bottom: 20px;
-    }
-
-    .variant-row {
-      background: #faf7f6;
-      padding: 12px;
-      border-radius: 10px;
-      margin-bottom: 12px;
-    }
-
+    body { background:#f6eeec; font-family:Inter,sans-serif; }
+    .content { margin-left:250px; padding:40px; }
+    .card-box { background:#fff; border-radius:14px; padding:20px; margin-bottom:20px; }
+    .variant-row { background:#faf7f6; padding:15px; border-radius:10px; margin-bottom:15px; }
     .variant-images img {
-      width: 46px;
-      height: 46px;
-      object-fit: cover;
-      border-radius: 6px;
-      margin-right: 6px;
-      border: 1px solid #ddd;
+      width:46px; height:46px; object-fit:cover;
+      border-radius:6px; margin-right:6px; border:1px solid #ddd;
     }
-
-    .add-variant {
-      cursor: pointer;
-      color: #e0553f;
-      font-weight: 500;
-    }
-
-    .save-btn {
-      background: #e0553f;
-      color: white;
-      border: none;
-      padding: 12px;
-      border-radius: 10px;
-      font-weight: 500;
-    }
+    .add-variant { cursor:pointer; color:#e0553f; font-weight:500; }
+    .save-btn { background:#e0553f; color:#fff; border:none; padding:12px; border-radius:10px; }
+    small.hint { font-size:12px; color:#6c757d; }
   </style>
 </head>
+
 <body>
 
-<!-- SIDEBAR -->
 <%- include('./adminPartials/adminSidebar') %>
 
 <div class="content">
-
   <h3 class="fw-bold mb-4">Edit Product</h3>
 
   <form
@@ -78,35 +39,17 @@
     <div class="card-box">
       <h6 class="fw-semibold mb-3">Basic Information</h6>
 
-      <div class="mb-3">
-        <label class="form-label">Product Title</label>
-        <input
-          type="text"
-          name="title"
-          class="form-control"
-          value="<%= product.title %>"
-          required
-        >
-      </div>
+      <input class="form-control mb-3" name="title" value="<%= product.title %>" required>
+      <textarea class="form-control mb-3" name="description"><%= product.description %></textarea>
 
-      <div class="mb-3">
-        <label class="form-label">Description</label>
-        <textarea name="description" class="form-control"><%= product.description %></textarea>
-      </div>
-
-      <div class="mb-3">
-        <label class="form-label">Category</label>
-        <select name="category_id" class="form-select">
-          <% categories.forEach(cat => { %>
-            <option
-              value="<%= cat.category_id %>"
-              <%= cat.category_id === product.category_id ? 'selected' : '' %>
-            >
-              <%= cat.name %>
-            </option>
-          <% }) %>
-        </select>
-      </div>
+      <select name="category_id" class="form-select">
+        <% categories.forEach(cat => { %>
+          <option value="<%= cat.category_id %>"
+            <%= cat.category_id === product.category_id ? 'selected' : '' %>>
+            <%= cat.name %>
+          </option>
+        <% }) %>
+      </select>
     </div>
 
     <!-- PRICING -->
@@ -114,23 +57,12 @@
       <h6 class="fw-semibold mb-3">Pricing</h6>
       <div class="row">
         <div class="col-md-6">
-          <label>Regular Price</label>
-          <input
-            type="number"
-            name="regular_price"
-            class="form-control"
-            value="<%= product.regular_price %>"
-            required
-          >
+          <input class="form-control" name="regular_price" type="number"
+                 value="<%= product.regular_price %>" required>
         </div>
         <div class="col-md-6">
-          <label>Sale Price</label>
-          <input
-            type="number"
-            name="sale_price"
-            class="form-control"
-            value="<%= product.sale_price || '' %>"
-          >
+          <input class="form-control" name="sale_price" type="number"
+                 value="<%= product.sale_price || '' %>">
         </div>
       </div>
     </div>
@@ -138,173 +70,107 @@
     <!-- VARIANTS -->
     <div class="card-box">
       <div class="d-flex justify-content-between align-items-center mb-3">
-        <h6 class="fw-semibold mb-0">Variants</h6>
-        <span class="add-variant" onclick="addVariant()">
-          <i class="bi bi-plus-circle"></i> Add variant
+        <h6 class="fw-semibold mb-0">Variants (Color wise)</h6>
+        <span class="add-variant" id="addVariantBtn">
+          <i class="bi bi-plus-circle"></i> Add Color
         </span>
       </div>
 
-      <div id="variantContainer">
-
-        <% variants.forEach((variant, index) => { %>
-          <div class="row g-2 variant-row align-items-center">
-
-            <div class="col-md-2">
-              <select name="variants[<%= index %>][size]" class="form-select">
-                <option <%= variant.size === 'Small' ? 'selected' : '' %>>Small</option>
-                <option <%= variant.size === 'Medium' ? 'selected' : '' %>>Medium</option>
-                <option <%= variant.size === 'Large' ? 'selected' : '' %>>Large</option>
-              </select>
-            </div>
-
-            <div class="col-md-2">
-              <select name="variants[<%= index %>][color]" class="form-select">
-                <option <%= variant.color === 'Black' ? 'selected' : '' %>>Black</option>
-                <option <%= variant.color === 'White' ? 'selected' : '' %>>White</option>
-                <option <%= variant.color === 'Red' ? 'selected' : '' %>>Red</option>
-              </select>
-            </div>
-
-            <div class="col-md-2">
-              <input
-                type="number"
-                name="variants[<%= index %>][stock]"
-                class="form-control"
-                value="<%= variant.stock %>"
-                required
-              >
-            </div>
-
-            <div class="col-md-2">
-              <input
-                type="text"
-                name="variants[<%= index %>][sku]"
-                class="form-control"
-                value="<%= variant.sku %>"
-                required
-              >
-            </div>
-
-            <div class="col-md-2">
-              <input type="file" name="variantImages" class="form-control" multiple>
-              <% if (variant.images?.length) { %>
-                <div class="variant-images mt-2">
-                  <% variant.images.forEach(img => { %>
-                    <img src="/uploads/<%= img %>">
-                  <% }) %>
-                </div>
-              <% } %>
-            </div>
-
-            <!-- VARIANT TOGGLE -->
-            <div class="col-md-1 text-center">
-              <div class="form-check form-switch">
-                <input
-                  class="form-check-input"
-                  type="checkbox"
-                  <%= variant.status ? 'checked' : '' %>
-                  onchange="toggleVariant('<%= variant._id %>')"
-                >
-              </div>
-            </div>
-
-            <!-- VARIANT DELETE -->
-            <div class="col-md-1 text-center">
-              <button
-                type="button"
-                class="btn btn-sm btn-outline-danger"
-                onclick="deleteVariant('<%= variant._id %>')"
-              >
-                <i class="bi bi-trash"></i>
-              </button>
-            </div>
-
-          </div>
-        <% }) %>
-
-      </div>
+      <div id="variantContainer"></div>
     </div>
 
     <!-- STATUS -->
     <div class="card-box">
       <div class="form-check mb-3">
-        <input
-          type="checkbox"
-          name="status"
-          class="form-check-input"
-          <%= product.status ? 'checked' : '' %>
-        >
-        <label class="form-check-label">Set as Active</label>
+        <input type="checkbox" name="status" class="form-check-input"
+               <%= product.status ? 'checked' : '' %>>
+        <label class="form-check-label">Set Active</label>
       </div>
 
-      <button type="submit" class="save-btn w-100">
-        Update Product
-      </button>
+      <button class="save-btn w-100">Update Product</button>
     </div>
 
   </form>
 </div>
 
 <script>
-let variantIndex = <%= variants.length %>;
+document.addEventListener('DOMContentLoaded', () => {
 
-function addVariant() {
-  const container = document.getElementById('variantContainer');
+  const existingVariants = <%- JSON.stringify(colorVariants || {}) %>;
+  let index = 0;
 
-  const row = document.createElement('div');
-  row.className = 'row g-2 variant-row align-items-center';
+  const sizes = ['Small','Medium','Large','X-Large'];
+  const colors = ['Black','White','Yellow','Green','Red','Grey','Purple','Blue','Orange'];
 
-  row.innerHTML = `
-    <div class="col-md-2">
-      <select name="variants[${variantIndex}][size]" class="form-select">
-        <option>Small</option>
-        <option>Medium</option>
-        <option>Large</option>
-      </select>
-    </div>
+  /* ---------------- ADD / PREFILL COLOR VARIANT ---------------- */
 
-    <div class="col-md-2">
-      <select name="variants[${variantIndex}][color]" class="form-select">
-        <option>Black</option>
-        <option>White</option>
-        <option>Red</option>
-      </select>
-    </div>
+  function addColorVariant(prefill = null) {
+    const container = document.getElementById('variantContainer');
+    const div = document.createElement('div');
+    div.className = 'variant-row';
 
-    <div class="col-md-2">
-      <input type="number" name="variants[${variantIndex}][stock]" class="form-control" required>
-    </div>
+    div.innerHTML = `
+      <div class="row g-2 mb-2">
+        <div class="col-md-3">
+          <select name="variants[${index}][color]" class="form-select" required>
+            ${colors.map(c =>
+              `<option value="${c}" ${prefill?.color === c ? 'selected' : ''}>${c}</option>`
+            ).join('')}
+          </select>
+        </div>
 
-    <div class="col-md-2">
-      <input type="text" name="variants[${variantIndex}][sku]" class="form-control" required>
-    </div>
+        <div class="col-md-5">
+          <input type="file"
+            name="variants[${index}][images]"
+            class="form-control"
+            accept="image/*"
+            multiple>
 
-    <div class="col-md-2">
-      <input type="file" name="variantImages" class="form-control" multiple>
-    </div>
-  `;
+          <small class="hint">Upload only if you want to replace images</small>
 
-  container.appendChild(row);
-  variantIndex++;
-}
+          ${prefill?.images?.length ? `
+            <div class="variant-images mt-2">
+              ${prefill.images.map(img => `<img src="/uploads/${img}">`).join('')}
+            </div>
 
-function toggleVariant(id) {
-  fetch(`/admin/variants/${id}/status`, { method: 'PATCH' });
-}
+            ${prefill.images.map(img => `
+              <input type="hidden"
+                name="variants[${index}][existingImages][]"
+                value="${img}">
+            `).join('')}
+          ` : ''}
+        </div>
+      </div>
 
-function deleteVariant(id) {
-  Swal.fire({
-    title: 'Delete variant?',
-    icon: 'warning',
-    showCancelButton: true,
-    confirmButtonColor: '#d33'
-  }).then(res => {
-    if (res.isConfirmed) {
-      fetch(`/admin/variants/${id}`, { method: 'DELETE' })
-        .then(() => location.reload());
-    }
+      ${sizes.map(size => `
+        <div class="row g-2 mb-1">
+          <div class="col-md-3">
+            <input class="form-control" value="${size}" disabled>
+          </div>
+          <div class="col-md-3">
+            <input type="number"
+              name="variants[${index}][sizes][${size}][stock]"
+              class="form-control"
+              value="${prefill?.sizes?.[size] ?? ''}"
+              placeholder="Stock">
+          </div>
+        </div>
+      `).join('')}
+    `;
+
+    container.appendChild(div);
+    index++;
+  }
+
+  /* ---------------- PREFILL EXISTING VARIANTS ---------------- */
+  Object.values(existingVariants).forEach(v => addColorVariant(v));
+
+  /* ---------------- ADD NEW COLOR VARIANT ---------------- */
+  document.getElementById('addVariantBtn').addEventListener('click', () => {
+    addColorVariant();   // empty variant
   });
-}
+
+});
 </script>
 
 </body>

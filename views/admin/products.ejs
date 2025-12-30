@@ -201,11 +201,47 @@
 </div>
 
 <script>
-function toggleProductStatus(productId, status) {
-  fetch(`/admin/products/${productId}/status`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ status })
+function toggleProductStatus(productId, newStatus) {
+
+  Swal.fire({
+    title: newStatus ? 'Activate product?' : 'Unlist product?',
+    text: 'Are you sure you want to change the product status?',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'Yes',
+    cancelButtonText: 'Cancel'
+  }).then(result => {
+
+    if (!result.isConfirmed) {
+      event.target.checked = !newStatus;
+      return;
+    }
+
+    fetch(`/admin/products/${productId}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: newStatus })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (!data.success) {
+        Swal.fire('Error', 'Failed to update status', 'error');
+        event.target.checked = !newStatus;
+      } else {
+        Swal.fire({
+          toast: true,
+          position: 'top-end',
+          icon: 'success',
+          title: 'Status updated',
+          showConfirmButton: false,
+          timer: 1500
+        });
+      }
+    })
+    .catch(() => {
+      Swal.fire('Error', 'Server error', 'error');
+      event.target.checked = !newStatus;
+    });
   });
 }
 

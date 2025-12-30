@@ -9,70 +9,26 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
 
   <!-- Cropper -->
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css" rel="stylesheet" />
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
 
   <style>
-    body {
-      background: #f6eeec;
-      font-family: "Inter", sans-serif;
-    }
-
-    .content {
-      margin-left: 250px;
-      padding: 40px;
-    }
-
-    .card-box {
-      background: #fff;
-      border-radius: 14px;
-      padding: 20px;
-      margin-bottom: 20px;
-    }
-
-    .variant-row {
-      background: #faf7f6;
-      padding: 12px;
-      border-radius: 10px;
-      margin-bottom: 10px;
-    }
-
-    .add-variant {
-      cursor: pointer;
-      color: #e0553f;
-      font-weight: 500;
-    }
-
-    .save-btn {
-      background: #e0553f;
-      color: white;
-      border: none;
-      padding: 12px;
-      border-radius: 10px;
-      font-weight: 500;
-    }
-
-    small.hint {
-      font-size: 12px;
-      color: #6c757d;
-    }
-
-    #cropPreview {
-      max-width: 100%;
-      max-height: 300px;
-      display: none;
-      margin-top: 10px;
-    }
+    body { background:#f6eeec; font-family:Inter,sans-serif; }
+    .content { margin-left:250px; padding:40px; }
+    .card-box { background:#fff; border-radius:14px; padding:20px; margin-bottom:20px; }
+    .variant-row { background:#faf7f6; padding:15px; border-radius:10px; margin-bottom:15px; }
+    .add-variant { cursor:pointer; color:#e0553f; font-weight:500; }
+    .save-btn { background:#e0553f; color:white; border:none; padding:12px; border-radius:10px; }
+    small.hint { font-size:12px; color:#6c757d; }
+    #cropPreview { max-width:300px; display:none; margin-top:10px; }
   </style>
 </head>
 
 <body>
 
-<!-- SIDEBAR -->
 <%- include('./adminPartials/adminSidebar') %>
 
 <div class="content">
-
   <h3 class="fw-bold mb-4">Add Product</h3>
 
   <form id="productForm" action="/admin/products" method="POST" enctype="multipart/form-data">
@@ -81,33 +37,23 @@
     <div class="card-box">
       <h6 class="fw-semibold mb-3">Basic Information</h6>
 
-      <div class="mb-3">
-        <label class="form-label">Product Title</label>
-        <input type="text" name="title" class="form-control" required>
-      </div>
+      <input class="form-control mb-3" name="title" placeholder="Product title" required>
+      <textarea class="form-control mb-3" name="description" placeholder="Description"></textarea>
 
-      <div class="mb-3">
-        <label class="form-label">Description</label>
-        <textarea name="description" class="form-control"></textarea>
-      </div>
-
-      <div class="mb-3">
-        <label class="form-label">Category</label>
-        <select name="category_id" class="form-select" required>
-          <option value="">Select category</option>
-          <% categories.forEach(cat => { %>
-            <option value="<%= cat.category_id %>"><%= cat.name %></option>
-          <% }) %>
-        </select>
-      </div>
+      <select name="category_id" class="form-select" required>
+        <option value="">Select category</option>
+        <% categories.forEach(c => { %>
+          <option value="<%= c.category_id %>"><%= c.name %></option>
+        <% }) %>
+      </select>
     </div>
 
-    <!-- THUMBNAIL -->
+    <!-- THUMBNAIL WITH CROPPER -->
     <div class="card-box">
       <h6 class="fw-semibold mb-3">Product Thumbnail</h6>
 
       <input type="file" id="thumbnailInput" name="thumbnail"
-        class="form-control" accept="image/*" required>
+             class="form-control" accept="image/*" required>
 
       <img id="cropPreview">
       <small class="hint">Crop before upload (1:1)</small>
@@ -118,22 +64,22 @@
       <h6 class="fw-semibold mb-3">Pricing</h6>
       <div class="row">
         <div class="col-md-6">
-          <label class="form-label">Regular Price</label>
-          <input type="number" name="regular_price" class="form-control" required>
+          <input class="form-control" name="regular_price" type="number"
+                 placeholder="Regular price" required>
         </div>
         <div class="col-md-6">
-          <label class="form-label">Sale Price</label>
-          <input type="number" name="sale_price" class="form-control">
+          <input class="form-control" name="sale_price" type="number"
+                 placeholder="Sale price">
         </div>
       </div>
     </div>
 
-    <!-- VARIANTS -->
+    <!-- VARIANTS (COLOR LEVEL) -->
     <div class="card-box">
-      <div class="d-flex justify-content-between align-items-center mb-3">
-        <h6 class="fw-semibold mb-0">Variants</h6>
-        <span class="add-variant" onclick="addVariant()">
-          <i class="bi bi-plus-circle"></i> Add more
+      <div class="d-flex justify-content-between mb-3">
+        <h6 class="fw-semibold">Variants (Color wise)</h6>
+        <span class="add-variant" onclick="addColorVariant()">
+          <i class="bi bi-plus-circle"></i> Add Color
         </span>
       </div>
 
@@ -144,80 +90,74 @@
     <div class="card-box">
       <div class="form-check mb-3">
         <input type="checkbox" name="status" class="form-check-input" checked>
-        <label class="form-check-label">Set as Active</label>
+        <label class="form-check-label">Set Active</label>
       </div>
 
-      <button type="submit" class="save-btn w-100">Save Product</button>
+      <button class="save-btn w-100">Save Product</button>
     </div>
 
   </form>
 </div>
 
-<!-- ================= SCRIPTS ================= -->
-
 <script>
-/* ================= VARIANT CONFIG ================= */
+/* ---------------- VARIANTS ---------------- */
 
 let variantIndex = 0;
+const sizes = ['Small','Medium','Large','X-Large'];
+const colors = ['Black','White','Yellow','Green','Red','Grey','Purple','Blue','Orange'];
 
-const sizes = ['Small', 'Medium', 'Large', 'X-Large'];
-const colors = ['Black', 'White', 'Yellow', 'Green', 'Red', 'Grey', 'Purple','Blue'];
-
-function createOptions(list) {
-  return list.map(v => `<option value="${v}">${v}</option>`).join('');
-}
-
-function addVariant() {
+function addColorVariant() {
   const container = document.getElementById('variantContainer');
+  const div = document.createElement('div');
+  div.className = 'variant-row';
 
-  const row = document.createElement('div');
-  row.className = 'row g-2 variant-row';
+  div.innerHTML = `
+    <div class="row g-2 mb-2">
+      <div class="col-md-3">
+        <select name="variants[${variantIndex}][color]" class="form-select" required>
+          ${colors.map(c=>`<option value="${c}">${c}</option>`).join('')}
+        </select>
+      </div>
 
-  row.innerHTML = `
-    <div class="col-md-2">
-      <select name="variants[${variantIndex}][size]" class="form-select" required>
-        ${createOptions(sizes)}
-      </select>
+      <div class="col-md-5">
+        <input type="file"
+          name="variants[${variantIndex}][images]"
+          class="form-control variant-images"
+          accept="image/*"
+          multiple required>
+        <small class="hint">Min 3 images per color</small>
+      </div>
     </div>
 
-    <div class="col-md-2">
-      <select name="variants[${variantIndex}][color]" class="form-select" required>
-        ${createOptions(colors)}
-      </select>
-    </div>
-
-    <div class="col-md-2">
-      <input type="number" name="variants[${variantIndex}][stock]"
-        class="form-control" placeholder="Stock" required>
-    </div>
-
-    <div class="col-md-3">
-      <input type="text" name="variants[${variantIndex}][sku]"
-        class="form-control" placeholder="SKU" required>
-    </div>
-
-    <div class="col-md-3">
-      <input type="file" name="variantImages"
-        class="form-control variant-images"
-        accept="image/*" multiple required>
-      <small class="hint">Minimum 3 images</small>
-    </div>
+    ${sizes.map(s => `
+      <div class="row g-2 mb-1">
+        <div class="col-md-3">
+          <input class="form-control" value="${s}" disabled>
+          <input type="hidden" name="variants[${variantIndex}][sizes][${s}][size]" value="${s}">
+        </div>
+        <div class="col-md-3">
+          <input type="number"
+            name="variants[${variantIndex}][sizes][${s}][stock]"
+            class="form-control"
+            placeholder="Stock">
+        </div>
+      </div>
+    `).join('')}
   `;
 
-  container.appendChild(row);
+  container.appendChild(div);
   variantIndex++;
 }
 
-/* First variant auto added */
-addVariant();
+addColorVariant();
 
-/* ================= THUMBNAIL CROPPER ================= */
+/* ---------------- THUMBNAIL CROPPER ---------------- */
 
 let cropper;
-const input = document.getElementById('thumbnailInput');
+const thumbInput = document.getElementById('thumbnailInput');
 const preview = document.getElementById('cropPreview');
 
-input.addEventListener('change', e => {
+thumbInput.addEventListener('change', e => {
   const file = e.target.files[0];
   if (!file) return;
 
@@ -236,32 +176,32 @@ input.addEventListener('change', e => {
   reader.readAsDataURL(file);
 });
 
-/* ================= FORM SUBMIT ================= */
+/* ---------------- FORM SUBMIT (CROP + VALIDATION) ---------------- */
 
 document.getElementById('productForm').addEventListener('submit', async e => {
-  const images = document.querySelectorAll('.variant-images');
 
-  for (const input of images) {
+  // Validate variant images
+  document.querySelectorAll('.variant-images').forEach(input => {
     if (input.files.length < 3) {
-      alert('Each variant must have at least 3 images');
+      alert('Each color must have at least 3 images');
       e.preventDefault();
       return;
     }
-  }
+  });
 
-  if (cropper) {
-    e.preventDefault();
+  if (!cropper) return;
 
-    const canvas = cropper.getCroppedCanvas({ width: 600, height: 600 });
-    const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.9));
+  e.preventDefault();
 
-    const file = new File([blob], 'thumbnail.jpg', { type: 'image/jpeg' });
-    const dt = new DataTransfer();
-    dt.items.add(file);
-    input.files = dt.files;
+  const canvas = cropper.getCroppedCanvas({ width:600, height:600 });
+  const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.9));
 
-    e.target.submit();
-  }
+  const file = new File([blob], 'thumbnail.jpg', { type: 'image/jpeg' });
+  const dt = new DataTransfer();
+  dt.items.add(file);
+  thumbInput.files = dt.files;
+
+  e.target.submit();
 });
 </script>
 

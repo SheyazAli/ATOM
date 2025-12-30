@@ -14,7 +14,7 @@ router.put('/users/:id/toggle-status',verifyAdmin,adminController.toggleUserStat
 // PRODUCTS
 router.get('/products', verifyAdmin, adminController.getProducts);
 router.get('/products/add', verifyAdmin, adminController.getAddProducts);
-router.post('/products', verifyAdmin,upload.fields([{ name: 'thumbnail', maxCount: 1 },{ name: 'variantImages' }]), adminController.postAddProduct);
+router.post('/products', verifyAdmin,upload.any(), adminController.postAddProduct);
 router.get('/products/:productId/edit', verifyAdmin, adminController.getEditProduct);
 router.put('/products/:productId', verifyAdmin,upload.any(), adminController.postEditProduct);
 router.patch('/products/:productId/status', verifyAdmin, adminController.toggleProductStatus);

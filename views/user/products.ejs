@@ -22,20 +22,29 @@
       top: 90px;
     }
 
-    .filter-box h6 {
+    .accordion-button {
       font-weight: 600;
-      margin-top: 16px;
-      margin-bottom: 8px;
+      padding: 10px 0;
     }
 
-    /* ================= PRODUCT CARD FIX ================= */
+    .accordion-button:not(.collapsed) {
+      background: none;
+      color: #000;
+      box-shadow: none;
+    }
 
+    .accordion-item {
+      border: none;
+      border-bottom: 1px solid #eee;
+    }
+
+    /* PRODUCT CARD */
     .product-card {
       border: none;
       border-radius: 12px;
       background: #fff;
       overflow: hidden;
-      height: 100%;                     /* 🔥 equal height */
+      height: 100%;
       display: flex;
       flex-direction: column;
       transition: all 0.3s ease;
@@ -46,42 +55,31 @@
       box-shadow: 0 12px 30px rgba(0,0,0,0.12);
     }
 
-    /* IMAGE — FIXED HEIGHT */
     .product-card img {
-      height: 320px;                    /* 🔥 same for all */
+      height: 320px;
       width: 100%;
       object-fit: cover;
-      transition: transform 0.4s ease;
     }
 
-    .product-card:hover img {
-      transform: scale(1.05);
-    }
-
-    /* CARD BODY — LOCK HEIGHT */
     .product-card .card-body {
       padding: 14px;
       display: flex;
       flex-direction: column;
-      min-height: 140px;                /* 🔥 key fix */
+      min-height: 140px;
     }
 
-    /* TITLE — 2 LINE CLAMP */
     .product-card h6 {
       font-size: 14px;
       font-weight: 600;
-      margin-bottom: 6px;
       line-height: 1.4;
-
       display: -webkit-box;
       -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
       overflow: hidden;
     }
 
-    /* PRICE AREA — RESERVED SPACE */
     .price-box {
-      min-height: 24px;                 /* 🔥 even if no sale */
+      min-height: 24px;
       margin-bottom: 4px;
     }
 
@@ -98,33 +96,19 @@
       margin-left: 6px;
     }
 
-    /* COLORS — ALWAYS AT BOTTOM */
     .color-text {
       font-size: 13px;
       color: #777;
-      margin-top: auto;                 /* 🔥 push to bottom */
-      min-height: 18px;
+      margin-top: auto;
     }
 
-    /* PAGINATION */
     .pagination {
       justify-content: center;
       margin-top: 40px;
     }
-
-    .page-link {
-      color: #000;
-      border-radius: 50%;
-      margin: 0 4px;
-    }
-
-    .page-item.active .page-link {
-      background: #000;
-      border-color: #000;
-      color: #fff;
-    }
   </style>
 </head>
+
 <body>
 
 <%- include('./userPartials/navbar') %>
@@ -136,49 +120,9 @@
     <div class="col-lg-2 col-md-3">
       <form method="GET" action="/user/products" class="filter-box">
 
-        <input class="form-control mb-3"
-               name="search"
-               value="<%= search %>"
-               placeholder="Search products">
-
-        <h6>Category</h6>
-        <% categories.forEach(cat => { %>
-          <div class="form-check">
-            <input class="form-check-input"
-                   type="checkbox"
-                   name="category"
-                   value="<%= cat.category_id %>"
-                   <%= category.includes(cat.category_id) ? 'checked' : '' %>>
-            <label class="form-check-label"><%= cat.name %></label>
-          </div>
-        <% }) %>
-
-        <h6>Size</h6>
-        <% ['S','M','L','XL'].forEach(s => { %>
-          <div class="form-check">
-            <input class="form-check-input"
-                   type="checkbox"
-                   name="size"
-                   value="<%= s %>"
-                   <%= size.includes(s) ? 'checked' : '' %>>
-            <label class="form-check-label"><%= s %></label>
-          </div>
-        <% }) %>
-
-        <h6>Color</h6>
-        <% ['Black','White','Red'].forEach(c => { %>
-          <div class="form-check">
-            <input class="form-check-input"
-                   type="checkbox"
-                   name="color"
-                   value="<%= c %>"
-                   <%= color.includes(c) ? 'checked' : '' %>>
-            <label class="form-check-label"><%= c %></label>
-          </div>
-        <% }) %>
-
-        <h6>Sort</h6>
-        <select name="sort" class="form-select mb-3">
+        <!-- 🔽 SORT (AUTO SUBMIT) -->
+        <h6 class="fw-semibold mb-2">Sort</h6>
+        <select name="sort" class="form-select mb-3" onchange="this.form.submit()">
           <option value="">Default</option>
           <option value="priceLow" <%= sort==='priceLow'?'selected':'' %>>Price: Low → High</option>
           <option value="priceHigh" <%= sort==='priceHigh'?'selected':'' %>>Price: High → Low</option>
@@ -186,40 +130,124 @@
           <option value="za" <%= sort==='za'?'selected':'' %>>Z → A</option>
         </select>
 
-        <button class="btn btn-dark w-100 mb-2">Apply</button>
-        <a href="/user/products" class="btn btn-outline-dark w-100">Reset</a>
+        <!-- 🔽 DROPDOWN FILTERS -->
+        <div class="accordion" id="filterAccordion">
+
+          <!-- CATEGORY -->
+          <div class="accordion-item">
+            <h2 class="accordion-header">
+              <button class="accordion-button collapsed" type="button"
+                      data-bs-toggle="collapse" data-bs-target="#categoryFilter">
+                Category
+              </button>
+            </h2>
+            <div id="categoryFilter" class="accordion-collapse collapse">
+              <div class="accordion-body px-0">
+                <% categories.forEach(cat => { %>
+                  <div class="form-check">
+                    <input class="form-check-input"
+                           type="checkbox"
+                           name="category"
+                           value="<%= cat.category_id %>"
+                           <%= category.includes(cat.category_id) ? 'checked' : '' %>>
+                    <label class="form-check-label"><%= cat.name %></label>
+                  </div>
+                <% }) %>
+              </div>
+            </div>
+          </div>
+
+          <!-- SIZE -->
+          <div class="accordion-item">
+            <h2 class="accordion-header">
+              <button class="accordion-button collapsed" type="button"
+                      data-bs-toggle="collapse" data-bs-target="#sizeFilter">
+                Size
+              </button>
+            </h2>
+            <div id="sizeFilter" class="accordion-collapse collapse">
+              <div class="accordion-body px-0">
+                <% ['Small','Medium','Large','X-Large'].forEach(s => { %>
+                  <div class="form-check">
+                    <input class="form-check-input"
+                           type="checkbox"
+                           name="size"
+                           value="<%= s %>"
+                           <%= size.includes(s) ? 'checked' : '' %>>
+                    <label class="form-check-label"><%= s %></label>
+                  </div>
+                <% }) %>
+              </div>
+            </div>
+          </div>
+
+          <!-- COLOR -->
+          <div class="accordion-item">
+            <h2 class="accordion-header">
+              <button class="accordion-button collapsed" type="button"
+                      data-bs-toggle="collapse" data-bs-target="#colorFilter">
+                Color
+              </button>
+            </h2>
+            <div id="colorFilter" class="accordion-collapse collapse">
+              <div class="accordion-body px-0">
+                <% ['Black','White','Yellow','Green','Red','Grey','Purple','Blue','Orange'].forEach(c => { %>
+                  <div class="form-check">
+                    <input class="form-check-input"
+                           type="checkbox"
+                           name="color"
+                           value="<%= c %>"
+                           <%= color.includes(c) ? 'checked' : '' %>>
+                    <label class="form-check-label"><%= c %></label>
+                  </div>
+                <% }) %>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <button class="btn btn-dark w-100 mt-3">Apply Filters</button>
+        <a href="/user/products" class="btn btn-outline-dark w-100 mt-2">Reset</a>
+
       </form>
     </div>
 
     <!-- PRODUCTS -->
     <div class="col-lg-10 col-md-9">
-      <div class="row g-4">
+  <div class="row g-4">
 
-        <% products.forEach(p => { %>
-          <!-- 🔥 4 PER ROW -->
-          <div class="col-xl-3 col-lg-3 col-md-4 col-sm-6">
-            <div class="card product-card">
+    <% products.forEach(p => { %>
+      <div class="col-xl-3 col-lg-3 col-md-4 col-sm-6">
 
-              <img src="/uploads/<%= p.thumbnail %>" alt="<%= p.title %>">
+        <!-- Product Card Link -->
+        <a href="/user/product/<%= p.product_id %>"
+           class="text-decoration-none text-dark">
 
-              <div class="card-body">
-                <h6><%= p.title %></h6>
+          <div class="card product-card">
+            <img src="/uploads/<%= p.thumbnail %>" alt="<%= p.title %>">
 
-                <div class="price-box">
-                  <span class="mrp">₹ <%= p.regular_price %></span>
-                  <span class="sale">₹ <%= p.sale_price %></span>
-                </div>
+            <div class="card-body">
+              <h6><%= p.title %></h6>
 
-                <div class="color-text">
-                  Available in <%= p.colorsCount %> colors
-                </div>
+              <div class="price-box">
+                <span class="mrp">₹ <%= p.regular_price %></span>
+                <span class="sale">₹ <%= p.sale_price %></span>
               </div>
 
+              <div class="color-text">
+                Available in <%= p.colorsCount %> colors
+              </div>
             </div>
           </div>
-        <% }) %>
 
+        </a>
       </div>
+    <% }) %>
+
+  </div>
+</div>
+
 
       <!-- PAGINATION -->
       <nav>
@@ -227,7 +255,7 @@
           <% for (let i = 1; i <= totalPages; i++) { %>
             <li class="page-item <%= i === currentPageNum ? 'active' : '' %>">
               <a class="page-link"
-                 href="?page=<%= i %>&search=<%= search %>&sort=<%= sort %>
+                 href="?page=<%= i %>&sort=<%= sort %>
                  <% category.forEach(c=>{ %>&category=<%= c %><% }) %>
                  <% size.forEach(s=>{ %>&size=<%= s %><% }) %>
                  <% color.forEach(c=>{ %>&color=<%= c %><% }) %>">
@@ -241,8 +269,8 @@
     </div>
   </div>
 </div>
-
+<!-- ================= FOOTER ================= -->
 <%- include('./userPartials/footer') %>
-
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

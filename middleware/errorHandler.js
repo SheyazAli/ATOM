@@ -1,26 +1,55 @@
 const HttpStatus = require('../constants/httpStatus');
 
 module.exports = (err, req, res, next) => {
-  console.error('❌ ERROR:', err);
+  /* ---------------------------
+     Normalize error
+  --------------------------- */
+  if (!err) {
+    err = new Error('Page Not Found');
+    err.statusCode = HttpStatus.NOT_FOUND;
+  }
 
   const statusCode =
     err.statusCode || HttpStatus.INTERNAL_SERVER_ERROR;
 
-  // JSON response (API)
-  if (req.headers.accept?.includes('application/json')) {
+  /* ---------------------------
+     Detect API / AJAX
+  --------------------------- */
+  const isApi =
+    req.xhr ||
+    req.headers['x-requested-with'] === 'XMLHttpRequest' ||
+    req.headers.accept?.includes('application/json');
+
+  /* ---------------------------
+     Home URL (always defined)
+  --------------------------- */
+  const homeUrl =
+    req.originalUrl?.startsWith('/admin')
+      ? '/admin/products'
+      : '/user/home';
+
+  /* ---------------------------
+     API / AJAX → JSON
+  --------------------------- */
+  if (isApi) {
     return res.status(statusCode).json({
       success: false,
-      message: err.message || 'Internal Server Error'
+      statusCode,
+      message:
+        statusCode === HttpStatus.NOT_FOUND
+          ? 'Resource not found'
+          : err.message || 'Internal Server Error'
     });
   }
 
-  // Render correct error page
+  /* ---------------------------
+     UI → HTML
+  --------------------------- */
   if (statusCode === HttpStatus.NOT_FOUND) {
-    return res.status(statusCode).render('error/404');
+    return res.status(404).render('error/404', { homeUrl });
   }
 
-  res.status(statusCode).render('error/500', {
-    message: err.message || 'Something went wrong',
-    statusCode
+  return res.status(statusCode).render('error/500', {
+    homeUrl
   });
 };

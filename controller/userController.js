@@ -549,7 +549,7 @@ exports.getProducts = async (req, res) => {
     const limit = 12;
     const skip = (page - 1) * limit;
 
-    const {
+    let {
       search = '',
       sort = '',
       category = [],
@@ -557,58 +557,83 @@ exports.getProducts = async (req, res) => {
       color = []
     } = req.query;
 
-    /* ---------------------------
-       BASE QUERY
-    --------------------------- */
+    // normalize to arrays
+    category = [].concat(category);
+    size = [].concat(size);
+    color = [].concat(color);
+
+    /* ---------------- VARIANT FILTER ---------------- */
+
+    let variantFilter = {};
+
+    if (size.length) {
+      variantFilter.size = { $in: size };
+    }
+
+    if (color.length) {
+      variantFilter.color = { $in: color };
+    }
+
+    let filteredProductIds = null;
+
+    if (size.length || color.length) {
+      filteredProductIds = await Variant.distinct('product_id', variantFilter);
+    }
+
+    /* ---------------- PRODUCT FILTER ---------------- */
+
     const productQuery = {
       status: true,
       title: { $regex: search, $options: 'i' }
     };
 
     if (category.length) {
-      productQuery.category_id = { $in: [].concat(category) };
+      productQuery.category_id = { $in: category };
     }
 
-    /* ---------------------------
-       SORTING
-    --------------------------- */
+    if (filteredProductIds) {
+      // no matching variants → no products
+      if (!filteredProductIds.length) {
+        filteredProductIds = ['__none__'];
+      }
+      productQuery.product_id = { $in: filteredProductIds };
+    }
+
+    /* ---------------- SORT ---------------- */
+
     let sortOption = {};
     if (sort === 'priceLow') sortOption.sale_price = 1;
     if (sort === 'priceHigh') sortOption.sale_price = -1;
     if (sort === 'az') sortOption.title = 1;
     if (sort === 'za') sortOption.title = -1;
 
-    /* ---------------------------
-       PRODUCTS
-    --------------------------- */
+    /* ---------------- FETCH PRODUCTS ---------------- */
+
     const products = await Product.find(productQuery)
       .sort(sortOption)
       .skip(skip)
       .limit(limit)
       .lean();
 
+    /* ---------------- ENRICH PRODUCTS ---------------- */
+
     for (const product of products) {
-      const categoryDoc = await Category.findOne({
-        category_id: product.category_id
+      const variants = await Variant.find({
+        product_id: product.product_id
       }).lean();
-
-      product.category_name = categoryDoc ? categoryDoc.name : '—';
-
-      const variantQuery = { product_id: product.product_id };
-
-      if (size.length) variantQuery.size = { $in: [].concat(size) };
-      if (color.length) variantQuery.color = { $in: [].concat(color) };
-
-      const variants = await Variant.find(variantQuery).lean();
 
       product.totalStock = variants.reduce((s, v) => s + v.stock, 0);
       product.colorsCount = [...new Set(variants.map(v => v.color))].length;
     }
 
+    /* ---------------- PAGINATION ---------------- */
+
     const totalProducts = await Product.countDocuments(productQuery);
     const totalPages = Math.ceil(totalProducts / limit);
 
     const categories = await Category.find({ status: true }).lean();
+
+    /* ---------------- RENDER ---------------- */
 
     res.render('user/products', {
       products,
@@ -617,16 +642,110 @@ exports.getProducts = async (req, res) => {
       totalPages,
       search,
       sort,
-      category: [].concat(category),
-      size: [].concat(size),
-      color: [].concat(color)
+      category,
+      size,
+      color
     });
 
   } catch (error) {
-    console.error(error);
+    console.error('GET PRODUCTS ERROR:', error);
     res.status(500).send('Server error');
   }
 };
+
+exports.getProductDetails = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    /* ---------- PRODUCT ---------- */
+    const product = await Product.findOne({
+      product_id: id,
+      status: true
+    }).lean();
+
+    if (!product) {
+      return res.redirect('/user/products');
+    }
+
+    /* ---------- CATEGORY ---------- */
+    const category = await Category.findOne({
+      category_id: product.category_id,
+      status: true
+    }).lean();
+
+    /* ---------- VARIANTS ---------- */
+    const variants = await Variant.find({
+      product_id: product.product_id
+    }).lean();
+
+    if (!variants.length) {
+      return res.redirect('/user/products');
+    }
+
+    /* ---------- COLOR MAP ---------- */
+    const colorMap = {};
+    let totalStock = 0;
+
+    variants.forEach(v => {
+      totalStock += v.stock;
+
+      if (!colorMap[v.color]) {
+        colorMap[v.color] = {
+          images: v.images || [],
+          sizes: []
+        };
+      }
+
+      colorMap[v.color].sizes.push({
+        size: v.size,
+        stock: v.stock
+      });
+    });
+
+    const colors = Object.keys(colorMap);
+    const defaultColor = colors[0];
+    const isOutOfStock = totalStock === 0;
+
+    /* ---------- RELATED PRODUCTS ---------- */
+    const relatedProducts = await Product.find({
+      category_id: product.category_id,
+      status: true,
+      product_id: { $ne: product.product_id }
+    })
+      .limit(4)
+      .lean();
+
+    for (const rp of relatedProducts) {
+      const rVariants = await Variant.find({
+        product_id: rp.product_id
+      }).lean();
+
+      rp.colorsCount = [...new Set(rVariants.map(v => v.color))].length;
+    }
+
+    /* ---------- BREADCRUMB LINK ---------- */
+    const breadcrumbLink = category
+      ? `/user/products?category=${category.category_id}`
+      : '/user/products';
+
+    /* ---------- RENDER ---------- */
+    res.render('user/product-details', {
+      product,
+      category,
+      breadcrumbLink,
+      colorMap,
+      colors,
+      defaultColor,
+      isOutOfStock,
+      relatedProducts
+    });
+
+  } catch (error) {
+    console.error('PRODUCT DETAILS ERROR:', error);
+    res.redirect('/user/products');
+  }
+};
+
 
 
 exports.logout = (req, res) => {

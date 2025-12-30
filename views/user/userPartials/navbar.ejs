@@ -1,41 +1,68 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ATOM | Home</title>
+  <title>ATOM</title>
 
   <!-- Bootstrap -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-
-  <!-- Bootstrap Icons -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
   <style>
     body {
-    font-family: 'Segoe UI', sans-serif;
-  }
+      font-family: 'Segoe UI', sans-serif;
+    }
 
-  .navbar {
-    padding: 18px 0;
-  }
+    .navbar {
+      padding: 18px 0;
+    }
 
-  .navbar-brand img {
-    height: 60px; /* bigger logo */
-  }
+    .navbar-brand img {
+      height: 60px;
+    }
 
-  .nav-link {
-    font-weight: 500;
-    letter-spacing: 0.5px;
-  }
+    /* CENTER MENU */
+    .nav-center {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+    }
 
-</style>
+    .nav-center .nav-link {
+      font-weight: 500;
+      letter-spacing: 0.5px;
+      padding: 0 14px;
+      white-space: nowrap;
+    }
 
+    /* SEARCH */
+    .nav-search {
+      width: 220px;
+      border-radius: 20px;
+      padding: 6px 14px;
+    }
+
+    /* RIGHT ICONS */
+    .nav-icons a {
+      color: #000;
+      font-size: 18px;
+    }
+
+    /* MOBILE FIX */
+    @media (max-width: 991px) {
+      .nav-center {
+        position: static;
+        transform: none;
+      }
+    }
+  </style>
 </head>
 
 <nav class="navbar navbar-expand-lg bg-white border-bottom">
-  <div class="container">
-    <a class="navbar-brand" href="#">
-      <img src="/uploads/Atom logo white bg with name.png" alt="ATOM">
+  <div class="container position-relative">
+
+    <!-- LOGO -->
+    <a class="navbar-brand" href="/user/home">
+      <img src="/uploads/Atom logo white bg with name.png" alt="ATOM" height="60">
     </a>
 
     <button class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#menu">
@@ -43,25 +70,76 @@
     </button>
 
     <div class="collapse navbar-collapse" id="menu">
-      <ul class="navbar-nav mx-auto">
-        <li class="nav-item"><a class="nav-link" href="#">T-Shirts</a></li>
-        <li class="nav-item"><a class="nav-link" href="#">Hoodies</a></li>
-        <li class="nav-item"><a class="nav-link" href="#">Polos</a></li>
-        <li class="nav-item"><a class="nav-link" href="#">Oversized</a></li>
-        <li class="nav-item"><a class="nav-link" href="#">Winter Collection</a></li>
-        <li class="nav-item"><a class="nav-link text-success" href="#">Sale</a></li>
+
+      <!-- CENTER MENU -->
+      <ul class="navbar-nav nav-center">
+
+        <!-- T-SHIRTS = ALL PRODUCTS -->
+        <li class="nav-item">
+          <a class="nav-link" href="/user/products">
+            T-Shirts
+          </a>
+        </li>
+
+        <!-- HOODIES (Hoodi in DB) -->
+        <li class="nav-item">
+          <a class="nav-link"
+             href="/user/products?category=<%= navCategories.hoodiId %>">
+            Hoodies
+          </a>
+        </li>
+
+        <!-- POLOS -->
+        <li class="nav-item">
+          <a class="nav-link"
+             href="/user/products?category=<%= navCategories.poloId %>">
+            Polos
+          </a>
+        </li>
+
+        <!-- OVERSIZED -->
+        <li class="nav-item">
+          <a class="nav-link"
+             href="/user/products?category=<%= navCategories.oversizedId %>">
+            Oversized
+          </a>
+        </li>
+
+        <!-- WINTER COLLECTION = HOODI + SWEATSHIRT -->
+        <li class="nav-item">
+          <a class="nav-link"
+             href="/user/products?category=<%= navCategories.hoodiId %>&category=<%= navCategories.sweatshirtId %>">
+            Winter Collection
+          </a>
+        </li>
+
+        <!-- SALE -->
+        <li class="nav-item">
+          <a class="nav-link text-success"
+             href="/user/products?sale=true">
+            Sale
+          </a>
+        </li>
+
       </ul>
 
-    <div class="d-flex gap-3 align-items-center">
-  <i class="bi bi-search"></i>
+      <!-- RIGHT -->
+      <form class="d-flex align-items-center gap-3 ms-auto"
+            method="GET"
+            action="/user/products">
 
-  <a href="/user/profile" class="text-dark">
-    <i class="bi bi-person"></i>
-  </a>
+        <input
+          type="text"
+          name="search"
+          class="form-control nav-search"
+          placeholder="Search products">
 
-  <i class="bi bi-bag"></i>
-</div>
+        <a href="/user/profile"><i class="bi bi-person"></i></a>
+        <a href="/user/cart"><i class="bi bi-bag"></i></a>
+      </form>
 
     </div>
   </div>
 </nav>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
