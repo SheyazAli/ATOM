@@ -69,15 +69,30 @@
   </div>
 
   <!-- SEARCH -->
-  <div class="mb-4 w-50">
-    <input
-      type="text"
-      class="form-control search-box"
-      placeholder="🔍 Search category..."
-      value="<%= search %>"
-      onkeydown="if(event.key==='Enter') searchCategory(this.value)"
-    >
-  </div>
+<div class="mb-4 w-75 d-flex gap-2">
+  <input
+    type="text"
+    id="searchInput"
+    class="form-control search-box"
+    placeholder="🔍 Search category..."
+    value="<%= search %>"
+    onkeydown="if(event.key==='Enter') searchCategory()"
+  >
+
+  <button
+    class="btn btn-dark px-4"
+    onclick="searchCategory()"
+  >
+    Search
+  </button>
+
+  <button
+    class="btn btn-outline-secondary px-4"
+    onclick="clearSearch()"
+  >
+    Clear
+  </button>
+</div>
 
   <!-- TABLE -->
   <div class="table-card">
@@ -155,8 +170,15 @@
 </div>
 
 <script>
-function searchCategory(value) {
-  window.location.href = `/admin/categories?search=${value}`;
+function searchCategory() {
+  const value = document.getElementById('searchInput').value.trim();
+  window.location.href = value
+    ? `/admin/categories?search=${encodeURIComponent(value)}`
+    : '/admin/categories';
+}
+
+function clearSearch() {
+  window.location.href = '/admin/categories';
 }
 
 function toggleFeatured(id, featured) {
