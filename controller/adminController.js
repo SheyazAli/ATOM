@@ -386,8 +386,9 @@ exports.deleteProduct = async (req, res) => {
     return res.json({ success: true });
 
   } catch (err) {
-    console.error(err);
-    return res.status(500).json({ success: false });
+    error.statusCode =
+    error.statusCode || HttpStatus.INTERNAL_SERVER_ERROR;
+  next(error);
   }
 };
 
@@ -401,7 +402,9 @@ exports.toggleVariantStatus = async (req, res) => {
     res.json({ success: true });
 
   } catch (err) {
-    res.status(500).json({ success: false });
+    error.statusCode =
+    error.statusCode || HttpStatus.INTERNAL_SERVER_ERROR;
+  next(error);
   }
 };
 
@@ -418,8 +421,9 @@ exports.toggleProductStatus = async (req, res) => {
     return res.json({ success: true });
 
   } catch (error) {
-    console.error('TOGGLE PRODUCT STATUS ERROR:', error);
-    return res.status(500).json({ success: false });
+    error.statusCode =
+    error.statusCode || HttpStatus.INTERNAL_SERVER_ERROR;
+  next(error);
   }
 };
 
@@ -428,7 +432,9 @@ exports.deleteVariant = async (req, res) => {
     await Variant.findByIdAndDelete(req.params.variantId);
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ success: false });
+    error.statusCode =
+    error.statusCode || HttpStatus.INTERNAL_SERVER_ERROR;
+  next(error);
   }
 };
 
@@ -451,7 +457,7 @@ exports.getCategories = async (req, res) => {
       .limit(limit)
       .lean();
 
-    // 🧮 count products per category
+    // count products per category
     for (const category of categories) {
       category.productCount = await Product.countDocuments({
         category_id: category.category_id
