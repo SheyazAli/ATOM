@@ -96,6 +96,19 @@
       margin-left: 6px;
     }
 
+    .discount {
+      color: #d9534f;
+      font-size: 12px;
+      font-weight: 600;
+      margin-left: 6px;
+    }
+
+    .single-price {
+      color: #198754;
+      font-weight: 600;
+      font-size: 14px;
+    }
+
     .color-text {
       font-size: 13px;
       color: #777;
@@ -120,7 +133,6 @@
     <div class="col-lg-2 col-md-3">
       <form method="GET" action="/user/products" class="filter-box">
 
-        <!-- 🔽 SORT (AUTO SUBMIT) -->
         <h6 class="fw-semibold mb-2">Sort</h6>
         <select name="sort" class="form-select mb-3" onchange="this.form.submit()">
           <option value="">Default</option>
@@ -130,7 +142,6 @@
           <option value="za" <%= sort==='za'?'selected':'' %>>Z → A</option>
         </select>
 
-        <!-- 🔽 DROPDOWN FILTERS -->
         <div class="accordion" id="filterAccordion">
 
           <!-- CATEGORY -->
@@ -145,10 +156,8 @@
               <div class="accordion-body px-0">
                 <% categories.forEach(cat => { %>
                   <div class="form-check">
-                    <input class="form-check-input"
-                           type="checkbox"
-                           name="category"
-                           value="<%= cat.category_id %>"
+                    <input class="form-check-input" type="checkbox"
+                           name="category" value="<%= cat.category_id %>"
                            <%= category.includes(cat.category_id) ? 'checked' : '' %>>
                     <label class="form-check-label"><%= cat.name %></label>
                   </div>
@@ -169,10 +178,8 @@
               <div class="accordion-body px-0">
                 <% ['Small','Medium','Large','X-Large'].forEach(s => { %>
                   <div class="form-check">
-                    <input class="form-check-input"
-                           type="checkbox"
-                           name="size"
-                           value="<%= s %>"
+                    <input class="form-check-input" type="checkbox"
+                           name="size" value="<%= s %>"
                            <%= size.includes(s) ? 'checked' : '' %>>
                     <label class="form-check-label"><%= s %></label>
                   </div>
@@ -193,10 +200,8 @@
               <div class="accordion-body px-0">
                 <% ['Black','White','Yellow','Green','Red','Grey','Purple','Blue','Orange'].forEach(c => { %>
                   <div class="form-check">
-                    <input class="form-check-input"
-                           type="checkbox"
-                           name="color"
-                           value="<%= c %>"
+                    <input class="form-check-input" type="checkbox"
+                           name="color" value="<%= c %>"
                            <%= color.includes(c) ? 'checked' : '' %>>
                     <label class="form-check-label"><%= c %></label>
                   </div>
@@ -215,39 +220,47 @@
 
     <!-- PRODUCTS -->
     <div class="col-lg-10 col-md-9">
-  <div class="row g-4">
+      <div class="row g-4">
 
-    <% products.forEach(p => { %>
-      <div class="col-xl-3 col-lg-3 col-md-4 col-sm-6">
+        <% products.forEach(p => { 
+          const samePrice = p.regular_price === p.sale_price;
+          const discount = !samePrice
+            ? Math.round(((p.regular_price - p.sale_price) / p.regular_price) * 100)
+            : 0;
+        %>
 
-        <!-- Product Card Link -->
-        <a href="/user/product/<%= p.product_id %>"
-           class="text-decoration-none text-dark">
+          <div class="col-xl-3 col-lg-3 col-md-4 col-sm-6">
+            <a href="/user/product/<%= p.product_id %>"
+               class="text-decoration-none text-dark">
 
-          <div class="card product-card">
-            <img src="/uploads/<%= p.thumbnail %>" alt="<%= p.title %>">
+              <div class="card product-card">
+                <img src="/uploads/<%= p.thumbnail %>" alt="<%= p.title %>">
 
-            <div class="card-body">
-              <h6><%= p.title %></h6>
+                <div class="card-body">
+                  <h6><%= p.title %></h6>
 
-              <div class="price-box">
-                <span class="mrp">₹ <%= p.regular_price %></span>
-                <span class="sale">₹ <%= p.sale_price %></span>
+                  <div class="price-box">
+                    <% if (samePrice) { %>
+                      <span class="single-price">₹ <%= p.sale_price %></span>
+                    <% } else { %>
+                      <span class="mrp">₹ <%= p.regular_price %></span>
+                      <span class="sale">₹ <%= p.sale_price %></span>
+                      <span class="discount"><%= discount %>% OFF</span>
+                    <% } %>
+                  </div>
+
+                  <div class="color-text">
+                    Available in <%= p.colorsCount %> colors
+                  </div>
+                </div>
               </div>
 
-              <div class="color-text">
-                Available in <%= p.colorsCount %> colors
-              </div>
-            </div>
+            </a>
           </div>
 
-        </a>
+        <% }) %>
+
       </div>
-    <% }) %>
-
-  </div>
-</div>
-
 
       <!-- PAGINATION -->
       <nav>
@@ -269,7 +282,7 @@
     </div>
   </div>
 </div>
-<!-- ================= FOOTER ================= -->
+
 <%- include('./userPartials/footer') %>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>

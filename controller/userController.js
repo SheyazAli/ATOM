@@ -655,25 +655,17 @@ exports.getProducts = async (req, res) => {
 
 exports.getProductDetails = async (req, res) => {
   try {
-    const { id } = req.params;
-
-    /* ---------- PRODUCT ---------- */
-    const product = await Product.findOne({
-      product_id: id,
-      status: true
-    }).lean();
+    const product = req.product;
 
     if (!product) {
       return res.redirect('/user/products');
     }
 
-    /* ---------- CATEGORY ---------- */
     const category = await Category.findOne({
       category_id: product.category_id,
       status: true
     }).lean();
 
-    /* ---------- VARIANTS ---------- */
     const variants = await Variant.find({
       product_id: product.product_id
     }).lean();
@@ -682,11 +674,10 @@ exports.getProductDetails = async (req, res) => {
       return res.redirect('/user/products');
     }
 
-    /* ---------- COLOR MAP ---------- */
     const colorMap = {};
     let totalStock = 0;
 
-    variants.forEach(v => {
+    for (const v of variants) {
       totalStock += v.stock;
 
       if (!colorMap[v.color]) {
@@ -700,13 +691,12 @@ exports.getProductDetails = async (req, res) => {
         size: v.size,
         stock: v.stock
       });
-    });
+    }
 
     const colors = Object.keys(colorMap);
     const defaultColor = colors[0];
     const isOutOfStock = totalStock === 0;
 
-    /* ---------- RELATED PRODUCTS ---------- */
     const relatedProducts = await Product.find({
       category_id: product.category_id,
       status: true,
@@ -723,13 +713,11 @@ exports.getProductDetails = async (req, res) => {
       rp.colorsCount = [...new Set(rVariants.map(v => v.color))].length;
     }
 
-    /* ---------- BREADCRUMB LINK ---------- */
     const breadcrumbLink = category
       ? `/user/products?category=${category.category_id}`
       : '/user/products';
 
-    /* ---------- RENDER ---------- */
-    res.render('user/product-details', {
+    return res.render('user/product-details', {
       product,
       category,
       breadcrumbLink,
@@ -742,7 +730,7 @@ exports.getProductDetails = async (req, res) => {
 
   } catch (error) {
     console.error('PRODUCT DETAILS ERROR:', error);
-    res.redirect('/user/products');
+    return res.redirect('/user/products');
   }
 };
 

@@ -4,10 +4,10 @@ const userController = require('../controller/userController');
 const { verifyUser, noCache } = require('../middleware/userMiddleware');
 const addressController = require('../controller/addressController');
 const passport = require('passport');
-
+const productStatus = require('../middleware/checkProductActive')
 
 router.get('/home',userController.getHome);
-
+//AUTH
 router.get('/login',userController.getLogin)
 router.post('/login',userController.postLogin)
 
@@ -27,6 +27,7 @@ router.get('/verify-otp',userController.getOtpPage)
 router.post('/verify-otp',userController.postOtpPage)
 router.post('/resend-otp', userController.resendOtp);
 
+//PROFILE
 router.get('/profile', verifyUser, userController.getProfile);
 
 router.get('/profile/edit', verifyUser, userController.getEditProfile);
@@ -46,9 +47,9 @@ router.get('/address/:id/edit',verifyUser,addressController.getEditAddress);
 router.put('/address/:id', verifyUser, addressController.updateAddress);
 router.delete('/address/:id', verifyUser, addressController.deleteAddress);
 
-
+//PRODUCTS
 router.get('/products', userController.getProducts);
-router.get('/product/:id', userController.getProductDetails)
+router.get('/product/:id',productStatus, userController.getProductDetails)
 
 router.get('/logout',userController.logout)
 
