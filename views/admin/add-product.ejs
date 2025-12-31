@@ -48,7 +48,7 @@
       </select>
     </div>
 
-    <!-- THUMBNAIL WITH CROPPER -->
+    <!-- THUMBNAIL -->
     <div class="card-box">
       <h6 class="fw-semibold mb-3">Product Thumbnail</h6>
 
@@ -64,17 +64,15 @@
       <h6 class="fw-semibold mb-3">Pricing</h6>
       <div class="row">
         <div class="col-md-6">
-          <input class="form-control" name="regular_price" type="number"
-                 placeholder="Regular price" required>
+          <input class="form-control" name="regular_price" type="number" required>
         </div>
         <div class="col-md-6">
-          <input class="form-control" name="sale_price" type="number"
-                 placeholder="Sale price">
+          <input class="form-control" name="sale_price" type="number">
         </div>
       </div>
     </div>
 
-    <!-- VARIANTS (COLOR LEVEL) -->
+    <!-- VARIANTS -->
     <div class="card-box">
       <div class="d-flex justify-content-between mb-3">
         <h6 class="fw-semibold">Variants (Color wise)</h6>
@@ -105,6 +103,8 @@
 let variantIndex = 0;
 const sizes = ['Small','Medium','Large','X-Large'];
 const colors = ['Black','White','Yellow','Green','Red','Grey','Purple','Blue','Orange'];
+const MIN_IMAGES = 3;
+const MAX_IMAGES = 5;
 
 function addColorVariant() {
   const container = document.getElementById('variantContainer');
@@ -124,8 +124,9 @@ function addColorVariant() {
           name="variants[${variantIndex}][images]"
           class="form-control variant-images"
           accept="image/*"
-          multiple required>
-        <small class="hint">Min 3 images per color</small>
+          multiple
+          required>
+        <small class="hint">Min 3, Max 5 images</small>
       </div>
     </div>
 
@@ -150,6 +151,19 @@ function addColorVariant() {
 }
 
 addColorVariant();
+
+/* ---------------- IMAGE COUNT VALIDATION ---------------- */
+
+document.addEventListener('change', e => {
+  if (!e.target.classList.contains('variant-images')) return;
+
+  const count = e.target.files.length;
+
+  if (count > MAX_IMAGES) {
+    alert(`Maximum ${MAX_IMAGES} images allowed per color`);
+    e.target.value = '';
+  }
+});
 
 /* ---------------- THUMBNAIL CROPPER ---------------- */
 
@@ -176,18 +190,19 @@ thumbInput.addEventListener('change', e => {
   reader.readAsDataURL(file);
 });
 
-/* ---------------- FORM SUBMIT (CROP + VALIDATION) ---------------- */
+/* ---------------- FORM SUBMIT ---------------- */
 
 document.getElementById('productForm').addEventListener('submit', async e => {
 
-  // Validate variant images
-  document.querySelectorAll('.variant-images').forEach(input => {
-    if (input.files.length < 3) {
-      alert('Each color must have at least 3 images');
+  for (const input of document.querySelectorAll('.variant-images')) {
+    const count = input.files.length;
+
+    if (count < MIN_IMAGES || count > MAX_IMAGES) {
+      alert(`Each color must have ${MIN_IMAGES}–${MAX_IMAGES} images`);
       e.preventDefault();
       return;
     }
-  });
+  }
 
   if (!cropper) return;
 
