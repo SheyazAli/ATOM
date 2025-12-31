@@ -1,0 +1,225 @@
+<%- include('./userPartials/navbar') %>
+
+<style>
+  body { background:#fafafa; }
+
+  /* ---------- SIDEBAR (SAME AS ACCOUNT) ---------- */
+  .promo-card {
+    background: #000;
+    color: #fff;
+    border-radius: 14px;
+    padding: 20px;
+    font-size: 14px;
+  }
+
+  .promo-card span {
+    color: #28a745;
+    font-weight: 600;
+  }
+
+  .account-menu {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .account-menu a {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 16px;
+    border-radius: 10px;
+    text-decoration: none;
+    color: #111;
+    margin-bottom: 6px;
+    font-size: 15px;
+    background: #fff;
+    border: 1px solid #eaeaea;
+    transition: all .2s ease;
+  }
+
+  .account-menu a.active {
+    background: #f1faf4;
+    color: #198754;
+    font-weight: 600;
+    border-color: #cdebdc;
+  }
+
+  .account-menu a:hover {
+    background: #f7f7f7;
+  }
+
+  /* ---------- CART ---------- */
+  .cart-card {
+    background:#fff;
+    border-radius:12px;
+    padding:16px;
+    margin-bottom:16px;
+    display:flex;
+    gap:16px;
+  }
+
+  .cart-card img {
+    width:90px;
+    aspect-ratio:5/7;
+    object-fit:cover;
+    border-radius:6px;
+  }
+
+  .qty-btn {
+    width:28px;
+    height:28px;
+    border:1px solid #ddd;
+    background:#fff;
+    border-radius:4px;
+    cursor:pointer;
+  }
+
+  .summary-box {
+    background:#fff;
+    border-radius:12px;
+    padding:20px;
+    position:sticky;
+    top:20px;
+  }
+
+  /* ---------- RELATED PRODUCTS ---------- */
+  .related-card img {
+    aspect-ratio:5/7;
+    object-fit:cover;
+  }
+</style>
+
+<div class="container py-4">
+  <div class="row">
+
+    <!-- SIDEBAR -->
+    <div class="col-lg-3 col-md-4">
+
+      <div class="promo-card mb-4">
+        <div class="fw-semibold mb-1">BRIGHT & BOLD</div>
+        <div>PICKS TO LIGHT UP YOUR STYLE</div>
+        <div class="mt-2">UP TO <span>40% OFF</span></div>
+      </div>
+
+      <div class="account-menu">
+        <a href="/user/cart" class="active">
+          <span><i class="bi bi-cart me-2"></i>Cart</span>
+          <i class="bi bi-chevron-right"></i>
+        </a>
+
+        <a href="/user/wishlist">
+          <span><i class="bi bi-heart me-2"></i>Wishlist</span>
+          <i class="bi bi-chevron-right"></i>
+        </a>
+      </div>
+
+    </div>
+
+    <!-- CART ITEMS -->
+    <div class="col-lg-6 col-md-8">
+      <h5 class="fw-semibold mb-3">Cart</h5>
+
+      <% if (!cartItems.length) { %>
+        <p class="text-muted">Your cart is empty</p>
+      <% } %>
+
+      <% cartItems.forEach(item => { %>
+        <div class="cart-card">
+
+          <img src="/uploads/<%= item.image %>">
+
+          <div class="flex-grow-1">
+            <h6 class="mb-1"><%= item.title %></h6>
+
+            <div class="text-success small mb-1">
+              <%= item.stock > 0 ? 'In Stock' : 'Out of Stock' %>
+            </div>
+
+            <div class="small text-muted mb-2">
+              Size: <%= item.size %> · Color: <%= item.color %>
+            </div>
+
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <button class="qty-btn">−</button>
+              <span><%= item.quantity %></span>
+              <button class="qty-btn">+</button>
+            </div>
+
+            <div class="small text-muted">
+              <i class="bi bi-heart"></i> Move to Wishlist
+              &nbsp;&nbsp;
+              <span class="text-danger">Remove</span>
+            </div>
+          </div>
+
+          <div class="fw-semibold">
+            ₹ <%= item.itemTotal %>
+          </div>
+
+        </div>
+      <% }) %>
+    </div>
+
+    <!-- ORDER SUMMARY -->
+    <div class="col-lg-3">
+      <div class="summary-box">
+        <h6 class="fw-semibold mb-3">Order Summary</h6>
+
+        <div class="d-flex justify-content-between mb-2">
+          <span>Subtotal</span>
+          <span>₹ <%= subtotal %></span>
+        </div>
+
+        <div class="d-flex justify-content-between mb-2">
+          <span>Delivery</span>
+          <span class="text-success">FREE</span>
+        </div>
+
+        <hr>
+
+        <div class="d-flex justify-content-between mb-3">
+          <strong>Total</strong>
+          <strong>₹ <%= subtotal %></strong>
+        </div>
+
+        <button class="btn btn-dark w-100 mb-2">
+          Proceed to Checkout
+        </button>
+
+        <button class="btn btn-outline-secondary w-100">
+          Continue Shopping
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- RELATED PRODUCTS (SAME AS PRODUCT DETAILS) -->
+  <div class="container pb-5 mt-5">
+    <h4 class="fw-semibold mb-4">You may also like</h4>
+
+    <div class="row g-4">
+      <% if (!relatedProducts || !relatedProducts.length) { %>
+        <p class="text-muted">No related products found.</p>
+      <% } %>
+
+      <% relatedProducts?.forEach(p => { %>
+        <div class="col-lg-3 col-md-4 col-sm-6">
+          <a href="/user/product/<%= p.product_id %>" class="text-decoration-none text-dark">
+            <div class="card h-100 shadow-sm related-card">
+              <img src="/uploads/<%= p.thumbnail %>" class="card-img-top">
+              <div class="card-body">
+                <h6><%= p.title %></h6>
+                <span class="fw-semibold text-success">₹ <%= p.sale_price %></span>
+                <div class="text-muted small"><%= p.colorsCount %> colors</div>
+              </div>
+            </div>
+          </a>
+        </div>
+      <% }) %>
+    </div>
+  </div>
+
+</div>
+
+<%- include('./userPartials/footer') %>

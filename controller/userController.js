@@ -4,9 +4,11 @@ const bcrypt = require('bcryptjs');
 const Address = require('../db/address');
 const Product = require('../db/productModel');
 const Category = require('../db/categoryModel');
+const Cart  = require('../db/cartModel')
 const Variant = require('../db/variantModel');
 const { sendOtpMail } = require('../Services/emailService')
 const { generateReferralCode } = require('../Services/referralService');
+const HttpStatus = require('../constants/httpStatus')
 
 
 // HOME PAGE
@@ -657,9 +659,7 @@ exports.getProductDetails = async (req, res) => {
   try {
     const product = req.product;
 
-    if (!product) {
-      return res.redirect('/user/products');
-    }
+    if (!product) return res.redirect('/user/products');
 
     const category = await Category.findOne({
       category_id: product.category_id,
@@ -670,9 +670,7 @@ exports.getProductDetails = async (req, res) => {
       product_id: product.product_id
     }).lean();
 
-    if (!variants.length) {
-      return res.redirect('/user/products');
-    }
+    if (!variants.length) return res.redirect('/user/products');
 
     const colorMap = {};
     let totalStock = 0;
@@ -688,6 +686,7 @@ exports.getProductDetails = async (req, res) => {
       }
 
       colorMap[v.color].sizes.push({
+        variant_id: v.variant_id,   // ✅ REQUIRED
         size: v.size,
         stock: v.stock
       });
@@ -701,9 +700,7 @@ exports.getProductDetails = async (req, res) => {
       category_id: product.category_id,
       status: true,
       product_id: { $ne: product.product_id }
-    })
-      .limit(4)
-      .lean();
+    }).limit(4).lean();
 
     for (const rp of relatedProducts) {
       const rVariants = await Variant.find({
@@ -713,14 +710,9 @@ exports.getProductDetails = async (req, res) => {
       rp.colorsCount = [...new Set(rVariants.map(v => v.color))].length;
     }
 
-    const breadcrumbLink = category
-      ? `/user/products?category=${category.category_id}`
-      : '/user/products';
-
     return res.render('user/product-details', {
       product,
       category,
-      breadcrumbLink,
       colorMap,
       colors,
       defaultColor,
@@ -733,6 +725,10 @@ exports.getProductDetails = async (req, res) => {
     return res.redirect('/user/products');
   }
 };
+
+
+
+
 
 
 

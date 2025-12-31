@@ -3,6 +3,7 @@ const router = express.Router();
 const userController = require('../controller/userController');
 const { verifyUser, noCache } = require('../middleware/userMiddleware');
 const addressController = require('../controller/addressController');
+const cartController = require('../controller/cartController')
 const passport = require('passport');
 const productStatus = require('../middleware/checkProductActive')
 
@@ -50,6 +51,10 @@ router.delete('/address/:id', verifyUser, addressController.deleteAddress);
 //PRODUCTS
 router.get('/products', userController.getProducts);
 router.get('/product/:id',productStatus, userController.getProductDetails)
+
+//CART
+router.get('/cart',verifyUser, cartController.getCartPage)
+router.post('/cart/add', verifyUser, cartController.addToCart);
 
 router.get('/logout',userController.logout)
 

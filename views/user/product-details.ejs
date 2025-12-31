@@ -145,12 +145,10 @@
       <h6>Size</h6>
       <div id="sizes" class="d-flex mb-4"></div>
 
-      <button class="btn btn-success w-100 mb-2" <%= isOutOfStock ? 'disabled' : '' %>>
+      <button id="addToCartBtn"
+        class="btn btn-success w-100 mb-2"
+        <%= isOutOfStock ? 'disabled' : '' %>>
         ADD TO CART
-      </button>
-
-      <button class="btn btn-dark w-100 mb-2" <%= isOutOfStock ? 'disabled' : '' %>>
-        BUY NOW
       </button>
 
       <button class="btn btn-outline-dark w-100">
@@ -237,49 +235,90 @@
   let images = [];
   let currentIndex = 0;
   let scale = 1;
+  let selectedVariant = null;
 
   function renderImages(color) {
-    images = colorMap[color].images;
+    images = colorMap[color].images || [];
+    if (!images.length) return;
+
     currentIndex = 0;
     mainImage.src = '/uploads/' + images[0];
+
     thumbs.innerHTML = images.map((img,i)=>
       `<img src="/uploads/${img}" class="thumb" onclick="setImage(${i})">`
     ).join('');
   }
 
   function renderSizes(color) {
-    sizes.innerHTML = colorMap[color].sizes.map(s => `
-      <div class="option-box ${s.stock===0?'option-disabled':''}">
-        ${s.size}
-        <div class="stock-text ${s.stock===0?'out-stock':'low-stock'}">
-          ${s.stock===0 ? 'Out of stock' :
-            s.stock<4 ? `Only ${s.stock} left` : ''}
+    const sizeList = colorMap[color].sizes;
+
+    sizes.innerHTML = sizeList.map(v => `
+      <div class="option-box ${v.stock === 0 ? 'option-disabled' : ''}"
+           data-variant="${v.variant_id}">
+        ${v.size}
+        <div class="stock-text ${v.stock === 0 ? 'out-stock' : 'low-stock'}">
+          ${v.stock === 0
+            ? 'Out of stock'
+            : v.stock < 4 ? `Only ${v.stock} left` : ''}
         </div>
       </div>
     `).join('');
   }
 
-  function setImage(i){ currentIndex=i; mainImage.src='/uploads/'+images[i]; }
-  function openZoom(){ zoomImg.src='/uploads/'+images[currentIndex]; scale=1; zoomImg.style.transform='scale(1)'; new bootstrap.Modal(zoomModal).show(); }
-  zoomContainer.addEventListener('wheel',e=>{ e.preventDefault(); scale+=e.deltaY*-0.001; scale=Math.min(Math.max(1,scale),4); zoomImg.style.transform=`scale(${scale})`; });
-  function next(){ currentIndex=(currentIndex+1)%images.length; openZoom(); }
-  function prev(){ currentIndex=(currentIndex-1+images.length)%images.length; openZoom(); }
+  document.getElementById('sizes').addEventListener('click', e => {
+    const box = e.target.closest('.option-box');
+    if (!box || box.classList.contains('option-disabled')) return;
 
-  document.querySelectorAll('.color-box').forEach(b=>{
-    b.onclick=()=>{
-      document.querySelectorAll('.color-box').forEach(x=>x.classList.remove('option-active'));
+    document.querySelectorAll('#sizes .option-box')
+      .forEach(b => b.classList.remove('option-active'));
+
+    box.classList.add('option-active');
+    selectedVariant = box.dataset.variant;
+  });
+
+  document.querySelectorAll('.color-box').forEach(b => {
+    b.onclick = () => {
+      document.querySelectorAll('.color-box')
+        .forEach(x => x.classList.remove('option-active'));
+
       b.classList.add('option-active');
-      currentColor=b.dataset.color;
+      currentColor = b.dataset.color;
+      selectedVariant = null;
       renderImages(currentColor);
       renderSizes(currentColor);
     };
   });
 
-  mainImage.onclick=openZoom;
-  document.querySelector(`[data-color="${currentColor}"]`).classList.add('option-active');
+  document.getElementById('addToCartBtn').onclick = () => {
+    if (!selectedVariant) {
+      alert('Please select size');
+      return;
+    }
+
+    fetch('/user/cart/add', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        product_id: "<%= product.product_id %>",
+        variant_id: selectedVariant
+      })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.error) alert(data.error);
+      else window.location.href = '/user/cart';
+    });
+  };
+
+  function setImage(i){ currentIndex=i; mainImage.src='/uploads/'+images[i]; }
+
+  document.querySelector(`[data-color="${currentColor}"]`)
+    .classList.add('option-active');
+
   renderImages(currentColor);
   renderSizes(currentColor);
 </script>
+
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <%- include('./userPartials/footer') %>
