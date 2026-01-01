@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Checkout</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- Minimal reset + layout -->
+  <style>
+    body {
+      margin: 0;
+      font-family: Inter, system-ui, -apple-system, sans-serif;
+      background: #fafafa;
+      color: #111;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 40px auto;
+      padding: 0 24px;
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 40px;
+    }
+
+    h2 {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      margin-bottom: 24px;
+    }
+
+    .muted {
+      font-size: 13px;
+      color: #666;
+    }
+
+    /* LEFT */
+    .address p {
+      margin: 4px 0;
+      font-size: 14px;
+    }
+
+    .payment-option {
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+    }
+
+    .payment-option input {
+      accent-color: #2563eb;
+    }
+
+    /* RIGHT */
+    .product {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .product img {
+      width: 64px;
+      height: 64px;
+      border-radius: 8px;
+      object-fit: cover;
+      background: #eee;
+    }
+
+    .product-name {
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .price {
+      margin-left: auto;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .divider {
+      height: 1px;
+      background: #eee;
+      margin: 16px 0;
+    }
+
+    .row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 14px;
+      margin: 8px 0;
+    }
+
+    .total {
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .pay-btn {
+      width: 100%;
+      margin-top: 24px;
+      background: #111827;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 14px;
+      font-size: 15px;
+      cursor: pointer;
+    }
+
+    .pay-btn:hover {
+      background: #000;
+    }
+
+    @media (max-width: 900px) {
+      .container {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <form method="POST" action="/checkout/pay">
+    <div class="container">
+
+      <!-- LEFT COLUMN -->
+      <div>
+        <div class="card address">
+          <h2>Ship to</h2>
+          <p><strong><%= user.name %></strong></p>
+          <p><%= user.address.line1 %></p>
+          <p><%= user.address.city %>, <%= user.address.state %> <%= user.address.zip %></p>
+          <p><%= user.address.country %></p>
+        </div>
+
+        <div class="card">
+          <h2>Payment</h2>
+          <p class="muted">All transactions are secure and encrypted.</p>
+
+          <label class="payment-option">
+            <input type="radio" name="paymentMethod" value="razorpay" checked />
+            Cards, UPI, NetBanking, BNPL (Razorpay)
+          </label>
+        </div>
+      </div>
+
+      <!-- RIGHT COLUMN -->
+      <div>
+        <div class="card">
+          <% cart.items.forEach(item => { %>
+            <div class="product">
+              <img src="<%= item.image %>" alt="<%= item.name %>" />
+              <div>
+                <div class="product-name"><%= item.name %></div>
+                <div class="muted"><%= item.variant %></div>
+              </div>
+              <div class="price">₹<%= item.price %></div>
+            </div>
+          <% }) %>
+
+          <div class="divider"></div>
+
+          <div class="row">
+            <span>Subtotal</span>
+            <span>₹<%= cart.subtotal %></span>
+          </div>
+
+          <div class="row">
+            <span>Shipping</span>
+            <span>FREE</span>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="row total">
+            <span>Total</span>
+            <span>₹<%= cart.total %></span>
+          </div>
+
+          <button class="pay-btn" type="submit">
+            Pay now
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </form>
+</body>
+</html>

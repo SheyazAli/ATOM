@@ -55,6 +55,10 @@ router.get('/product/:id',productStatus, userController.getProductDetails)
 //CART
 router.get('/cart',verifyUser, cartController.getCartPage)
 router.post('/cart/add', verifyUser, cartController.addToCart);
+router.patch('/cart/item/:cartItemId',verifyUser,cartController.updateCartQuantity);
+
+router.delete('/cart/item/:cartItemId',verifyUser,cartController.removeCartItem);
+
 
 router.get('/logout',userController.logout)
 

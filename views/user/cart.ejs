@@ -3,52 +3,38 @@
 <style>
   body { background:#fafafa; }
 
-  /* ---------- SIDEBAR (SAME AS ACCOUNT) ---------- */
+  /* ... (Keep existing styles unchanged) ... */
+
   .promo-card {
-    background: #000;
-    color: #fff;
-    border-radius: 14px;
-    padding: 20px;
-    font-size: 14px;
+    background:#000;
+    color:#fff;
+    border-radius:14px;
+    padding:20px;
+    font-size:14px;
   }
 
-  .promo-card span {
-    color: #28a745;
-    font-weight: 600;
-  }
-
-  .account-menu {
-    display: flex;
-    flex-direction: column;
-  }
+  .promo-card span { color:#28a745; font-weight:600; }
 
   .account-menu a {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 14px 16px;
-    border-radius: 10px;
-    text-decoration: none;
-    color: #111;
-    margin-bottom: 6px;
-    font-size: 15px;
-    background: #fff;
-    border: 1px solid #eaeaea;
-    transition: all .2s ease;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:14px 16px;
+    border-radius:10px;
+    text-decoration:none;
+    color:#111;
+    margin-bottom:6px;
+    font-size:15px;
+    background:#fff;
+    border:1px solid #eaeaea;
   }
 
   .account-menu a.active {
-    background: #f1faf4;
-    color: #198754;
-    font-weight: 600;
-    border-color: #cdebdc;
+    background:#f1faf4;
+    color:#198754;
+    font-weight:600;
   }
 
-  .account-menu a:hover {
-    background: #f7f7f7;
-  }
-
-  /* ---------- CART ---------- */
   .cart-card {
     background:#fff;
     border-radius:12px;
@@ -72,6 +58,14 @@
     background:#fff;
     border-radius:4px;
     cursor:pointer;
+    font-weight:600;
+    /* Adding transition for better user feedback */
+    transition: opacity 0.1s;
+  }
+
+  .qty-btn:disabled {
+    opacity:.5;
+    cursor:not-allowed;
   }
 
   .summary-box {
@@ -82,21 +76,24 @@
     top:20px;
   }
 
-  /* ---------- RELATED PRODUCTS ---------- */
   .related-card img {
     aspect-ratio:5/7;
     object-fit:cover;
+    max-height:260px;
   }
+
+  .related-card .card-body { padding:10px 12px; }
+  .related-card h6 { font-size:14px; margin-bottom:4px; }
+  .related-card span { font-size:14px; }
+  .related-card .text-muted { font-size:12px; }
 </style>
 
 <div class="container py-4">
   <div class="row">
 
-    <!-- SIDEBAR -->
     <div class="col-lg-3 col-md-4">
-
       <div class="promo-card mb-4">
-        <div class="fw-semibold mb-1">BRIGHT & BOLD</div>
+        <div class="fw-semibold">BRIGHT & BOLD</div>
         <div>PICKS TO LIGHT UP YOUR STYLE</div>
         <div class="mt-2">UP TO <span>40% OFF</span></div>
       </div>
@@ -106,16 +103,13 @@
           <span><i class="bi bi-cart me-2"></i>Cart</span>
           <i class="bi bi-chevron-right"></i>
         </a>
-
         <a href="/user/wishlist">
           <span><i class="bi bi-heart me-2"></i>Wishlist</span>
           <i class="bi bi-chevron-right"></i>
         </a>
       </div>
-
     </div>
 
-    <!-- CART ITEMS -->
     <div class="col-lg-6 col-md-8">
       <h5 class="fw-semibold mb-3">Cart</h5>
 
@@ -124,86 +118,70 @@
       <% } %>
 
       <% cartItems.forEach(item => { %>
-        <div class="cart-card">
+        <div class="cart-card"
+          data-cart-id="<%= item.cartItemId %>"
+          data-price="<%= item.price_snapshot %>"
+          data-stock="<%= item.stock %>">
 
           <img src="/uploads/<%= item.image %>">
 
           <div class="flex-grow-1">
-            <h6 class="mb-1"><%= item.title %></h6>
-
-            <div class="text-success small mb-1">
-              <%= item.stock > 0 ? 'In Stock' : 'Out of Stock' %>
-            </div>
+            <h6><%= item.title %></h6>
 
             <div class="small text-muted mb-2">
               Size: <%= item.size %> · Color: <%= item.color %>
             </div>
 
             <div class="d-flex align-items-center gap-2 mb-2">
-              <button class="qty-btn">−</button>
-              <span><%= item.quantity %></span>
-              <button class="qty-btn">+</button>
+              <button class="qty-btn minus" data-delta="-1">−</button>
+              <span class="qty"><%= item.quantity %></span>
+              <button class="qty-btn plus" data-delta="1">+</button>
             </div>
 
-            <div class="small text-muted">
-              <i class="bi bi-heart"></i> Move to Wishlist
-              &nbsp;&nbsp;
-              <span class="text-danger">Remove</span>
+            <div class="small">
+              <a href="javascript:void(0)"
+                 onclick="addToWishlist('<%= item.cartItemId %>')"
+                 class="me-3 text-decoration-none">
+                <i class="bi bi-heart"></i> Wishlist
+              </a>
+
+              <a href="javascript:void(0)"
+                 onclick="removeItem('<%= item.cartItemId %>')"
+                 class="text-danger text-decoration-none">
+                Remove
+              </a>
             </div>
           </div>
-
-          <div class="fw-semibold">
-            ₹ <%= item.itemTotal %>
-          </div>
-
         </div>
       <% }) %>
     </div>
 
-    <!-- ORDER SUMMARY -->
     <div class="col-lg-3">
       <div class="summary-box">
-        <h6 class="fw-semibold mb-3">Order Summary</h6>
+        <h6 class="fw-semibold">Order Summary</h6>
 
         <div class="d-flex justify-content-between mb-2">
           <span>Subtotal</span>
-          <span>₹ <%= subtotal %></span>
-        </div>
-
-        <div class="d-flex justify-content-between mb-2">
-          <span>Delivery</span>
-          <span class="text-success">FREE</span>
+          <span id="subtotal">₹ <%= subtotal %></span>
         </div>
 
         <hr>
 
         <div class="d-flex justify-content-between mb-3">
           <strong>Total</strong>
-          <strong>₹ <%= subtotal %></strong>
+          <strong id="grandTotal">₹ <%= subtotal %></strong>
         </div>
 
-        <button class="btn btn-dark w-100 mb-2">
-          Proceed to Checkout
-        </button>
-
-        <button class="btn btn-outline-secondary w-100">
-          Continue Shopping
-        </button>
+        <button class="btn btn-dark w-100">Proceed to Checkout</button>
       </div>
     </div>
 
   </div>
 
-  <!-- RELATED PRODUCTS (SAME AS PRODUCT DETAILS) -->
-  <div class="container pb-5 mt-5">
+  <div class="mt-5">
     <h4 class="fw-semibold mb-4">You may also like</h4>
-
     <div class="row g-4">
-      <% if (!relatedProducts || !relatedProducts.length) { %>
-        <p class="text-muted">No related products found.</p>
-      <% } %>
-
-      <% relatedProducts?.forEach(p => { %>
+      <% relatedProducts.forEach(p => { %>
         <div class="col-lg-3 col-md-4 col-sm-6">
           <a href="/user/product/<%= p.product_id %>" class="text-decoration-none text-dark">
             <div class="card h-100 shadow-sm related-card">
@@ -219,7 +197,125 @@
       <% }) %>
     </div>
   </div>
-
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  // Attach one listener to the document and delegate the click event
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.qty-btn');
+    if (btn) {
+      // Find the closest parent .cart-card
+      const card = btn.closest('.cart-card');
+      const delta = Number(btn.dataset.delta);
+      if (card && delta !== 0) {
+        changeQty(card, delta);
+      }
+    }
+  });
+
+  // Initial sync for button states
+  document.querySelectorAll('.cart-card').forEach(card => {
+    syncButtons(card);
+  });
+
+  // Ensure the initial total display is correct on load
+  // (Optional, as EJS should render it, but good as a fallback)
+  recalculateSubtotal(); 
+});
+
+// Helper function to format currency (simple version)
+function formatCurrency(amount) {
+    // Assuming '₹' is the correct symbol and 2 decimal places are required
+    return `₹ ${parseFloat(amount).toFixed(0)}`; 
+}
+
+function recalculateSubtotal() {
+  let subtotal = 0;
+  document.querySelectorAll('.cart-card').forEach(card => {
+    // Use Number() for robust parsing
+    const price = Number(card.dataset.price) || 0; 
+    const qty = Number(card.querySelector('.qty').innerText) || 0;
+    subtotal += price * qty;
+  });
+  
+  // Update the DOM elements with the new formatted total
+  const formattedTotal = formatCurrency(subtotal);
+  document.getElementById('subtotal').innerText = formattedTotal;
+  document.getElementById('grandTotal').innerText = formattedTotal;
+}
+
+async function changeQty(card, delta) {
+  const stock = Number(card.dataset.stock);
+  const cartItemId = card.dataset.cartId;
+  const qtyEl = card.querySelector('.qty');
+  const buttons = card.querySelectorAll('.qty-btn');
+
+  const oldQty = Number(qtyEl.innerText);
+  const tempNewQty = oldQty + delta; // Calculate potential new quantity
+
+  // 1. Client-side Boundary Check (to prevent unnecessary requests)
+  if (tempNewQty < 1 || tempNewQty > stock) {
+    // Optional: show a temporary message like "Minimum quantity reached"
+    return;
+  }
+
+  // 2. Disable buttons during request to prevent double-clicks
+  buttons.forEach(btn => btn.disabled = true);
+  
+  try {
+    const response = await fetch(`/user/cart/item/${cartItemId}`, {
+      method:'PATCH',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ delta })
+    });
+
+    const data = await response.json();
+
+    if (response.ok && data.success) {
+      // 3. SUCCESS: Update DOM with confirmed quantity
+      qtyEl.innerText = data.newQty; 
+      
+      // 4. IMPORTANT: Recalculate and display new total
+      recalculateSubtotal(); 
+
+    } else {
+      // 5. FAILURE: Server returned an error (e.g., stock issue)
+      alert(data.error || 'Failed to update quantity. Please try again.');
+    }
+  } catch (error) {
+    // 6. NETWORK FAILURE: Request failed
+    console.error('Fetch error:', error);
+    alert('A network error occurred. Please check your connection.');
+  } finally {
+    // 7. Re-enable buttons and sync state based on the current quantity
+    syncButtons(card);
+  }
+}
+
+function syncButtons(card) {
+  const qty = Number(card.querySelector('.qty').innerText);
+  const stock = Number(card.dataset.stock);
+  
+  // Re-enable and apply limits
+  card.querySelector('.minus').disabled = qty <= 1;
+  card.querySelector('.plus').disabled  = qty >= stock;
+}
+
+function removeItem(id) {
+  if (confirm('Are you sure you want to remove this item?')) {
+    fetch(`/user/cart/item/${id}`, { method:'DELETE' })
+      .then(()=>location.reload());
+  }
+}
+
+function addToWishlist(id) {
+  fetch('/user/wishlist/add-from-cart', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({ cartItemId:id })
+  }).then(()=>location.reload());
+}
+</script>
 
 <%- include('./userPartials/footer') %>

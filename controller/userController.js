@@ -729,9 +729,6 @@ exports.getProductDetails = async (req, res) => {
 
 
 
-
-
-
 exports.logout = (req, res) => {
   res.clearCookie('userToken',{
     httpOnly: true,
