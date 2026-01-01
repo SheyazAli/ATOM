@@ -726,8 +726,70 @@ exports.getProductDetails = async (req, res) => {
   }
 };
 
+exports.getCheckout = async (req, res) => {
+  try {
+    const cartUserId = req.user.user_id;
+    const addressUserId = req.user._id.toString();
 
+    const cartDoc = await Cart.findOne({ user_id: cartUserId }).lean();
+    if (!cartDoc || !cartDoc.items.length) {
+      return res.redirect('/user/cart');
+    }
 
+    let items = [];
+    let subtotal = 0;
+
+    for (const item of cartDoc.items) {
+      const product = await Product.findOne({
+        product_id: item.product_id,
+        status: true
+      }).lean();
+
+      const variant = await Variant.findOne({
+        variant_id: item.variant_id
+      }).lean();
+
+      if (!product || !variant) continue;
+
+      const itemTotal = item.quantity * item.price_snapshot;
+      subtotal += itemTotal;
+
+      items.push({
+        name: product.title,
+        image: variant.images?.[0] || 'default-product.webp',
+        variant: `${variant.size} · ${variant.color}`,
+        quantity: item.quantity,
+        price: item.price_snapshot,
+        itemTotal
+      });
+    }
+    const addresses = await Address.find({
+      user_id: addressUserId
+    }).lean();
+
+    const defaultAddress =
+      addresses.find(a => a.is_default) || addresses[0] || null;
+
+    return res.render('user/checkout', {
+      cart: {
+        items,
+        subtotal,
+        total: subtotal
+      },
+      user: {
+        name: `${req.user.first_name} ${req.user.last_name}`
+      },
+      addresses,
+      defaultAddress
+    });
+
+  } catch (error) {
+    console.error('GET CHECKOUT ERROR:', error);
+    return res
+      .status(HttpStatus.INTERNAL_SERVER_ERROR)
+      .render('user/500');
+  }
+};
 
 exports.logout = (req, res) => {
   res.clearCookie('userToken',{

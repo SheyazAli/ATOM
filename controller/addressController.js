@@ -31,7 +31,6 @@ exports.getAddressPage = async (req, res) => {
 }
 };
 
-
 exports.getAddAddress = (req, res) => {
   try{
 res.render('user/address-add', {
@@ -45,7 +44,6 @@ res.render('user/address-add', {
 }
   
 };
-
 
 exports.postAddAddress = async (req, res) => {
   try {
@@ -97,7 +95,6 @@ exports.postAddAddress = async (req, res) => {
 }
 };
 
-
 exports.getEditAddress = async (req, res) => {
   try {
     const userId = req.user._id; 
@@ -119,7 +116,6 @@ exports.getEditAddress = async (req, res) => {
     res.redirect('/user/address');
   }
 };
-
 
 exports.updateAddress = async (req, res) => {
   try {
@@ -166,8 +162,6 @@ exports.updateAddress = async (req, res) => {
     .json({ success: false });
 }
 };
-
-
 
 exports.deleteAddress = async (req, res) => {
   try {

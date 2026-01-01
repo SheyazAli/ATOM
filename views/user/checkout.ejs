@@ -1,200 +1,265 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <title>Checkout</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<%- include('./userPartials/navbar') %>
 
-  <!-- Minimal reset + layout -->
-  <style>
-    body {
-      margin: 0;
-      font-family: Inter, system-ui, -apple-system, sans-serif;
-      background: #fafafa;
-      color: #111;
-    }
+<style>
+  body { background:#fafafa; }
 
-    .container {
-      max-width: 1200px;
-      margin: 40px auto;
-      padding: 0 24px;
-      display: grid;
-      grid-template-columns: 1.1fr 0.9fr;
-      gap: 40px;
-    }
+  .checkout-card {
+    background:#fff;
+    border-radius:12px;
+    padding:20px;
+    margin-bottom:16px;
+    border:1px solid #eaeaea;
+  }
 
-    h2 {
-      font-size: 16px;
-      font-weight: 600;
-      margin-bottom: 12px;
-    }
+  .address p {
+    margin:4px 0;
+    font-size:14px;
+  }
 
-    .card {
-      background: #fff;
-      border-radius: 12px;
-      padding: 20px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-      margin-bottom: 24px;
-    }
+  .payment-option {
+    border:1px solid #e5e7eb;
+    border-radius:10px;
+    padding:14px;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    cursor:pointer;
+    margin-bottom:10px;
+    font-size:14px;
+  }
 
-    .muted {
-      font-size: 13px;
-      color: #666;
-    }
+  .payment-option input {
+    accent-color:#111;
+  }
 
-    /* LEFT */
-    .address p {
-      margin: 4px 0;
-      font-size: 14px;
-    }
+  .payment-option.disabled {
+    opacity:.5;
+    cursor:not-allowed;
+  }
 
-    .payment-option {
-      border: 1px solid #e5e7eb;
-      border-radius: 10px;
-      padding: 14px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      cursor: pointer;
-    }
+  .product {
+    display:flex;
+    gap:12px;
+    margin-bottom:14px;
+  }
 
-    .payment-option input {
-      accent-color: #2563eb;
-    }
+  .product img {
+    width:70px;
+    aspect-ratio:5/7;
+    object-fit:cover;
+    border-radius:6px;
+    background:#eee;
+  }
 
-    /* RIGHT */
-    .product {
-      display: flex;
-      gap: 12px;
-      margin-bottom: 16px;
-    }
+  .product-name {
+    font-size:14px;
+    font-weight:500;
+  }
 
-    .product img {
-      width: 64px;
-      height: 64px;
-      border-radius: 8px;
-      object-fit: cover;
-      background: #eee;
-    }
+  .price {
+    margin-left:auto;
+    font-weight:500;
+  }
 
-    .product-name {
-      font-size: 14px;
-      font-weight: 500;
-    }
+  .summary-box {
+    background:#fff;
+    border-radius:12px;
+    padding:20px;
+    border:1px solid #eaeaea;
+    position:sticky;
+    top:20px;
+  }
 
-    .price {
-      margin-left: auto;
-      font-size: 14px;
-      font-weight: 500;
-    }
+  .divider {
+    height:1px;
+    background:#eee;
+    margin:16px 0;
+  }
 
-    .divider {
-      height: 1px;
-      background: #eee;
-      margin: 16px 0;
-    }
+  .row-line {
+    display:flex;
+    justify-content:space-between;
+    font-size:14px;
+    margin:8px 0;
+  }
 
-    .row {
-      display: flex;
-      justify-content: space-between;
-      font-size: 14px;
-      margin: 8px 0;
-    }
+  .total {
+    font-size:16px;
+    font-weight:600;
+  }
 
-    .total {
-      font-size: 16px;
-      font-weight: 600;
-    }
+  .pay-btn {
+    width:100%;
+    margin-top:20px;
+    background:#5cb85c;
+    color:#fff;
+    border:none;
+    border-radius:10px;
+    padding:14px;
+    font-size:15px;
+    cursor:pointer;
+  }
 
-    .pay-btn {
-      width: 100%;
-      margin-top: 24px;
-      background: #111827;
-      color: #fff;
-      border: none;
-      border-radius: 10px;
-      padding: 14px;
-      font-size: 15px;
-      cursor: pointer;
-    }
+  .pay-btn:hover {
+    background:#7ace7a;
+  }
+  .cart-btn{
+    width:100%;
+    margin-top:20px;
+    background:#111827;
+    color:#fff;
+    border:none;
+    border-radius:10px;
+    padding:14px;
+    font-size:15px;
+    cursor:pointer;
+  }
+  .cart-btn:hover {
+    background:#000;
+  }
+</style>
 
-    .pay-btn:hover {
-      background: #000;
-    }
+<div class="container py-4">
+  <div class="row">
 
-    @media (max-width: 900px) {
-      .container {
-        grid-template-columns: 1fr;
-      }
-    }
-  </style>
-</head>
+    <!-- LEFT COLUMN -->
+    <div class="col-lg-7 col-md-7">
 
-<body>
-  <form method="POST" action="/checkout/pay">
-    <div class="container">
+      <!-- ADDRESS -->
+      <div class="checkout-card address">
+        <h6 class="fw-semibold mb-3">Ship to</h6>
 
-      <!-- LEFT COLUMN -->
-      <div>
-        <div class="card address">
-          <h2>Ship to</h2>
-          <p><strong><%= user.name %></strong></p>
-          <p><%= user.address.line1 %></p>
-          <p><%= user.address.city %>, <%= user.address.state %> <%= user.address.zip %></p>
-          <p><%= user.address.country %></p>
+        <div id="selectedAddress">
+          <% if (defaultAddress) { %>
+            <p><strong><%= user.name %></strong></p>
+            <p><%= defaultAddress.building_name %></p>
+            <p><%= defaultAddress.address_line_1 %></p>
+            <p>
+              <%= defaultAddress.city %>,
+              <%= defaultAddress.state %>
+              <%= defaultAddress.postal_code %>
+            </p>
+            <p><%= defaultAddress.country %></p>
+          <% } else { %>
+            <p class="text-muted">No address found</p>
+          <% } %>
         </div>
 
-        <div class="card">
-          <h2>Payment</h2>
-          <p class="muted">All transactions are secure and encrypted.</p>
-
-          <label class="payment-option">
-            <input type="radio" name="paymentMethod" value="razorpay" checked />
-            Cards, UPI, NetBanking, BNPL (Razorpay)
-          </label>
+        <div class="mt-3">
+          <select class="form-select" id="addressSelect">
+            <% addresses.forEach(addr => { %>
+              <option
+                value="<%= addr.address_id %>"
+                <%= defaultAddress && addr.address_id === defaultAddress.address_id ? 'selected' : '' %>>
+                <%= addr.building_name %>, <%= addr.city %>, <%= addr.state %>
+              </option>
+            <% }) %>
+            <option value="add_new">➕ Add new address</option>
+          </select>
         </div>
       </div>
 
-      <!-- RIGHT COLUMN -->
-      <div>
-        <div class="card">
-          <% cart.items.forEach(item => { %>
-            <div class="product">
-              <img src="<%= item.image %>" alt="<%= item.name %>" />
-              <div>
-                <div class="product-name"><%= item.name %></div>
-                <div class="muted"><%= item.variant %></div>
-              </div>
-              <div class="price">₹<%= item.price %></div>
-            </div>
-          <% }) %>
+      <!-- PAYMENT -->
+      <div class="checkout-card">
+        <h6 class="fw-semibold mb-2">Payment</h6>
+        <p class="text-muted small mb-3">All transactions are secure and encrypted.</p>
 
-          <div class="divider"></div>
+        <label class="payment-option">
+          <input type="radio" name="paymentMethod" value="razorpay" checked>
+          Cards, UPI, NetBanking, BNPL (Razorpay)
+        </label>
 
-          <div class="row">
-            <span>Subtotal</span>
-            <span>₹<%= cart.subtotal %></span>
-          </div>
+        <label class="payment-option">
+          <input type="radio" name="paymentMethod" value="cod">
+          Cash on Delivery (COD)
+        </label>
 
-          <div class="row">
-            <span>Shipping</span>
-            <span>FREE</span>
-          </div>
+        <label class="payment-option">
+          <input type="radio" name="paymentMethod" value="wallet">
+          Wallet
+        </label>
 
-          <div class="divider"></div>
-
-          <div class="row total">
-            <span>Total</span>
-            <span>₹<%= cart.total %></span>
-          </div>
-
-          <button class="pay-btn" type="submit">
-            Pay now
-          </button>
-        </div>
+        <label class="payment-option disabled">
+          <input type="radio" disabled>
+          Pay Later (Coming Soon)
+        </label>
       </div>
 
     </div>
-  </form>
-</body>
-</html>
+
+    <!-- RIGHT COLUMN -->
+    <div class="col-lg-5 col-md-5">
+      <div class="summary-box">
+
+        <h6 class="fw-semibold mb-3">Order Summary</h6>
+
+        <% cart.items.forEach(item => { %>
+          <div class="product">
+            <img src="/uploads/<%= item.image %>" alt="<%= item.name %>">
+            <div>
+              <div class="product-name"><%= item.name %></div>
+              <div class="text-muted small"><%= item.variant %></div>
+              <div class="text-muted small">Qty x <%= item.quantity %></div>
+            </div>
+            <div class="price">₹ <%= item.price %></div>
+          </div>
+        <% }) %>
+
+        <div class="divider"></div>
+
+        <div class="row-line">
+          <span>Subtotal</span>
+          <span>₹ <%= cart.subtotal %></span>
+        </div>
+
+        <div class="row-line">
+          <span>Shipping</span>
+          <span>FREE</span>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="row-line total">
+          <span>Total</span>
+          <span>₹ <%= cart.total %></span>
+        </div>
+
+        <form method="POST" action="/checkout/pay">
+          <button class="pay-btn" type="submit">Pay now</button>
+        </form>
+        <form method="POST" action="/user/cart">
+          <button class="cart-btn" type="submit">Back to cart</button>
+        </form>
+
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  const addresses = <%- JSON.stringify(addresses) %>;
+
+  const addressSelect = document.getElementById('addressSelect');
+  const addressContainer = document.getElementById('selectedAddress');
+
+  addressSelect?.addEventListener('change', function () {
+    if (this.value === 'add_new') {
+      window.location.href = '/user/address/add';
+      return;
+    }
+
+    const addr = addresses.find(a => a.address_id === this.value);
+    if (!addr) return;
+
+    addressContainer.innerHTML = `
+      <p><strong><%= user.name %></strong></p>
+      <p>${addr.building_name}</p>
+      <p>${addr.address_line_1}</p>
+      <p>${addr.city}, ${addr.state} ${addr.postal_code}</p>
+      <p>${addr.country}</p>
+    `;
+  });
+</script>
+
+<%- include('./userPartials/footer') %>

@@ -222,7 +222,6 @@ exports.updateCartQuantity = async (req, res) => {
       .json({ error: 'Server error' });
   }
 };
-
 exports.removeCartItem = async (req, res) => {
   try {
     const userId = req.user.user_id;
