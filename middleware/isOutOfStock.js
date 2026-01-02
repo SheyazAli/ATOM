@@ -12,9 +12,6 @@ module.exports = async (req, res, next) => {
       return res.redirect('/user/products');
     }
 
-    /* -----------------------------
-       Calculate total stock
-    ----------------------------- */
     const variants = await Variant.find({
       product_id: product.product_id
     }).lean();

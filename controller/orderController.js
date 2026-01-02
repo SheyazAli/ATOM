@@ -41,21 +41,49 @@ exports.placeOrderCOD = async (req, res) => {
     }
 
     let subtotal = 0;
+    const items = [];
 
-    const items = cartDoc.items.map(item => {
-      const itemTotal = item.price_snapshot * item.quantity;
-      subtotal += itemTotal;
+    /* ================= STOCK VALIDATION ================= */
+    for (const item of cartDoc.items) {
+      const variant = await Variant.findOne({
+        variant_id: item.variant_id
+      });
 
-      return {
+      if (!variant) {
+        return res
+          .status(HttpStatus.BAD_REQUEST)
+          .send('Product variant not found');
+      }
+
+      if (variant.stock < item.quantity) {
+        return res
+          .status(HttpStatus.BAD_REQUEST)
+          .send(
+            `Only ${variant.stock} left for ${variant.variant_id}`
+          );
+      }
+
+      subtotal += item.price_snapshot * item.quantity;
+
+      items.push({
         variant_id: item.variant_id,
         price: item.price_snapshot,
         quantity: item.quantity
-      };
-    });
+      });
+    }
 
-    const shipping = 0; // or calculate later
+    const shipping = 0;
     const total = subtotal + shipping;
 
+    /* ================= STOCK DEDUCTION ================= */
+    for (const item of cartDoc.items) {
+      await Variant.updateOne(
+        { variant_id: item.variant_id },
+        { $inc: { stock: -item.quantity } }
+      );
+    }
+
+    /* ================= CREATE ORDER ================= */
     const order = await Order.create({
       orderNumber: generateOrderNumber(),
       user_id: userId,
@@ -77,6 +105,7 @@ exports.placeOrderCOD = async (req, res) => {
       status: 'placed'
     });
 
+    /* ================= CLEAR CART ================= */
     await Cart.updateOne(
       { user_id: userId },
       { $set: { items: [] } }
@@ -132,7 +161,6 @@ exports.orderSuccessPage = async (req, res) => {
     return res.status(HttpStatus.INTERNAL_SERVER_ERROR).render('user/500');
   }
 };
-
 
 exports.downloadInvoice = async (req, res) => {
   try {
@@ -233,22 +261,34 @@ exports.downloadInvoice = async (req, res) => {
   }
 };
 
-
 exports.getOrders = async (req, res) => {
   try {
     const limit = 6;
     const page = parseInt(req.query.page) || 1;
     const userId = req.user._id;
 
-    const query = { user_id: userId };
-
-    const orders = await Order.find(query)
+    const orders = await Order.find({ user_id: userId })
       .sort({ created_at: -1 })
       .skip((page - 1) * limit)
       .limit(limit)
       .lean();
 
-    const totalOrders = await Order.countDocuments(query);
+    for (const order of orders) {
+      order.thumbnails = [];
+
+      for (const item of order.items.slice(0, 4)) {
+        const variant = await Variant.findOne(
+          { variant_id: item.variant_id },
+          { images: 1 }
+        ).lean();
+
+        if (variant?.images?.length) {
+          order.thumbnails.push(variant.images[0]);
+        }
+      }
+    }
+
+    const totalOrders = await Order.countDocuments({ user_id: userId });
 
     res.render('user/orders', {
       orders,
@@ -256,8 +296,71 @@ exports.getOrders = async (req, res) => {
       totalPages: Math.ceil(totalOrders / limit),
       activePage: 'orders'
     });
-  } catch (err) {
-    console.error(err);
+
+  } catch (error) {
+    console.error('GET ORDERS PAGE ERROR:', error);
     res.status(500).render('user/500');
+  }
+};
+
+exports.getOrderDetails = async (req, res) => {
+  try {
+    const { orderNumber } = req.params;
+    const userId = req.user._id;
+
+    const order = await Order.findOne({
+      orderNumber,
+      user_id: userId
+    }).lean();
+
+    if (!order) {
+      return res.status(HttpStatus.NOT_FOUND).render('user/404');
+    }
+
+    let items = [];
+    let itemTotal = 0;
+
+    for (const item of order.items) {
+      const variant = await Variant.findOne({
+        variant_id: item.variant_id
+      }).lean();
+
+      if (!variant) continue;
+
+      const product = await Product.findOne({
+        product_id: variant.product_id
+      }).lean();
+
+      if (!product) continue;
+
+      const total = item.price * item.quantity;
+      itemTotal += total;
+
+      items.push({
+        name: product.title,
+        image: variant.images?.[0] || 'default-product.webp',
+        size: variant.size,
+        color: variant.color,
+        quantity: item.quantity,
+        price: item.price,
+        total
+      });
+    }
+
+    res.render('user/order-details', {
+      order,
+      activePage: 'orders',
+      items,
+      price: {
+        itemTotal,
+        discount: 0,
+        shipping: order.shipping || 0,
+        finalAmount: order.total
+      }
+    });
+
+  } catch (error) {
+    console.error('GET ORDER DETAILS ERROR:', error);
+    res.status(HttpStatus.INTERNAL_SERVER_ERROR).render('user/500');
   }
 };

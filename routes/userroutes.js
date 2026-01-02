@@ -69,6 +69,8 @@ router.get('/orders/:orderNumber/success', verifyUser, orderController.orderSucc
 router.get('/orders/:orderNumber/invoice',verifyUser,orderController.downloadInvoice);
 
 router.get('/orders',verifyUser, orderController.getOrders)
+router.get('/orders/:orderNumber',verifyUser,orderController.getOrderDetails);
+
 
 router.get('/logout',userController.logout)
 
