@@ -9,6 +9,7 @@ const Order = require('../db/orderModel');
 const Variant = require('../db/variantModel');
 const HttpStatus = require('../constants/httpStatus')
 const PDFDocument = require('pdfkit');
+const { generateOrderNumber } = require('../Services/orderNumberService')
 
 exports.placeOrderCOD = async (req, res) => {
   try {
@@ -54,7 +55,8 @@ exports.placeOrderCOD = async (req, res) => {
     const total = subtotal;
 
     const order = await Order.create({
-      user_id: cartUserId, // keep STRING for consistency
+      orderNumber: generateOrderNumber(),
+      user_id: cartUserId, 
       paymentMethod,
       paymentStatus: 'pending',
       address: {

@@ -108,10 +108,4 @@ const orderSchema = new mongoose.Schema(
   }
 );
 
-/* AUTO-GENERATE 6-DIGIT ORDER NUMBER */
-orderSchema.pre('save', function () {
-  if (this.orderNumber) return;
-  this.orderNumber = Math.floor(100000 + Math.random() * 900000).toString();
-});
-
 module.exports = mongoose.model('Order', orderSchema);
