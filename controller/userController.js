@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const Address = require('../db/address');
 const Product = require('../db/productModel');
 const Category = require('../db/categoryModel');
+const Order = require('../db/orderModel');
 const Cart  = require('../db/cartModel')
 const Variant = require('../db/variantModel');
 const { sendOtpMail } = require('../Services/emailService')
@@ -654,7 +655,6 @@ exports.getProducts = async (req, res) => {
     res.status(500).send('Server error');
   }
 };
-
 exports.getProductDetails = async (req, res) => {
   try {
     const product = req.product;
@@ -726,6 +726,7 @@ exports.getProductDetails = async (req, res) => {
   }
 };
 
+
 exports.getCheckout = async (req, res) => {
   try {
     const cartUserId = req.user.user_id;
@@ -790,6 +791,7 @@ exports.getCheckout = async (req, res) => {
       .render('user/500');
   }
 };
+
 
 exports.logout = (req, res) => {
   res.clearCookie('userToken',{

@@ -1,6 +1,7 @@
 const Admin = require('../db/adminmodel');
 const User = require('../db/user');
 const Product = require('../db/productModel');
+const Order = require('../db/orderModel');
 const Variant = require('../db/variantModel');
 const Category = require('../db/categoryModel');
 const bcrypt = require('bcryptjs');

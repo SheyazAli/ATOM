@@ -1,0 +1,193 @@
+<%- include('./userPartials/navbar') %>
+
+<style>
+  body { background:#fafafa; }
+
+  .success-icon {
+    width:64px;
+    height:64px;
+    border-radius:50%;
+    background:#e6f9ed;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    margin:0 auto 16px;
+    color:#28a745;
+    font-size:30px;
+  }
+
+  .checkout-card {
+    background:#fff;
+    border-radius:12px;
+    padding:20px;
+    margin-bottom:16px;
+    border:1px solid #eaeaea;
+  }
+
+  .summary-box {
+    background:#fff;
+    border-radius:12px;
+    padding:20px;
+    border:1px solid #eaeaea;
+  }
+
+  .product {
+    display:flex;
+    gap:12px;
+    margin-bottom:14px;
+  }
+
+  .product img {
+    width:60px;
+    aspect-ratio:5/7;
+    object-fit:cover;
+    border-radius:6px;
+    background:#eee;
+  }
+
+  .product-name {
+    font-size:14px;
+    font-weight:500;
+  }
+
+  .price {
+    margin-left:auto;
+    font-weight:500;
+  }
+
+  .row-line {
+    display:flex;
+    justify-content:space-between;
+    font-size:14px;
+    margin:8px 0;
+  }
+
+  .total {
+    font-size:16px;
+    font-weight:600;
+  }
+
+  .btn-dark,
+  .btn-outline-dark {
+    border-radius:10px;
+    padding:12px 16px;
+  }
+</style>
+
+<div class="container py-5">
+
+  <!-- HEADER -->
+  <div class="text-center mb-4">
+    <div class="success-icon">✓</div>
+    <h4 class="fw-semibold">Order Placed Successfully!</h4>
+    <p class="text-muted">
+      Order <strong>#<%= order.orderNumber %></strong> has been placed
+    </p>
+  </div>
+
+  <div class="row">
+
+    <!-- LEFT -->
+    <div class="col-lg-7">
+
+      <!-- ORDER INFO -->
+      <div class="checkout-card">
+        <h6 class="fw-semibold mb-3">Order Details</h6>
+
+        <div class="row mb-2">
+          <div class="col-6 text-muted small">Order ID</div>
+          <div class="col-6 text-end">#<%= order.orderNumber %></div>
+        </div>
+
+        <div class="row mb-2">
+          <div class="col-6 text-muted small">Order Status</div>
+          <div class="col-6 text-end text-success text-capitalize">
+            <%= order.status %>
+          </div>
+        </div>
+
+        <div class="row mb-2">
+          <div class="col-6 text-muted small">Payment Method</div>
+          <div class="col-6 text-end text-uppercase">
+            <%= order.paymentMethod %>
+          </div>
+        </div>
+
+        <div class="row mb-2">
+          <div class="col-6 text-muted small">Delivery</div>
+          <div class="col-6 text-end">
+            5–7 working days
+          </div>
+        </div>
+      </div>
+
+      <!-- SHIPPING -->
+      <div class="checkout-card">
+        <h6 class="fw-semibold mb-3">Shipping Address</h6>
+
+        <p class="mb-1"><strong><%= order.address.building_name %></strong></p>
+        <p class="mb-1"><%= order.address.address_line_1 %></p>
+        <p class="mb-1">
+          <%= order.address.city %>, <%= order.address.state %>
+          <%= order.address.postal_code %>
+        </p>
+        <p class="mb-1"><%= order.address.country %></p>
+        <p class="mb-0">Phone: <%= order.address.phone_number %></p>
+      </div>
+
+    </div>
+
+    <!-- RIGHT -->
+    <div class="col-lg-5">
+      <div class="summary-box">
+
+        <h6 class="fw-semibold mb-3">Order Summary</h6>
+
+        <% order.items.forEach(item => { %>
+          <div class="product">
+            <img src="/uploads/<%= item.image %>" alt="<%= item.name %>">
+            <div>
+              <div class="product-name"><%= item.name %></div>
+              <div class="text-muted small"><%= item.variant %></div>
+              <div class="text-muted small">Qty x <%= item.quantity %></div>
+            </div>
+            <div class="price">₹ <%= item.price %></div>
+          </div>
+        <% }) %>
+
+        <hr>
+
+        <div class="row-line">
+          <span>Subtotal</span>
+          <span>₹ <%= order.subtotal %></span>
+        </div>
+
+        <div class="row-line">
+          <span>Shipping</span>
+          <span>FREE</span>
+        </div>
+
+        <div class="row-line total">
+          <span>Total</span>
+          <span>₹ <%= order.total %></span>
+        </div>
+
+        <div class="mt-4 d-grid gap-2">
+          <a href="/user/orders/<%= order.orderNumber %>/invoice"
+             class="btn btn-outline-dark">
+            Download Invoice (PDF)
+          </a>
+
+          <a href="/user/home" class="btn btn-dark">
+            Continue Shopping
+          </a>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<%- include('./userPartials/footer') %>

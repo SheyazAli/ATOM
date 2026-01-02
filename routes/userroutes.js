@@ -4,6 +4,7 @@ const userController = require('../controller/userController');
 const { verifyUser, noCache } = require('../middleware/userMiddleware');
 const addressController = require('../controller/addressController');
 const cartController = require('../controller/cartController')
+const orderController = require('../controller/orderController')
 const passport = require('passport');
 const productStatus = require('../middleware/checkProductActive')
 
@@ -54,13 +55,16 @@ router.get('/product/:id',productStatus, userController.getProductDetails)
 
 //CART
 router.get('/cart',verifyUser, cartController.getCartPage)
-router.post('/cart',verifyUser, cartController.getCartPage)
 router.post('/cart/add', verifyUser, cartController.addToCart);
 router.patch('/cart/item/:cartItemId',verifyUser,cartController.updateCartQuantity);
 
 router.delete('/cart/item/:cartItemId',verifyUser,cartController.removeCartItem);
 
+//checkuot
 router.get('/checkout',verifyUser,userController.getCheckout)
+router.post('/checkout/pay', verifyUser, orderController.placeOrderCOD);
+router.get('/orders/:orderNumber/success', verifyUser, orderController.orderSuccessPage);
+router.get('/orders/:orderNumber/invoice',verifyUser,orderController.downloadInvoice);
 
 router.get('/logout',userController.logout)
 

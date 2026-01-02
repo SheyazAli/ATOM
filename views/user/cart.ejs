@@ -3,8 +3,6 @@
 <style>
   body { background:#fafafa; }
 
-  /* ... (Keep existing styles unchanged) ... */
-
   .promo-card {
     background:#000;
     color:#fff;
@@ -75,6 +73,27 @@
     top:20px;
   }
 
+  /* NEW: Coupon */
+  .coupon-box {
+    display:flex;
+    gap:8px;
+    margin-bottom:16px;
+  }
+
+  .coupon-box input {
+    flex:1;
+    font-size:14px;
+    padding:8px 10px;
+    border-radius:6px;
+    border:1px solid #ddd;
+  }
+
+  .coupon-box button {
+    font-size:14px;
+    padding:8px 14px;
+    border-radius:6px;
+  }
+
   .related-card img {
     aspect-ratio:5/7;
     object-fit:cover;
@@ -92,9 +111,9 @@
 
     <div class="col-lg-3 col-md-4">
       <div class="promo-card mb-4">
-        <div class="fw-semibold">BRIGHT & BOLD</div>
-        <div>PICKS TO LIGHT UP YOUR STYLE</div>
-        <div class="mt-2">UP TO <span>40% OFF</span></div>
+        <div>USE CODE</div>
+        <div class="fw-semibold">ATOM10</div>
+        <div class="mt-2">& GET UP TO <span>40% OFF</span></div>
       </div>
 
       <div class="account-menu">
@@ -157,6 +176,10 @@
 
     <div class="col-lg-3">
       <div class="summary-box">
+        <div class="coupon-box">
+          <input type="text" placeholder="Enter coupon code">
+          <button class="btn btn-outline-dark">Apply</button>
+        </div>
         <h6 class="fw-semibold">Order Summary</h6>
 
         <div class="d-flex justify-content-between mb-2">
@@ -203,7 +226,6 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-  // Attach one listener to the document and delegate the click event
   document.addEventListener('click', (e) => {
     const btn = e.target.closest('.qty-btn');
     if (btn) {
@@ -216,35 +238,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Initial sync for button states
   document.querySelectorAll('.cart-card').forEach(card => {
     syncButtons(card);
   });
 
-  // Ensure the initial total display is correct on load
-  // (Optional, as EJS should render it, but good as a fallback)
   recalculateSubtotal(); 
 });
 
-// Helper function to format currency (simple version)
 function formatCurrency(amount) {
-    // Assuming '₹' is the correct symbol and 2 decimal places are required
     return `₹ ${parseFloat(amount).toFixed(0)}`; 
-}
-
-function recalculateSubtotal() {
-  let subtotal = 0;
-  document.querySelectorAll('.cart-card').forEach(card => {
-    // Use Number() for robust parsing
-    const price = Number(card.dataset.price) || 0; 
-    const qty = Number(card.querySelector('.qty').innerText) || 0;
-    subtotal += price * qty;
-  });
-  
-  // Update the DOM elements with the new formatted total
-  const formattedTotal = formatCurrency(subtotal);
-  document.getElementById('subtotal').innerText = formattedTotal;
-  document.getElementById('grandTotal').innerText = formattedTotal;
 }
 
 async function changeQty(card, delta) {
@@ -254,15 +256,11 @@ async function changeQty(card, delta) {
   const buttons = card.querySelectorAll('.qty-btn');
 
   const oldQty = Number(qtyEl.innerText);
-  const tempNewQty = oldQty + delta; // Calculate potential new quantity
+  const tempNewQty = oldQty + delta;
 
-  // 1. Client-side Boundary Check (to prevent unnecessary requests)
   if (tempNewQty < 1 || tempNewQty > stock) {
-    // Optional: show a temporary message like "Minimum quantity reached"
     return;
   }
-
-  // 2. Disable buttons during request to prevent double-clicks
   buttons.forEach(btn => btn.disabled = true);
   
   try {
@@ -273,26 +271,38 @@ async function changeQty(card, delta) {
     });
 
     const data = await response.json();
-
     if (response.ok && data.success) {
-      // 3. SUCCESS: Update DOM with confirmed quantity
       qtyEl.innerText = data.newQty; 
-      
-      // 4. IMPORTANT: Recalculate and display new total
+      syncButtons(card);
       recalculateSubtotal(); 
-
     } else {
-      // 5. FAILURE: Server returned an error (e.g., stock issue)
       alert(data.error || 'Failed to update quantity. Please try again.');
+      syncButtons(card);
     }
   } catch (error) {
-    // 6. NETWORK FAILURE: Request failed
     console.error('Fetch error:', error);
     alert('A network error occurred. Please check your connection.');
-  } finally {
-    // 7. Re-enable buttons and sync state based on the current quantity
     syncButtons(card);
   }
+}
+
+function recalculateSubtotal() {
+  let subtotal = 0;
+  document.querySelectorAll('.cart-card').forEach(card => {
+    const price = parseFloat(card.dataset.price) || 0; 
+    const qtyEl = card.querySelector('.qty');
+    if (qtyEl) {
+      const qty = parseInt(qtyEl.textContent.trim()) || 0;
+      subtotal += price * qty;
+    }
+  });
+  
+  const formattedTotal = formatCurrency(subtotal);
+  const subtotalEl = document.getElementById('subtotal');
+  const grandTotalEl = document.getElementById('grandTotal');
+  
+  if (subtotalEl) subtotalEl.textContent = formattedTotal;
+  if (grandTotalEl) grandTotalEl.textContent = formattedTotal;
 }
 
 function syncButtons(card) {
