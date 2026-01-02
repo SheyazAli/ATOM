@@ -13,9 +13,7 @@ const { generateOrderNumber } = require('../Services/orderNumberService')
 
 exports.placeOrderCOD = async (req, res) => {
   try {
-    const cartUserId = req.user.user_id;  
-    const addressUserId = req.user._id.toString(); 
-
+    const userId = req.user._id;
     const { paymentMethod, address_id } = req.body;
 
     if (paymentMethod !== 'cod') {
@@ -24,7 +22,7 @@ exports.placeOrderCOD = async (req, res) => {
         .send('Invalid payment method');
     }
 
-    const cartDoc = await Cart.findOne({ user_id: cartUserId }).lean();
+    const cartDoc = await Cart.findOne({ user_id: userId }).lean();
     if (!cartDoc || !cartDoc.items.length) {
       return res
         .status(HttpStatus.BAD_REQUEST)
@@ -32,7 +30,7 @@ exports.placeOrderCOD = async (req, res) => {
     }
 
     const address = await Address.findOne({
-      user_id: addressUserId,
+      user_id: userId,
       address_id
     }).lean();
 
@@ -41,10 +39,13 @@ exports.placeOrderCOD = async (req, res) => {
         .status(HttpStatus.BAD_REQUEST)
         .send('Invalid address');
     }
+
     let subtotal = 0;
 
     const items = cartDoc.items.map(item => {
-      subtotal += item.price_snapshot * item.quantity;
+      const itemTotal = item.price_snapshot * item.quantity;
+      subtotal += itemTotal;
+
       return {
         variant_id: item.variant_id,
         price: item.price_snapshot,
@@ -52,12 +53,13 @@ exports.placeOrderCOD = async (req, res) => {
       };
     });
 
-    const total = subtotal;
+    const shipping = 0; // or calculate later
+    const total = subtotal + shipping;
 
     const order = await Order.create({
       orderNumber: generateOrderNumber(),
-      user_id: cartUserId, 
-      paymentMethod,
+      user_id: userId,
+      paymentMethod: 'cod',
       paymentStatus: 'pending',
       address: {
         building_name: address.building_name,
@@ -70,11 +72,13 @@ exports.placeOrderCOD = async (req, res) => {
       },
       items,
       subtotal,
+      shipping,
       total,
       status: 'placed'
     });
+
     await Cart.updateOne(
-      { user_id: cartUserId },
+      { user_id: userId },
       { $set: { items: [] } }
     );
 
@@ -90,31 +94,30 @@ exports.placeOrderCOD = async (req, res) => {
   }
 };
 
+
 exports.orderSuccessPage = async (req, res) => {
   try {
     const { orderNumber } = req.params;
+    const userId = req.user._id;
 
     const order = await Order.findOne({
       orderNumber,
-      user_id: req.user.user_id 
+      user_id: userId
     }).lean();
 
     if (!order) {
-      return res
-        .status(HttpStatus.NOT_FOUND)
-        .render('user/404');
+      return res.status(HttpStatus.NOT_FOUND).render('user/404');
     }
+
     for (const item of order.items) {
       const variant = await Variant.findOne({
         variant_id: item.variant_id
       }).lean();
-
       if (!variant) continue;
 
       const product = await Product.findOne({
         product_id: variant.product_id
       }).lean();
-
       if (!product) continue;
 
       item.name = product.title;
@@ -126,19 +129,19 @@ exports.orderSuccessPage = async (req, res) => {
 
   } catch (error) {
     console.error('ORDER SUCCESS PAGE ERROR:', error);
-    return res
-      .status(HttpStatus.INTERNAL_SERVER_ERROR)
-      .render('user/500');
+    return res.status(HttpStatus.INTERNAL_SERVER_ERROR).render('user/500');
   }
 };
+
 
 exports.downloadInvoice = async (req, res) => {
   try {
     const { orderNumber } = req.params;
+    const userId = req.user._id;
 
     const order = await Order.findOne({
       orderNumber,
-      user_id: req.user.user_id
+      user_id: userId
     }).lean();
 
     if (!order) {
@@ -146,14 +149,17 @@ exports.downloadInvoice = async (req, res) => {
         .status(HttpStatus.NOT_FOUND)
         .render('user/404');
     }
+
     for (const item of order.items) {
       const variant = await Variant.findOne({
         variant_id: item.variant_id
       }).lean();
+      if (!variant) continue;
 
       const product = await Product.findOne({
         product_id: variant.product_id
       }).lean();
+      if (!product) continue;
 
       item.name = product.title;
       item.variant = `${variant.size} · ${variant.color}`;
@@ -170,7 +176,7 @@ exports.downloadInvoice = async (req, res) => {
 
     doc.pipe(res);
 
-    /*  INVOICE CONTENT*/
+    /* ================= INVOICE CONTENT ================= */
 
     doc.fontSize(18).text('INVOICE', { align: 'center' });
     doc.moveDown();
@@ -181,31 +187,38 @@ exports.downloadInvoice = async (req, res) => {
       .text(`Payment Method: ${order.paymentMethod.toUpperCase()}`)
       .moveDown();
 
-    doc.text('Shipping Address', { underline: true });
-    doc.text(order.address.building_name);
-    doc.text(order.address.address_line_1);
-    doc.text(
-      `${order.address.city}, ${order.address.state} ${order.address.postal_code}`
-    );
-    doc.text(order.address.country);
-    doc.text(`Phone: ${order.address.phone_number}`);
+    doc.fontSize(13).text('Shipping Address', { underline: true });
+    doc.moveDown(0.5);
+
+    doc.fontSize(11)
+      .text(order.address.building_name)
+      .text(order.address.address_line_1)
+      .text(
+        `${order.address.city}, ${order.address.state} ${order.address.postal_code}`
+      )
+      .text(order.address.country)
+      .text(`Phone: ${order.address.phone_number}`);
+
     doc.moveDown();
 
-    doc.text('Items', { underline: true });
+    doc.fontSize(13).text('Items', { underline: true });
     doc.moveDown(0.5);
 
     order.items.forEach(item => {
-      doc.text(`${item.name}`);
-      doc.text(`Variant: ${item.variant}`);
-      doc.text(`Qty: ${item.quantity}`);
-      doc.text(`Price: ₹${item.price}`);
-      doc.text(`Total: ₹${item.total}`);
+      doc.fontSize(11)
+        .text(item.name)
+        .text(`Variant: ${item.variant}`)
+        .text(`Qty: ${item.quantity}`)
+        .text(`Price: ₹${item.price}`)
+        .text(`Total: ₹${item.total}`);
       doc.moveDown();
     });
 
     doc.moveDown();
-    doc.text(`Subtotal: ₹${order.subtotal}`);
-    doc.text(`Shipping: ₹${order.shipping}`);
+    doc.fontSize(12).text(`Subtotal: ₹${order.subtotal}`);
+    doc.text(`Shipping: ₹${order.shipping || 0}`);
+    doc.moveDown(0.5);
+
     doc.fontSize(14).text(`Grand Total: ₹${order.total}`, {
       underline: true
     });
@@ -217,5 +230,34 @@ exports.downloadInvoice = async (req, res) => {
     return res
       .status(HttpStatus.INTERNAL_SERVER_ERROR)
       .render('user/500');
+  }
+};
+
+
+exports.getOrders = async (req, res) => {
+  try {
+    const limit = 6;
+    const page = parseInt(req.query.page) || 1;
+    const userId = req.user._id;
+
+    const query = { user_id: userId };
+
+    const orders = await Order.find(query)
+      .sort({ created_at: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean();
+
+    const totalOrders = await Order.countDocuments(query);
+
+    res.render('user/orders', {
+      orders,
+      currentPage: page,
+      totalPages: Math.ceil(totalOrders / limit),
+      activePage: 'orders'
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).render('user/500');
   }
 };

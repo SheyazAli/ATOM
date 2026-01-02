@@ -63,8 +63,12 @@ router.delete('/cart/item/:cartItemId',verifyUser,cartController.removeCartItem)
 //checkuot
 router.get('/checkout',verifyUser,userController.getCheckout)
 router.post('/checkout/pay', verifyUser, orderController.placeOrderCOD);
+
+//ORDER
 router.get('/orders/:orderNumber/success', verifyUser, orderController.orderSuccessPage);
 router.get('/orders/:orderNumber/invoice',verifyUser,orderController.downloadInvoice);
+
+router.get('/orders',verifyUser, orderController.getOrders)
 
 router.get('/logout',userController.logout)
 

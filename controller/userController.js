@@ -729,10 +729,9 @@ exports.getProductDetails = async (req, res) => {
 
 exports.getCheckout = async (req, res) => {
   try {
-    const cartUserId = req.user.user_id;
-    const addressUserId = req.user._id.toString();
+    const userId = req.user._id;
 
-    const cartDoc = await Cart.findOne({ user_id: cartUserId }).lean();
+    const cartDoc = await Cart.findOne({ user_id: userId }).lean();
     if (!cartDoc || !cartDoc.items.length) {
       return res.redirect('/user/cart');
     }
@@ -764,10 +763,8 @@ exports.getCheckout = async (req, res) => {
         itemTotal
       });
     }
-    const addresses = await Address.find({
-      user_id: addressUserId
-    }).lean();
 
+    const addresses = await Address.find({ user_id: userId }).lean();
     const defaultAddress =
       addresses.find(a => a.is_default) || addresses[0] || null;
 
@@ -791,7 +788,6 @@ exports.getCheckout = async (req, res) => {
       .render('user/500');
   }
 };
-
 
 exports.logout = (req, res) => {
   res.clearCookie('userToken',{

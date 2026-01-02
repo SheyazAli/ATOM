@@ -35,10 +35,11 @@ const orderSchema = new mongoose.Schema(
 
     // 🔹 One user → many orders
     user_id: {
-      type: String,
-      required: true,
-      index: true
-    },
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+    index: true
+  },
 
     // 🔹 Address snapshot (important)
     address: {

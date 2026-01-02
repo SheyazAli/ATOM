@@ -35,11 +35,11 @@ const cartSchema = new mongoose.Schema(
 
     // ONE-TO-ONE RELATION WITH USER
     user_id: {
-      type: String,
-      required: true,
-      unique: true
-    },
-
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+    unique: true
+  },
     items: [cartItemSchema]
   },
   {
