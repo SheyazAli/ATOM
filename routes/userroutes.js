@@ -70,6 +70,8 @@ router.get('/orders/:orderNumber/invoice',verifyUser,orderController.downloadInv
 
 router.get('/orders',verifyUser, orderController.getOrders)
 router.get('/orders/:orderNumber',verifyUser,orderController.getOrderDetails);
+router.get('/orders/:orderNumber/cancel',verifyUser,orderController.getCancelOrder);
+router.post('/orders/:orderNumber/cancel',verifyUser, orderController.postCancelOrder)
 
 
 router.get('/logout',userController.logout)

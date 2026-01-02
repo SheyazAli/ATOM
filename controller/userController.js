@@ -726,6 +726,108 @@ exports.getProductDetails = async (req, res) => {
   }
 };
 
+//   try {
+//     console.log('🔥 GET CHECKOUT HIT');
+
+//     const userId = req.user._id;
+//     console.log('👤 USER ID:', userId.toString());
+
+//     const cartDoc = await Cart.findOne({ user_id: userId }).lean();
+
+//     console.log('🛒 RAW CART DOC:', cartDoc);
+
+//     if (!cartDoc || !cartDoc.items.length) {
+//       console.log('❌ CART EMPTY — REDIRECTING TO CART');
+//       return res.redirect('/user/cart');
+//     }
+
+//     let items = [];
+//     let subtotal = 0;
+
+//     console.log('🧾 CART ITEMS COUNT:', cartDoc.items.length);
+
+//     for (const item of cartDoc.items) {
+//       console.log('➡️ PROCESSING CART ITEM:', item);
+
+//       console.log('🔎 LOOKING FOR VARIANT ID:', item.variant_id);
+
+//       const variant = await Variant.findOne({
+//         variant_id: item.variant_id
+//       }).lean();
+
+//       if (!variant) {
+//         console.log('❌ VARIANT NOT FOUND:', item.variant_id);
+//         continue;
+//       }
+
+//       console.log('✅ VARIANT FOUND:', variant._id);
+
+//       const product = await Product.findOne({
+//         product_id: variant.product_id,
+//         status: true
+//       }).lean();
+
+//       if (!product) {
+//         console.log('❌ PRODUCT NOT FOUND FOR VARIANT:', variant.product_id);
+//         continue;
+//       }
+
+//       console.log('✅ PRODUCT FOUND:', product.title);
+
+//       const itemTotal = item.price_snapshot * item.quantity;
+//       subtotal += itemTotal;
+
+//       items.push({
+//         name: product.title,
+//         image: variant.images?.[0] || 'default-product.webp',
+//         variant: `${variant.size} · ${variant.color}`,
+//         quantity: item.quantity,
+//         price: item.price_snapshot,
+//         itemTotal
+//       });
+//     }
+
+//     console.log('📦 FINAL CHECKOUT ITEMS COUNT:', items.length);
+//     console.log('💰 SUBTOTAL:', subtotal);
+
+//     // TEMP: keep redirect disabled until debug complete
+//     // if (!items.length) {
+//     //   console.log('❌ NO VALID ITEMS — REDIRECTING TO CART');
+//     //   return res.redirect('/user/cart');
+//     // }
+
+//     const discount = 0;
+//     const shipping = 0;
+//     const total = subtotal - discount + shipping;
+
+//     const addresses = await Address.find({ user_id: userId }).lean();
+//     const defaultAddress =
+//       addresses.find(a => a.is_default) || addresses[0] || null;
+
+//     console.log('🏠 ADDRESSES FOUND:', addresses.length);
+
+//     return res.render('user/checkout', {
+//       cart: { items },
+//       summary: {
+//         subtotal,
+//         discount,
+//         shipping,
+//         total
+//       },
+//       user: {
+//         name: `${req.user.first_name} ${req.user.last_name}`
+//       },
+//       addresses,
+//       defaultAddress
+//     });
+
+//   } catch (error) {
+//     console.error('🔥 GET CHECKOUT ERROR:', error);
+//     return res
+//       .status(HttpStatus.INTERNAL_SERVER_ERROR)
+//       .render('user/500');
+//   }
+// };
 
 exports.getCheckout = async (req, res) => {
   try {
@@ -740,16 +842,14 @@ exports.getCheckout = async (req, res) => {
     let subtotal = 0;
 
     for (const item of cartDoc.items) {
+      const variant = await Variant.findById(item.variant_id).lean();
+      if (!variant) continue;
+
       const product = await Product.findOne({
-        product_id: item.product_id,
+        product_id: variant.product_id,
         status: true
       }).lean();
-
-      const variant = await Variant.findOne({
-        variant_id: item.variant_id
-      }).lean();
-
-      if (!product || !variant) continue;
+      if (!product) continue;
 
       const itemTotal = item.quantity * item.price_snapshot;
       subtotal += itemTotal;
@@ -764,30 +864,35 @@ exports.getCheckout = async (req, res) => {
       });
     }
 
+    if (!items.length) {
+      return res.redirect('/user/cart');
+    }
+
     const addresses = await Address.find({ user_id: userId }).lean();
     const defaultAddress =
       addresses.find(a => a.is_default) || addresses[0] || null;
 
-    return res.render('user/checkout', {
-      cart: {
-        items,
+    res.render('user/checkout', {
+      cart: { items },
+      summary: {
         subtotal,
+        discount: 0,
+        shipping: 0,
         total: subtotal
       },
+      addresses,
+      defaultAddress,
       user: {
         name: `${req.user.first_name} ${req.user.last_name}`
-      },
-      addresses,
-      defaultAddress
+      }
     });
 
   } catch (error) {
     console.error('GET CHECKOUT ERROR:', error);
-    return res
-      .status(HttpStatus.INTERNAL_SERVER_ERROR)
-      .render('user/500');
+    res.status(500).render('user/500');
   }
 };
+
 
 exports.logout = (req, res) => {
   res.clearCookie('userToken',{

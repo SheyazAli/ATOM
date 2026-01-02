@@ -24,9 +24,7 @@ exports.getCartPage = async (req, res) => {
           status: true
         }).lean();
 
-        const variant = await Variant.findOne({
-          variant_id: item.variant_id
-        }).lean();
+        const variant = await Variant.findById(item.variant_id).lean();
 
         if (!product || !variant) continue;
 
@@ -62,6 +60,7 @@ exports.getCartPage = async (req, res) => {
   }
 };
 
+
 exports.addToCart = async (req, res) => {
   try {
     const userId = req.user._id;
@@ -71,7 +70,8 @@ exports.addToCart = async (req, res) => {
       return res.status(HttpStatus.BAD_REQUEST).json({ error: 'Invalid request' });
     }
 
-    const variant = await Variant.findOne({ variant_id }).lean();
+    // frontend sends string variant_id → convert here
+    const variant = await Variant.findOne({ variant_id });
     if (!variant || variant.stock === 0) {
       return res.status(HttpStatus.BAD_REQUEST).json({ error: 'Variant out of stock' });
     }
@@ -88,14 +88,11 @@ exports.addToCart = async (req, res) => {
     let cart = await Cart.findOne({ user_id: userId });
 
     if (!cart) {
-      cart = new Cart({
-        user_id: userId,
-        items: []
-      });
+      cart = new Cart({ user_id: userId, items: [] });
     }
 
     const existingItem = cart.items.find(
-      item => item.variant_id === variant_id
+      item => item.variant_id.toString() === variant._id.toString()
     );
 
     if (existingItem) {
@@ -106,7 +103,7 @@ exports.addToCart = async (req, res) => {
     } else {
       cart.items.push({
         product_id,
-        variant_id,
+        variant_id: variant._id, // ✅ ObjectId stored
         quantity: 1,
         price_snapshot: product.sale_price
       });
@@ -141,10 +138,7 @@ exports.updateCartQuantity = async (req, res) => {
       return res.status(HttpStatus.NOT_FOUND).json({ error: 'Item not found' });
     }
 
-    const variant = await Variant.findOne({
-      variant_id: item.variant_id
-    }).lean();
-
+    const variant = await Variant.findById(item.variant_id).lean();
     if (!variant) {
       return res.status(HttpStatus.BAD_REQUEST).json({ error: 'Variant not available' });
     }
@@ -162,16 +156,14 @@ exports.updateCartQuantity = async (req, res) => {
     item.quantity = newQty;
     await cart.save();
 
-    res.status(HttpStatus.OK).json({
-      success: true,
-      newQty
-    });
+    res.status(HttpStatus.OK).json({ success: true, newQty });
 
   } catch (error) {
     console.error('UPDATE CART QTY ERROR:', error);
     res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ error: 'Server error' });
   }
 };
+
 
 exports.removeCartItem = async (req, res) => {
   try {
@@ -181,14 +173,6 @@ exports.removeCartItem = async (req, res) => {
     const cart = await Cart.findOne({ user_id: userId });
     if (!cart) {
       return res.status(HttpStatus.NOT_FOUND).json({ error: 'Cart not found' });
-    }
-
-    const itemExists = cart.items.some(
-      item => item._id.toString() === cartItemId
-    );
-
-    if (!itemExists) {
-      return res.status(HttpStatus.NOT_FOUND).json({ error: 'Item not found' });
     }
 
     cart.items = cart.items.filter(

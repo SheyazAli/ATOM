@@ -94,20 +94,20 @@
     </a>
 
     </a>
-
     <% if (order.status === 'delivered') { %>
-      <button
-        class="btn btn-outline-danger btn-sm"
-        onclick="handleReturn('<%= order._id %>')">
-        Return
-      </button>
-    <% } else if (['placed','confirmed','shipped'].includes(order.status)) { %>
-      <button
-        class="btn btn-outline-danger btn-sm"
-        onclick="handleCancel('<%= order._id %>')">
-        Cancel
-      </button>
-    <% } %>
+  <a
+    href="/user/orders/<%= order.orderNumber %>/cancel"
+    class="btn btn-outline-danger btn-sm">
+    Return
+  </a>
+<% } else if (['placed','confirmed','shipped'].includes(order.status)) { %>
+  <a
+    href="/user/orders/<%= order.orderNumber %>/cancel"
+    class="btn btn-outline-danger btn-sm">
+    Cancel
+  </a>
+<% } %>
+
   </div>
 
 </div>

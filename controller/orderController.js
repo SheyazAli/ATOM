@@ -11,119 +11,166 @@ const HttpStatus = require('../constants/httpStatus')
 const PDFDocument = require('pdfkit');
 const { generateOrderNumber } = require('../Services/orderNumberService')
 
+//   try {
+//     const userId = req.user._id;
+//     const { paymentMethod, address_id } = req.body;
+
+//     if (paymentMethod !== 'cod') {
+//       return res.status(HttpStatus.BAD_REQUEST).send('Invalid payment method');
+//     }
+
+//     const cartDoc = await Cart.findOne({ user_id: userId });
+//     if (!cartDoc || !cartDoc.items.length) {
+//       return res.status(HttpStatus.BAD_REQUEST).send('Cart is empty');
+//     }
+
+//     const address = await Address.findOne({ user_id: userId, address_id }).lean();
+//     if (!address) {
+//       return res.status(HttpStatus.BAD_REQUEST).send('Invalid address');
+//     }
+
+//     let subtotal = 0;
+//     const items = [];
+
+//     /* ========= STOCK VALIDATION ========= */
+//     for (const item of cartDoc.items) {
+//       const variant = await Variant.findById(item.variant_id);
+
+//       if (!variant) {
+//         return res.status(HttpStatus.BAD_REQUEST).send('Product variant not found');
+//       }
+
+//       if (variant.stock < item.quantity) {
+//         return res
+//           .status(HttpStatus.BAD_REQUEST)
+//           .send(`Only ${variant.stock} left`);
+//       }
+
+//       subtotal += item.price_snapshot * item.quantity;
+
+//       items.push({
+//         variant_id: item.variant_id,
+//         price: item.price_snapshot,
+//         quantity: item.quantity
+//       });
+//     }
+
+//     const shipping = 0;
+//     const total = subtotal + shipping;
+
+//     /* ========= STOCK DEDUCTION ========= */
+//     for (const item of cartDoc.items) {
+//       await Variant.updateOne(
+//         { _id: item.variant_id },
+//         { $inc: { stock: -item.quantity } }
+//       );
+//     }
+
+//     /* ========= CREATE ORDER ========= */
+//     const order = await Order.create({
+//       orderNumber: generateOrderNumber(),
+//       user_id: userId,
+//       paymentMethod: 'cod',
+//       paymentStatus: 'pending',
+//       address: {
+//         building_name: address.building_name,
+//         address_line_1: address.address_line_1,
+//         city: address.city,
+//         state: address.state,
+//         postal_code: address.postal_code,
+//         country: address.country,
+//         phone_number: address.phone_number
+//       },
+//       items,
+//       subtotal,
+//       shipping,
+//       total,
+//       status: 'placed'
+//     });
+
+//     /* ========= CLEAR CART ========= */
+//     cartDoc.items = [];
+//     await cartDoc.save();
+
+//     return res.redirect(`/user/orders/${order.orderNumber}/success`);
+
+//   } catch (error) {
+//     console.error('PLACE COD ORDER ERROR:', error);
+//     return res.status(HttpStatus.INTERNAL_SERVER_ERROR).render('user/500');
+//   }
+// };
+
 exports.placeOrderCOD = async (req, res) => {
   try {
     const userId = req.user._id;
-    const { paymentMethod, address_id } = req.body;
+    const { address_id } = req.body;
 
-    if (paymentMethod !== 'cod') {
-      return res
-        .status(HttpStatus.BAD_REQUEST)
-        .send('Invalid payment method');
-    }
-
-    const cartDoc = await Cart.findOne({ user_id: userId }).lean();
-    if (!cartDoc || !cartDoc.items.length) {
-      return res
-        .status(HttpStatus.BAD_REQUEST)
-        .send('Cart is empty');
+    const cart = await Cart.findOne({ user_id: userId });
+    if (!cart || !cart.items.length) {
+      return res.status(400).send('Cart is empty');
     }
 
     const address = await Address.findOne({
       user_id: userId,
       address_id
     }).lean();
-
     if (!address) {
-      return res
-        .status(HttpStatus.BAD_REQUEST)
-        .send('Invalid address');
+      return res.status(400).send('Invalid address');
     }
 
     let subtotal = 0;
     const items = [];
 
-    /* ================= STOCK VALIDATION ================= */
-    for (const item of cartDoc.items) {
-      const variant = await Variant.findOne({
-        variant_id: item.variant_id
-      });
-
-      if (!variant) {
-        return res
-          .status(HttpStatus.BAD_REQUEST)
-          .send('Product variant not found');
-      }
-
-      if (variant.stock < item.quantity) {
-        return res
-          .status(HttpStatus.BAD_REQUEST)
-          .send(
-            `Only ${variant.stock} left for ${variant.variant_id}`
-          );
+    // ✅ STOCK CHECK
+    for (const item of cart.items) {
+      const variant = await Variant.findById(item.variant_id);
+      if (!variant || variant.stock < item.quantity) {
+        return res.status(400).send('Stock issue');
       }
 
       subtotal += item.price_snapshot * item.quantity;
 
       items.push({
-        variant_id: item.variant_id,
+        variant_id: variant._id,
         price: item.price_snapshot,
         quantity: item.quantity
       });
     }
 
-    const shipping = 0;
-    const total = subtotal + shipping;
-
-    /* ================= STOCK DEDUCTION ================= */
-    for (const item of cartDoc.items) {
-      await Variant.updateOne(
-        { variant_id: item.variant_id },
+    // ✅ DEDUCT STOCK
+    for (const item of cart.items) {
+      await Variant.findByIdAndUpdate(
+        item.variant_id,
         { $inc: { stock: -item.quantity } }
       );
     }
 
-    /* ================= CREATE ORDER ================= */
     const order = await Order.create({
       orderNumber: generateOrderNumber(),
       user_id: userId,
       paymentMethod: 'cod',
       paymentStatus: 'pending',
-      address: {
-        building_name: address.building_name,
-        address_line_1: address.address_line_1,
-        city: address.city,
-        state: address.state,
-        postal_code: address.postal_code,
-        country: address.country,
-        phone_number: address.phone_number
-      },
+      address,
       items,
       subtotal,
-      shipping,
-      total,
+      shipping: 0,
+      total: subtotal,
       status: 'placed'
     });
 
-    /* ================= CLEAR CART ================= */
-    await Cart.updateOne(
-      { user_id: userId },
-      { $set: { items: [] } }
-    );
+    cart.items = [];
+    await cart.save();
 
-    return res.redirect(
-      `/user/orders/${order.orderNumber}/success`
-    );
+    res.redirect(`/user/orders/${order.orderNumber}/success`);
 
   } catch (error) {
-    console.error('PLACE COD ORDER ERROR:', error);
-    return res
-      .status(HttpStatus.INTERNAL_SERVER_ERROR)
-      .render('user/500');
+    console.error('PLACE COD ERROR:', error);
+    res.status(500).render('user/500');
   }
 };
 
 
+/* ================= ORDER SUCCESS PAGE ================= */
 exports.orderSuccessPage = async (req, res) => {
   try {
     const { orderNumber } = req.params;
@@ -139,9 +186,7 @@ exports.orderSuccessPage = async (req, res) => {
     }
 
     for (const item of order.items) {
-      const variant = await Variant.findOne({
-        variant_id: item.variant_id
-      }).lean();
+      const variant = await Variant.findById(item.variant_id).lean();
       if (!variant) continue;
 
       const product = await Product.findOne({
@@ -162,6 +207,7 @@ exports.orderSuccessPage = async (req, res) => {
   }
 };
 
+/* ================= DOWNLOAD INVOICE ================= */
 exports.downloadInvoice = async (req, res) => {
   try {
     const { orderNumber } = req.params;
@@ -173,15 +219,11 @@ exports.downloadInvoice = async (req, res) => {
     }).lean();
 
     if (!order) {
-      return res
-        .status(HttpStatus.NOT_FOUND)
-        .render('user/404');
+      return res.status(HttpStatus.NOT_FOUND).render('user/404');
     }
 
     for (const item of order.items) {
-      const variant = await Variant.findOne({
-        variant_id: item.variant_id
-      }).lean();
+      const variant = await Variant.findById(item.variant_id).lean();
       if (!variant) continue;
 
       const product = await Product.findOne({
@@ -204,10 +246,7 @@ exports.downloadInvoice = async (req, res) => {
 
     doc.pipe(res);
 
-    /* ================= INVOICE CONTENT ================= */
-
-    doc.fontSize(18).text('INVOICE', { align: 'center' });
-    doc.moveDown();
+    doc.fontSize(18).text('INVOICE', { align: 'center' }).moveDown();
 
     doc.fontSize(12)
       .text(`Order ID: ${order.orderNumber}`)
@@ -215,22 +254,18 @@ exports.downloadInvoice = async (req, res) => {
       .text(`Payment Method: ${order.paymentMethod.toUpperCase()}`)
       .moveDown();
 
-    doc.fontSize(13).text('Shipping Address', { underline: true });
-    doc.moveDown(0.5);
+    doc.fontSize(13).text('Shipping Address', { underline: true }).moveDown(0.5);
 
     doc.fontSize(11)
       .text(order.address.building_name)
       .text(order.address.address_line_1)
-      .text(
-        `${order.address.city}, ${order.address.state} ${order.address.postal_code}`
-      )
+      .text(`${order.address.city}, ${order.address.state} ${order.address.postal_code}`)
       .text(order.address.country)
       .text(`Phone: ${order.address.phone_number}`);
 
     doc.moveDown();
 
-    doc.fontSize(13).text('Items', { underline: true });
-    doc.moveDown(0.5);
+    doc.fontSize(13).text('Items', { underline: true }).moveDown(0.5);
 
     order.items.forEach(item => {
       doc.fontSize(11)
@@ -238,29 +273,26 @@ exports.downloadInvoice = async (req, res) => {
         .text(`Variant: ${item.variant}`)
         .text(`Qty: ${item.quantity}`)
         .text(`Price: ₹${item.price}`)
-        .text(`Total: ₹${item.total}`);
-      doc.moveDown();
+        .text(`Total: ₹${item.total}`)
+        .moveDown();
     });
 
-    doc.moveDown();
-    doc.fontSize(12).text(`Subtotal: ₹${order.subtotal}`);
-    doc.text(`Shipping: ₹${order.shipping || 0}`);
-    doc.moveDown(0.5);
+    doc.fontSize(12)
+      .text(`Subtotal: ₹${order.subtotal}`)
+      .text(`Shipping: ₹${order.shipping || 0}`)
+      .moveDown(0.5);
 
-    doc.fontSize(14).text(`Grand Total: ₹${order.total}`, {
-      underline: true
-    });
+    doc.fontSize(14).text(`Grand Total: ₹${order.total}`, { underline: true });
 
     doc.end();
 
   } catch (error) {
     console.error('INVOICE ERROR:', error);
-    return res
-      .status(HttpStatus.INTERNAL_SERVER_ERROR)
-      .render('user/500');
+    return res.status(HttpStatus.INTERNAL_SERVER_ERROR).render('user/500');
   }
 };
 
+/* ================= GET ORDERS LIST ================= */
 exports.getOrders = async (req, res) => {
   try {
     const limit = 6;
@@ -277,8 +309,8 @@ exports.getOrders = async (req, res) => {
       order.thumbnails = [];
 
       for (const item of order.items.slice(0, 4)) {
-        const variant = await Variant.findOne(
-          { variant_id: item.variant_id },
+        const variant = await Variant.findById(
+          item.variant_id,
           { images: 1 }
         ).lean();
 
@@ -303,6 +335,7 @@ exports.getOrders = async (req, res) => {
   }
 };
 
+/* ================= ORDER DETAILS ================= */
 exports.getOrderDetails = async (req, res) => {
   try {
     const { orderNumber } = req.params;
@@ -321,16 +354,12 @@ exports.getOrderDetails = async (req, res) => {
     let itemTotal = 0;
 
     for (const item of order.items) {
-      const variant = await Variant.findOne({
-        variant_id: item.variant_id
-      }).lean();
-
+      const variant = await Variant.findById(item.variant_id).lean();
       if (!variant) continue;
 
       const product = await Product.findOne({
         product_id: variant.product_id
       }).lean();
-
       if (!product) continue;
 
       const total = item.price * item.quantity;
@@ -362,5 +391,102 @@ exports.getOrderDetails = async (req, res) => {
   } catch (error) {
     console.error('GET ORDER DETAILS ERROR:', error);
     res.status(HttpStatus.INTERNAL_SERVER_ERROR).render('user/500');
+  }
+};
+
+/* ================= GET CANCEL / RETURN PAGE ================= */
+exports.getCancelOrder = async (req, res) => {
+  try {
+    const { orderNumber } = req.params;
+    const userId = req.user._id;
+
+    const order = await Order.findOne({
+      orderNumber,
+      user_id: userId
+    }).lean();
+
+    if (!order) {
+      return res.status(404).render('user/404');
+    }
+
+    const items = [];
+
+    for (const item of order.items) {
+      const variant = await Variant.findById(item.variant_id).lean();
+      if (!variant) continue;
+
+      const product = await Product.findOne({
+        product_id: variant.product_id
+      }).lean();
+      if (!product) continue;
+
+      items.push({
+        variant_id: item.variant_id,
+        name: product.title,
+        image: variant.images?.[0] || 'default-product.webp',
+        size: variant.size,
+        quantity: item.quantity
+      });
+    }
+
+    const actionType =
+      order.status === 'delivered' ? 'Return' : 'Cancel';
+
+    res.render('user/order-cancel', {
+      order,
+      items,
+      actionType
+    });
+
+  } catch (error) {
+    console.error('GET CANCEL PAGE ERROR:', error);
+    res.status(500).render('user/500');
+  }
+};
+
+/* ================= POST CANCEL / RETURN ================= */
+exports.postCancelOrder = async (req, res) => {
+  try {
+    const { orderNumber } = req.params;
+    const userId = req.user._id;
+    const { items, reason, otherReason } = req.body;
+
+    if (!items || !reason) {
+      return res.status(400).send('Invalid request');
+    }
+
+    const order = await Order.findOne({
+      orderNumber,
+      user_id: userId
+    });
+
+    if (!order) {
+      return res.status(404).render('user/404');
+    }
+
+    for (const variantId of items) {
+      const qty = Number(req.body[`qty_${variantId}`]);
+
+      await Variant.updateOne(
+        { _id: variantId },
+        { $inc: { stock: qty } }
+      );
+    }
+
+    order.status =
+      order.status === 'delivered'
+        ? 'returned'
+        : 'cancelled';
+
+    order.cancelReason =
+      reason === 'Other' ? otherReason : reason;
+
+    await order.save();
+
+    return res.redirect('/user/orders');
+
+  } catch (error) {
+    console.error('POST CANCEL ORDER ERROR:', error);
+    res.status(500).render('user/500');
   }
 };
