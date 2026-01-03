@@ -1,15 +1,15 @@
-const User = require('../db/user');
+const User = require(__basedir +'/db/user');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-const Address = require('../db/address');
-const Product = require('../db/productModel');
-const Category = require('../db/categoryModel');
-const Cart  = require('../db/cartModel')
-const Order = require('../db/orderModel');
-const Variant = require('../db/variantModel');
-const HttpStatus = require('../constants/httpStatus')
+const Address = require(__basedir +'/db/address');
+const Product = require(__basedir +'/db/productModel');
+const Category = require(__basedir +'/db/categoryModel');
+const Cart  = require(__basedir +'/db/cartModel')
+const Order = require(__basedir +'/db/orderModel');
+const Variant = require(__basedir +'/db/variantModel');
+const HttpStatus = require(__basedir +'/constants/httpStatus')
 const PDFDocument = require('pdfkit');
-const { generateOrderNumber } = require('../Services/orderNumberService')
+const { generateOrderNumber } = require(__basedir +'/Services/orderNumberService')
 
 //   try {
 //     const userId = req.user._id;

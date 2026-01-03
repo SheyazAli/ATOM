@@ -2,12 +2,11 @@ const multer = require('multer');
 const path = require('path');
 
 const upload = multer({
-  storage: multer.memoryStorage(), // ✅ NO temp files on disk
+  storage: multer.memoryStorage(),
   limits: {
-    fileSize: 5 * 1024 * 1024 // 5MB per image
+    fileSize: 5 * 1024 * 1024 
   },
   fileFilter: (req, file, cb) => {
-    // ✅ allow only images
     if (!file.mimetype.startsWith('image/')) {
       return cb(new Error('Only image files are allowed'), false);
     }

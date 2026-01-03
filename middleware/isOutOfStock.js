@@ -1,11 +1,9 @@
-const Variant = require('../models/Variant');
-const HttpStatus = require('../constants/httpStatus');
+const Variant = require(__basedir +'/models/Variant');
+const HttpStatus = require(__basedir +'/constants/httpStatus');
 
 module.exports = async (req, res, next) => {
   try {
-    /**
-     * req.product MUST come from checkProductActive middleware
-     */
+
     const product = req.product;
 
     if (!product) {
@@ -28,8 +26,6 @@ module.exports = async (req, res, next) => {
     if (totalStock <= 0) {
       return handleOutOfStock(req, res);
     }
-
-    // attach stock info for later use
     req.stockInfo = {
       totalStock,
       variants
@@ -44,16 +40,12 @@ module.exports = async (req, res, next) => {
   }
 };
 
-/* -----------------------------
-   Helper: Out of stock response
------------------------------ */
 function handleOutOfStock(req, res) {
-  // UI request
   if (!req.headers.accept?.includes('application/json')) {
     return res.redirect('/user/products');
   }
 
-  // API request
+
   return res.status(HttpStatus.BAD_REQUEST).json({
     success: false,
     message: 'Product is out of stock'

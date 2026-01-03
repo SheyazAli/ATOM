@@ -1,15 +1,15 @@
-const User = require('../db/user');
+const User = require(__basedir +'/db/user');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-const Address = require('../db/address');
-const Product = require('../db/productModel');
-const Category = require('../db/categoryModel');
-const Order = require('../db/orderModel');
-const Cart  = require('../db/cartModel')
-const Variant = require('../db/variantModel');
-const { sendOtpMail } = require('../Services/emailService')
-const { generateReferralCode } = require('../Services/referralService');
-const HttpStatus = require('../constants/httpStatus')
+const Address = require(__basedir +'/db/address');
+const Product = require(__basedir +'/db/productModel');
+const Category = require(__basedir +'/db/categoryModel');
+const Order = require(__basedir +'/db/orderModel');
+const Cart  = require(__basedir +'/db/cartModel')
+const Variant = require(__basedir +'/db/variantModel');
+const { sendOtpMail } = require(__basedir +'/Services/emailService')
+const { generateReferralCode } = require(__basedir +'/Services/referralService');
+const HttpStatus = require(__basedir +'/constants/httpStatus')
 
 
 // HOME PAGE

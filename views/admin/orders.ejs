@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Orders | Admin Panel</title>
+
+  <!-- Bootstrap -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+  <!-- Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+
+  <style>
+    body {
+      background: #f2e5e2;
+      font-family: "Inter", sans-serif;
+    }
+
+    .content {
+      margin-left: 250px;
+      padding: 40px;
+    }
+
+    .table-card {
+      background: #fff;
+      border-radius: 18px;
+      padding: 25px 30px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    }
+
+    .search-box {
+      background: #ded6d3;
+      border-radius: 12px;
+      padding: 10px 15px;
+      border: none;
+    }
+
+    .order-row {
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    .order-row:hover {
+      background: #f7f4f3;
+    }
+
+    .status-badge {
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .badge-placed { background:#dbeafe; color:#1e40af; }
+    .badge-confirmed { background:#e0e7ff; color:#3730a3; }
+    .badge-shipped { background:#ede9fe; color:#5b21b6; }
+    .badge-delivered { background:#dcfce7; color:#166534; }
+    .badge-cancelled { background:#fee2e2; color:#991b1b; }
+    .badge-returned { background:#fff7ed; color:#9a3412; }
+
+    .return-btn {
+      background:#e0553f;
+      color:#fff;
+      border-radius:10px;
+      padding:8px 14px;
+      border:none;
+      position:relative;
+    }
+
+    .return-badge {
+      position:absolute;
+      top:-6px;
+      right:-6px;
+      background:#dc2626;
+      color:#fff;
+      border-radius:50%;
+      font-size:11px;
+      padding:2px 6px;
+    }
+  </style>
+</head>
+
+<body>
+
+<%- include('./adminPartials/adminSidebar') %>
+
+<div class="content">
+
+  <!-- HEADER -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h2 class="fw-bold mb-1">Orders</h2>
+      <small class="text-muted"><%= totalOrders %> total orders</small>
+    </div>
+
+    <a href="/admin/orders/returns" class="return-btn">
+      View return requests
+      <% if (pendingReturns > 0) { %>
+        <span class="return-badge"><%= pendingReturns %></span>
+      <% } %>
+    </a>
+  </div>
+
+  <!-- SEARCH + FILTER -->
+  <div class="d-flex gap-3 mb-4">
+    <input
+      type="text"
+      class="form-control search-box w-50"
+      placeholder="🔍 Search by order number or customer"
+      value="<%= search %>"
+      onkeydown="if(event.key==='Enter') applyFilters()"
+      id="searchInput"
+    >
+
+    <select class="form-select w-25" id="statusFilter" onchange="applyFilters()">
+      <option value="">All Status</option>
+      <% statuses.forEach(s => { %>
+        <option value="<%= s %>" <%= status === s ? 'selected' : '' %>>
+          <%= s.charAt(0).toUpperCase() + s.slice(1) %>
+        </option>
+      <% }) %>
+    </select>
+  </div>
+
+  <!-- TABLE -->
+  <div class="table-card">
+    <table class="table table-borderless align-middle">
+      <thead class="fw-semibold">
+        <tr>
+          <th>Order</th>
+          <th>Customer</th>
+          <th>Date</th>
+          <th>Items</th>
+          <th>Total</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        <% if (orders.length === 0) { %>
+          <tr>
+            <td colspan="6" class="text-center text-muted">
+              No orders found
+            </td>
+          </tr>
+        <% } %>
+
+        <% orders.forEach(order => { %>
+          <tr
+            class="order-row"
+            onclick="window.location.href='/admin/orders/<%= order.orderNumber %>'"
+          >
+            <td class="fw-semibold">#<%= order.orderNumber %></td>
+            <td><%= order.customerName || '—' %></td>
+            <td><%= new Date(order.created_at).toDateString() %></td>
+            <td><%= order.itemsCount %></td>
+            <td>₹ <%= order.total %></td>
+            <td>
+              <span class="status-badge badge-<%= order.status %>">
+                <%= order.status %>
+              </span>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<script>
+function applyFilters() {
+  const search = document.getElementById('searchInput').value.trim();
+  const status = document.getElementById('statusFilter').value;
+
+  const params = new URLSearchParams();
+  if (search) params.append('search', search);
+  if (status) params.append('status', status);
+
+  window.location.href = '/admin/orders?' + params.toString();
+}
+</script>
+
+</body>
+</html>

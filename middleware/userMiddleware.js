@@ -1,6 +1,6 @@
 const jwt = require('jsonwebtoken');
-const User = require('../db/user');
-const HttpStatus = require('../constants/httpStatus');
+const User = require(__basedir +'/db/user');
+const HttpStatus = require(__basedir +'/constants/httpStatus');
 
 exports.verifyUser = async (req, res, next) => {
   try {

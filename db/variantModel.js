@@ -11,7 +11,7 @@ const variantSchema = new mongoose.Schema(
     product_id: {
       type: String,
       required: true,
-      index: true // faster product → variants lookup
+      index: true 
     },
 
     size: {
@@ -35,7 +35,7 @@ const variantSchema = new mongoose.Schema(
     },
 
     images: {
-      type: [String] // array of image URLs / filenames
+      type: [String] 
     }
   },
   {

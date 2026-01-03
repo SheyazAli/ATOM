@@ -22,7 +22,7 @@ const categorySchema = new mongoose.Schema(
 
     status: {
       type: Boolean,
-      default: true // active / inactive
+      default: true 
     }
   },
   {

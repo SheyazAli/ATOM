@@ -1,4 +1,4 @@
-const User = require('../db/user');
+const User = require(__basedir +'/db/user');
 
 const generateReferralCode = async () => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';

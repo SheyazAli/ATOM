@@ -1,4 +1,4 @@
-const Category = require('../db/categoryModel');
+const Category = require(__basedir +'/db/categoryModel');
 
 module.exports = async function navbarMiddleware(req, res, next) {
   try {

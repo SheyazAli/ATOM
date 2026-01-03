@@ -1,4 +1,10 @@
 require('dotenv').config();
+
+Object.defineProperty(global, '__basedir', {
+  value: __dirname,
+  writable: false,
+});
+
 const express = require('express');
 const session = require('express-session');
 const cookieParser = require('cookie-parser');
@@ -39,6 +45,7 @@ app.use(
     }
   })
 );
+
 
 app.use('/admin', adminRoutes);
 app.use('/user', userRoutes);

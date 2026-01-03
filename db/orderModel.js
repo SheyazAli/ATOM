@@ -1,6 +1,5 @@
 const mongoose = require('mongoose');
 
-/* ORDER ITEM */
 const orderItemSchema = new mongoose.Schema(
   {
     variant_id: {
@@ -23,25 +22,20 @@ const orderItemSchema = new mongoose.Schema(
   { _id: false }
 );
 
-/* ORDER */
 const orderSchema = new mongoose.Schema(
   {
-    // 🔹 User-visible order ID (6-digit)
+
     orderNumber: {
       type: String,
       unique: true,
       index: true
     },
-
-    // 🔹 One user → many orders
     user_id: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true,
     index: true
   },
-
-    // 🔹 Address snapshot (important)
     address: {
       building_name: String,
       address_line_1: String,
@@ -51,14 +45,10 @@ const orderSchema = new mongoose.Schema(
       country: String,
       phone_number: String
     },
-
-    // 🔹 Products
     items: {
       type: [orderItemSchema],
       required: true
     },
-
-    // 🔹 Payment
     paymentMethod: {
       type: String,
       enum: ['cod', 'razorpay', 'wallet', 'pay_later'],
@@ -70,8 +60,6 @@ const orderSchema = new mongoose.Schema(
       enum: ['pending', 'paid', 'failed'],
       default: 'pending'
     },
-
-    // 🔹 Pricing
     subtotal: {
       type: Number,
       required: true
@@ -86,8 +74,6 @@ const orderSchema = new mongoose.Schema(
       type: Number,
       required: true
     },
-
-    // 🔹 Order lifecycle
     status: {
       type: String,
       enum: [

@@ -1,12 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const userController = require('../controller/userController');
-const { verifyUser, noCache } = require('../middleware/userMiddleware');
-const addressController = require('../controller/addressController');
-const cartController = require('../controller/cartController')
-const orderController = require('../controller/orderController')
+const userController = require(__basedir +'/controller/user/userController');
+const addressController = require(__basedir +'/controller/user/addressController');
+const cartController = require(__basedir +'/controller/user/cartController')
+const orderController = require(__basedir +'/controller/user/orderController')
+const productStatus = require(__basedir +'/middleware/checkProductActive')
+const { verifyUser, noCache } = require(__basedir +'/middleware/userMiddleware');
 const passport = require('passport');
-const productStatus = require('../middleware/checkProductActive')
 
 router.get('/home',userController.getHome);
 //AUTH

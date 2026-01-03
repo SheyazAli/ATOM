@@ -1,5 +1,5 @@
-const Product = require('../db/productModel');
-const HttpStatus = require('../constants/httpStatus');
+const Product = require(__basedir +'/db/productModel');
+const HttpStatus = require(__basedir +'/constants/httpStatus');
 
 module.exports = async (req, res, next) => {
   try {

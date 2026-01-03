@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-/* CART ITEM SUB-SCHEMA */
+
 const cartItemSchema = new mongoose.Schema(
   {
     product_id: {
@@ -21,10 +21,9 @@ const cartItemSchema = new mongoose.Schema(
       required: true
     }
   },
-  { _id: true } // each cart item gets its own _id
+  { _id: true } 
 );
 
-/* CART SCHEMA */
 const cartSchema = new mongoose.Schema(
   {
     cart_id: {
@@ -33,7 +32,6 @@ const cartSchema = new mongoose.Schema(
       default: () => new mongoose.Types.ObjectId().toString()
     },
 
-    // ONE-TO-ONE RELATION WITH USER
     user_id: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',

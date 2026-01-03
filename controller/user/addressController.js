@@ -1,5 +1,5 @@
-const Address = require('../db/address');
-const HttpStatus = require('../constants/httpStatus')
+const Address = require(__basedir +'/db/address');
+const HttpStatus = require(__basedir +'/constants/httpStatus')
 
 exports.getAddressPage = async (req, res) => {
   try {
