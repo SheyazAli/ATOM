@@ -9,26 +9,36 @@
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
   <style>
-    body { font-family: "Segoe UI", sans-serif; background:#fff; }
-    .account-wrapper { padding:60px 0 80px; }
+    body {
+      font-family: "Segoe UI", sans-serif;
+      background: #fff;
+    }
+
+    .account-wrapper {
+      padding: 60px 0 80px;
+    }
+
     .card-box {
-      background:#f9fafb;
-      border-radius:14px;
-      padding:22px;
-      margin-bottom:24px;
+      background: #f9fafb;
+      border-radius: 14px;
+      padding: 22px;
+      margin-bottom: 24px;
     }
+
     .product-img {
-      width:70px; height:90px;
-      object-fit:cover;
-      border-radius:10px;
-      border:1px solid #ddd;
+      width: 70px;
+      height: 90px;
+      object-fit: cover;
+      border-radius: 10px;
+      border: 1px solid #ddd;
     }
+
     .qty-btn {
-      width:32px;
-      height:32px;
-      border-radius:50%;
-      border:1px solid #ccc;
-      background:#fff;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: 1px solid #ccc;
+      background: #fff;
     }
   </style>
 </head>
@@ -46,73 +56,70 @@
 
       <h4 class="mb-4"><%= actionType %> Items</h4>
 
-      <form id="cancelForm" method="POST"
-        action="/user/orders/<%= order.orderNumber %>/cancel">
+      <form id="actionForm"
+            method="POST"
+            action="/user/orders/<%= order.orderNumber %>/cancel">
 
         <% items.forEach(item => { %>
-          <div class="card-box d-flex align-items-center justify-content-between">
+          <div class="card-box">
 
-            <div class="d-flex align-items-center">
-              <input type="checkbox"
-                     name="items[]"
-                     value="<%= item.variant_id %>"
-                     class="form-check-input me-3">
+            <div class="d-flex align-items-center justify-content-between">
 
-              <img src="/uploads/<%= item.image %>" class="product-img me-3">
+              <div class="d-flex align-items-center">
+                <input type="checkbox"
+                       class="form-check-input me-3"
+                       name="items[]"
+                       value="<%= item.variant_id %>">
 
-              <div>
-                <div class="fw-semibold"><%= item.name %></div>
-                <div class="text-muted small">
-                  Size: <%= item.size %>
+                <img src="/uploads/<%= item.image %>" class="product-img me-3">
+
+                <div>
+                  <div class="fw-semibold"><%= item.name %></div>
+                  <div class="text-muted small">
+                    Size: <%= item.size %>
+                  </div>
                 </div>
+              </div>
+
+              <div class="d-flex align-items-center gap-2">
+                <button type="button"
+                        class="qty-btn"
+                        onclick="changeQty('<%= item.variant_id %>', -1)">−</button>
+
+                <input type="number"
+                       class="form-control text-center"
+                       style="width:60px"
+                       id="qty_<%= item.variant_id %>"
+                       name="qty_<%= item.variant_id %>"
+                       value="1"
+                       min="1"
+                       max="<%= item.quantity - ((item.cancelledQty || 0) + (item.returnedQty || 0)) %>">
+
+                <button type="button"
+                        class="qty-btn"
+                        onclick="changeQty('<%= item.variant_id %>', 1)">+</button>
               </div>
             </div>
 
-            <div class="d-flex align-items-center gap-2">
-              <button type="button"
-                      class="qty-btn"
-                      onclick="changeQty('<%= item.variant_id %>', -1)">−</button>
-
-              <input type="number"
-                     name="qty_<%= item.variant_id %>"
-                     id="qty_<%= item.variant_id %>"
-                     value="1"
-                     min="1"
-                     max="<%= item.quantity %>"
-                     class="form-control text-center"
-                     style="width:60px">
-
-              <button type="button"
-                      class="qty-btn"
-                      onclick="changeQty('<%= item.variant_id %>', 1)">+</button>
-            </div>
+            <textarea
+              class="form-control mt-3"
+              name="message_<%= item.variant_id %>"
+              placeholder="Reason for this item (optional)"></textarea>
 
           </div>
         <% }) %>
 
-        <!-- Reason -->
-        <div class="card-box">
-          <label class="form-label">Reason</label>
-          <select class="form-select" name="reason" id="reason" onchange="toggleOther()">
-            <option value="">Select reason</option>
-            <option value="Size issue">Size issue</option>
-            <option value="Quality issue">Quality issue</option>
-            <option value="Wrong product">Wrong product</option>
-            <option value="Other">Other</option>
-          </select>
+        <div class="d-flex gap-3">
+          <button type="button"
+                  class="btn btn-danger px-4"
+                  onclick="confirmAction()">
+            <%= actionType %>
+          </button>
 
-          <textarea
-            name="otherReason"
-            id="otherReason"
-            class="form-control mt-3 d-none"
-            placeholder="Enter reason"></textarea>
+          <a href="/user/orders" class="btn btn-outline-secondary px-4">
+            Back
+          </a>
         </div>
-
-        <button type="button"
-                class="btn btn-danger px-4"
-                onclick="confirmAction()">
-          <%= actionType %>
-        </button>
 
       </form>
 
@@ -123,16 +130,11 @@
 <%- include('./userPartials/footer') %>
 
 <script>
-  function toggleOther() {
-    document.getElementById('otherReason')
-      .classList.toggle('d-none',
-        document.getElementById('reason').value !== 'Other');
-  }
-
   function changeQty(id, delta) {
     const input = document.getElementById('qty_' + id);
     let value = Number(input.value) + delta;
-    if (value >= 1 && value <= Number(input.max)) {
+
+    if (value >= Number(input.min) && value <= Number(input.max)) {
       input.value = value;
     }
   }
@@ -144,9 +146,9 @@
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: 'Yes, proceed'
-    }).then(res => {
-      if (res.isConfirmed) {
-        document.getElementById('cancelForm').submit();
+    }).then(result => {
+      if (result.isConfirmed) {
+        document.getElementById('actionForm').submit();
       }
     });
   }

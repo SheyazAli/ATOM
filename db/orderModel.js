@@ -3,9 +3,9 @@ const mongoose = require('mongoose');
 const orderItemSchema = new mongoose.Schema(
   {
     variant_id: {
-      type: String,
-      required: true,
-      index: true
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Variant',
+      required: true
     },
 
     price: {
@@ -17,25 +17,55 @@ const orderItemSchema = new mongoose.Schema(
       type: Number,
       required: true,
       min: 1
+    },
+
+    status: {
+      type: String,
+      enum: [
+        'placed',
+        'confirmed',
+        'shipped',
+        'delivered',
+        'cancelled',
+        'returned'
+      ],
+      default: 'placed'
+    },
+
+    cancelledQty: {
+      type: Number,
+      default: 0
+    },
+
+    returnedQty: {
+      type: Number,
+      default: 0
+    },
+
+    message: {
+      type: String,
+      default: null
     }
   },
   { _id: false }
 );
 
+
+
 const orderSchema = new mongoose.Schema(
   {
-
     orderNumber: {
       type: String,
       unique: true,
       index: true
     },
+
     user_id: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true,
-    index: true
-  },
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
+    },
+
     address: {
       building_name: String,
       address_line_1: String,
@@ -45,13 +75,15 @@ const orderSchema = new mongoose.Schema(
       country: String,
       phone_number: String
     },
+
     items: {
       type: [orderItemSchema],
       required: true
     },
+
     paymentMethod: {
       type: String,
-      enum: ['cod', 'razorpay', 'wallet', 'pay_later'],
+      enum: ['cod', 'razorpay', 'wallet'],
       required: true
     },
 
@@ -60,20 +92,11 @@ const orderSchema = new mongoose.Schema(
       enum: ['pending', 'paid', 'failed'],
       default: 'pending'
     },
-    subtotal: {
-      type: Number,
-      required: true
-    },
 
-    shipping: {
-      type: Number,
-      default: 0
-    },
+    subtotal: Number,
+    shipping: Number,
+    total: Number,
 
-    total: {
-      type: Number,
-      required: true
-    },
     status: {
       type: String,
       enum: [
@@ -81,6 +104,8 @@ const orderSchema = new mongoose.Schema(
         'confirmed',
         'shipped',
         'delivered',
+        'partially_cancelled',
+        'partially_returned',
         'cancelled',
         'returned'
       ],

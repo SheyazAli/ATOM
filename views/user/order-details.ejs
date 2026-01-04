@@ -21,18 +21,14 @@
     .page-title {
       font-size: 26px;
       font-weight: 600;
-      margin-bottom: 30px;
+      margin-bottom: 24px;
     }
 
     .card-box {
       background: #f9fafb;
       border-radius: 16px;
-      padding: 24px;
-      margin-bottom: 28px;
-    }
-
-    .product-row {
-      padding: 14px 0;
+      padding: 22px;
+      margin-bottom: 24px;
     }
 
     .product-img {
@@ -43,68 +39,16 @@
       border: 1px solid #ddd;
     }
 
-    .status-line {
-      display: flex;
-      justify-content: space-between;
-      position: relative;
-      margin-top: 35px;
+    .badge-status {
+      font-size: 12px;
+      padding: 4px 10px;
+      border-radius: 14px;
+      font-weight: 500;
     }
 
-    .status-line::before {
-      content: "";
-      position: absolute;
-      top: 18px;
-      left: 0;
-      right: 0;
-      height: 2px;
-      background: #e2e8f0;
-      z-index: 0;
-    }
-
-    .status-step {
-      position: relative;
-      z-index: 1;
-      width: 20%;
-      text-align: center;
-    }
-
-    .status-circle {
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin: 0 auto 6px;
-      font-size: 15px;
-      background: #e2e8f0;
-      color: #fff;
-    }
-
-    .status-circle.active {
-      background: #198754;
-    }
-
-    .status-text {
-      font-size: 13px;
-      color: #555;
-    }
-
-    .price-row {
-      display: flex;
-      justify-content: space-between;
-      font-size: 14px;
-      margin-bottom: 6px;
-    }
-
-    .price-final {
-      font-size: 16px;
-      font-weight: 600;
-    }
-
-    .action-btn {
-      min-width: 220px;
-    }
+    .badge-green { background:#dcfce7; color:#166534; }
+    .badge-red { background:#fee2e2; color:#991b1b; }
+    .badge-yellow { background:#fff7ed; color:#9a3412; }
   </style>
 </head>
 
@@ -117,124 +61,104 @@
 
     <%- include('./userPartials/sidebar') %>
 
-    <div class="col-lg-9 col-md-8">
+    <div class="col-lg-9">
 
-      <div class="page-title">Order Details</div>
+      <div class="page-title">
+        Order #<%= order.orderNumber %>
+      </div>
 
-      <!-- PRODUCT DETAILS -->
-      <div class="card-box">
-        <h6 class="mb-3">Product Details</h6>
+      <!-- ORDER META -->
+      <div class="card-box d-flex gap-5">
+        <div>
+          <small class="text-muted">Order Date</small>
+          <div class="fw-semibold">
+            <%= new Date(order.created_at).toDateString() %>
+          </div>
+        </div>
 
-        <% items.forEach(item => { %>
-          <div class="d-flex justify-content-between align-items-center product-row">
-            <div class="d-flex align-items-center">
-              <img src="/uploads/<%= item.image %>" class="product-img me-4">
+        <div>
+          <small class="text-muted">Payment</small>
+          <div class="fw-semibold text-uppercase">
+            <%= order.paymentMethod %>
+          </div>
+        </div>
 
-              <div>
-                <div class="fw-semibold"><%= item.name %></div>
-                <div class="text-muted small mt-1">
-                  Size: <%= item.size %> &nbsp;|&nbsp;
-                  Qty: <%= item.quantity %> &nbsp;|&nbsp;
-                  Price: ₹<%= item.price %>
-                </div>
+        <div>
+          <small class="text-muted">Status</small>
+          <div class="fw-semibold text-capitalize">
+            <%= order.status.replace('_', ' ') %>
+          </div>
+        </div>
+      </div>
+
+      <!-- ITEMS -->
+      <% items.forEach(item => { %>
+        <div class="card-box">
+          <div class="d-flex gap-4">
+            <img src="/uploads/<%= item.image %>" class="product-img">
+
+            <div class="flex-grow-1">
+              <div class="fw-semibold"><%= item.name %></div>
+
+              <div class="text-muted small mt-1">
+                Size: <%= item.size %> |
+                Ordered: <%= item.orderedQty %> |
+                Price: ₹<%= item.price %>
               </div>
+
+              <% if (item.cancelledQty > 0) { %>
+                <div class="mt-2 badge-status badge-red">
+                  Cancelled Qty: <%= item.cancelledQty %>
+                </div>
+              <% } %>
+
+              <% if (item.returnedQty > 0) { %>
+                <div class="mt-2 badge-status badge-yellow">
+                  Returned Qty: <%= item.returnedQty %>
+                </div>
+              <% } %>
+
+              <% if (item.message) { %>
+                <div class="alert alert-light mt-3 p-2">
+                  <strong>Reason:</strong> <%= item.message %>
+                </div>
+              <% } %>
             </div>
 
             <div class="fw-semibold">
               ₹<%= item.total %>
             </div>
           </div>
-        <% }) %>
-      </div>
+        </div>
+      <% }) %>
 
-      <!-- ORDER STATUS -->
+      <!-- SHIPPING -->
       <div class="card-box">
-        <h6 class="mb-2">Order Status</h6>
-
-        <% 
-          const steps = [
-            { key: 'placed', label: 'Order Placed', icon: '✓' },
-            { key: 'packed', label: 'Packed', icon: '✓' },
-            { key: 'shipped', label: 'Shipped', icon: '🚚' },
-            { key: 'out_for_delivery', label: 'Out for Delivery', icon: '🚚' },
-            { key: 'delivered', label: 'Delivered', icon: '✓' }
-          ];
-
-          const currentIndex = steps.findIndex(s => s.key === order.status);
-        %>
-
-        <div class="status-line">
-          <% steps.forEach((step, index) => { %>
-            <div class="status-step">
-              <div class="status-circle <%= index <= currentIndex ? 'active' : '' %>">
-                <%= step.icon %>
-              </div>
-              <div class="status-text"><%= step.label %></div>
-            </div>
-          <% }) %>
-        </div>
+        <h6 class="mb-2">Shipping Address</h6>
+        <p class="mb-1 fw-semibold"><%= order.address.building_name %></p>
+        <p class="mb-1"><%= order.address.address_line_1 %></p>
+        <p class="mb-1">
+          <%= order.address.city %>, <%= order.address.state %> - <%= order.address.postal_code %>
+        </p>
+        <p class="mb-0">Phone: <%= order.address.phone_number %></p>
       </div>
 
-      <!-- SHIPPING + PRICE -->
-      <div class="row">
-        <div class="col-md-6">
-          <div class="card-box">
-            <h6 class="mb-2">Shipping & Delivery Information</h6>
-
-            <p class="mb-1 fw-semibold">
-              <%= order.address.building_name %>
-            </p>
-            <p class="mb-1">
-              <%= order.address.address_line_1 %>
-            </p>
-            <p class="mb-1">
-              <%= order.address.city %>, <%= order.address.state %> - <%= order.address.postal_code %>
-            </p>
-            <p class="mb-1">
-              Phone: <%= order.address.phone_number %>
-            </p>
-          </div>
+      <!-- PRICE -->
+      <div class="card-box">
+        <h6 class="mb-2">Price Breakdown</h6>
+        <div class="d-flex justify-content-between">
+          <span>Item Total</span>
+          <span>₹<%= price.itemTotal %></span>
         </div>
-
-        <div class="col-md-6">
-          <div class="card-box">
-            <h6 class="mb-2">Price Breakdown</h6>
-
-            <div class="price-row">
-              <span>Item Total</span>
-              <span>₹<%= price.itemTotal %></span>
-            </div>
-            <div class="price-row">
-              <span>Discount</span>
-              <span class="text-success">₹<%= price.discount %></span>
-            </div>
-            <div class="price-row">
-              <span>Shipping</span>
-              <span class="text-success">
-                <%= price.shipping === 0 ? 'Free' : '₹' + price.shipping %>
-              </span>
-            </div>
-
-            <hr>
-
-            <div class="price-row price-final">
-              <span>Final Amount</span>
-              <span>₹<%= price.finalAmount %></span>
-            </div>
-          </div>
+        <div class="d-flex justify-content-between">
+          <span>Shipping</span>
+          <span><%= price.shipping === 0 ? 'Free' : '₹' + price.shipping %></span>
         </div>
-      </div>
-
-      <!-- ACTIONS -->
-      <div class="d-flex gap-3 mt-3">
-        <a href="#" class="btn btn-success action-btn">
-          Track Order
-        </a>
-        <a
-          href="/user/orders/<%= order.orderNumber %>/invoice"
-          class="btn btn-outline-secondary action-btn">
-          Download Invoice (PDF)
-        </a>
+        <hr>
+        <div class="d-flex justify-content-between fw-semibold">
+          <span>Total</span>
+          <span>₹<%= price.finalAmount %></span>
+        </div>
       </div>
 
     </div>

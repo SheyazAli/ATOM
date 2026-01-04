@@ -11,94 +11,6 @@ const HttpStatus = require(__basedir +'/constants/httpStatus')
 const PDFDocument = require('pdfkit');
 const { generateOrderNumber } = require(__basedir +'/Services/orderNumberService')
 
-//   try {
-//     const userId = req.user._id;
-//     const { paymentMethod, address_id } = req.body;
-
-//     if (paymentMethod !== 'cod') {
-//       return res.status(HttpStatus.BAD_REQUEST).send('Invalid payment method');
-//     }
-
-//     const cartDoc = await Cart.findOne({ user_id: userId });
-//     if (!cartDoc || !cartDoc.items.length) {
-//       return res.status(HttpStatus.BAD_REQUEST).send('Cart is empty');
-//     }
-
-//     const address = await Address.findOne({ user_id: userId, address_id }).lean();
-//     if (!address) {
-//       return res.status(HttpStatus.BAD_REQUEST).send('Invalid address');
-//     }
-
-//     let subtotal = 0;
-//     const items = [];
-
-//     /* ========= STOCK VALIDATION ========= */
-//     for (const item of cartDoc.items) {
-//       const variant = await Variant.findById(item.variant_id);
-
-//       if (!variant) {
-//         return res.status(HttpStatus.BAD_REQUEST).send('Product variant not found');
-//       }
-
-//       if (variant.stock < item.quantity) {
-//         return res
-//           .status(HttpStatus.BAD_REQUEST)
-//           .send(`Only ${variant.stock} left`);
-//       }
-
-//       subtotal += item.price_snapshot * item.quantity;
-
-//       items.push({
-//         variant_id: item.variant_id,
-//         price: item.price_snapshot,
-//         quantity: item.quantity
-//       });
-//     }
-
-//     const shipping = 0;
-//     const total = subtotal + shipping;
-
-//     /* ========= STOCK DEDUCTION ========= */
-//     for (const item of cartDoc.items) {
-//       await Variant.updateOne(
-//         { _id: item.variant_id },
-//         { $inc: { stock: -item.quantity } }
-//       );
-//     }
-
-//     /* ========= CREATE ORDER ========= */
-//     const order = await Order.create({
-//       orderNumber: generateOrderNumber(),
-//       user_id: userId,
-//       paymentMethod: 'cod',
-//       paymentStatus: 'pending',
-//       address: {
-//         building_name: address.building_name,
-//         address_line_1: address.address_line_1,
-//         city: address.city,
-//         state: address.state,
-//         postal_code: address.postal_code,
-//         country: address.country,
-//         phone_number: address.phone_number
-//       },
-//       items,
-//       subtotal,
-//       shipping,
-//       total,
-//       status: 'placed'
-//     });
-
-//     /* ========= CLEAR CART ========= */
-//     cartDoc.items = [];
-//     await cartDoc.save();
-
-//     return res.redirect(`/user/orders/${order.orderNumber}/success`);
-
-//   } catch (error) {
-//     console.error('PLACE COD ORDER ERROR:', error);
-//     return res.status(HttpStatus.INTERNAL_SERVER_ERROR).render('user/500');
-//   }
-// };
 
 exports.placeOrderCOD = async (req, res) => {
   try {
@@ -107,25 +19,31 @@ exports.placeOrderCOD = async (req, res) => {
 
     const cart = await Cart.findOne({ user_id: userId });
     if (!cart || !cart.items.length) {
-      return res.status(400).send('Cart is empty');
+      return res
+        .status(HttpStatus.BAD_REQUEST)
+        .json({ error: 'CART_EMPTY' });
     }
 
     const address = await Address.findOne({
       user_id: userId,
       address_id
     }).lean();
+
     if (!address) {
-      return res.status(400).send('Invalid address');
+      return res
+        .status(HttpStatus.BAD_REQUEST)
+        .json({ error: 'INVALID_ADDRESS' });
     }
 
     let subtotal = 0;
     const items = [];
-
-    // ✅ STOCK CHECK
     for (const item of cart.items) {
       const variant = await Variant.findById(item.variant_id);
+
       if (!variant || variant.stock < item.quantity) {
-        return res.status(400).send('Stock issue');
+        return res
+          .status(HttpStatus.BAD_REQUEST)
+          .json({ error: 'STOCK_ISSUE' });
       }
 
       subtotal += item.price_snapshot * item.quantity;
@@ -133,11 +51,11 @@ exports.placeOrderCOD = async (req, res) => {
       items.push({
         variant_id: variant._id,
         price: item.price_snapshot,
-        quantity: item.quantity
+        quantity: item.quantity,
+        status: 'placed' 
       });
     }
 
-    // ✅ DEDUCT STOCK
     for (const item of cart.items) {
       await Variant.findByIdAndUpdate(
         item.variant_id,
@@ -165,12 +83,13 @@ exports.placeOrderCOD = async (req, res) => {
 
   } catch (error) {
     console.error('PLACE COD ERROR:', error);
-    res.status(500).render('user/500');
+
+    res
+      .status(HttpStatus.INTERNAL_SERVER_ERROR)
+      .json({ error: 'INTERNAL_SERVER_ERROR' });
   }
 };
 
-
-/* ================= ORDER SUCCESS PAGE ================= */
 exports.orderSuccessPage = async (req, res) => {
   try {
     const { orderNumber } = req.params;
@@ -207,7 +126,6 @@ exports.orderSuccessPage = async (req, res) => {
   }
 };
 
-/* ================= DOWNLOAD INVOICE ================= */
 exports.downloadInvoice = async (req, res) => {
   try {
     const { orderNumber } = req.params;
@@ -292,12 +210,11 @@ exports.downloadInvoice = async (req, res) => {
   }
 };
 
-/* ================= GET ORDERS LIST ================= */
 exports.getOrders = async (req, res) => {
   try {
     const limit = 6;
     const page = parseInt(req.query.page) || 1;
-    const userId = req.user._id;
+    const userId = req.userId;
 
     const orders = await Order.find({ user_id: userId })
       .sort({ created_at: -1 })
@@ -306,7 +223,25 @@ exports.getOrders = async (req, res) => {
       .lean();
 
     for (const order of orders) {
+      order.items = order.items || [];
       order.thumbnails = [];
+
+      order.hasCancelableItem = order.items.some(i => {
+        const remainingQty =
+          i.quantity - (i.cancelledQty || 0) - (i.returnedQty || 0);
+
+        return (
+          remainingQty > 0 &&
+          ['placed', 'confirmed', 'shipped'].includes(i.status)
+        );
+      });
+
+      order.hasReturnableItem = order.items.some(i => {
+        const remainingQty =
+          i.quantity - (i.cancelledQty || 0) - (i.returnedQty || 0);
+
+        return remainingQty > 0 && i.status === 'delivered';
+      });
 
       for (const item of order.items.slice(0, 4)) {
         const variant = await Variant.findById(
@@ -322,7 +257,7 @@ exports.getOrders = async (req, res) => {
 
     const totalOrders = await Order.countDocuments({ user_id: userId });
 
-    res.render('user/orders', {
+    return res.render('user/orders', {
       orders,
       currentPage: page,
       totalPages: Math.ceil(totalOrders / limit),
@@ -330,12 +265,15 @@ exports.getOrders = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('GET ORDERS PAGE ERROR:', error);
-    res.status(500).render('user/500');
+    console.error('GET USER ORDERS ERROR:', error);
+
+    return res
+      .status(HttpStatus.INTERNAL_SERVER_ERROR)
+      .render('user/500');
   }
 };
 
-/* ================= ORDER DETAILS ================= */
+
 exports.getOrderDetails = async (req, res) => {
   try {
     const { orderNumber } = req.params;
@@ -347,7 +285,9 @@ exports.getOrderDetails = async (req, res) => {
     }).lean();
 
     if (!order) {
-      return res.status(HttpStatus.NOT_FOUND).render('user/404');
+      return res
+        .status(HttpStatus.NOT_FOUND)
+        .render('user/404');
     }
 
     let items = [];
@@ -362,7 +302,12 @@ exports.getOrderDetails = async (req, res) => {
       }).lean();
       if (!product) continue;
 
-      const total = item.price * item.quantity;
+      const activeQty =
+        item.quantity -
+        (item.cancelledQty || 0) -
+        (item.returnedQty || 0);
+
+      const total = activeQty * item.price;
       itemTotal += total;
 
       items.push({
@@ -370,13 +315,17 @@ exports.getOrderDetails = async (req, res) => {
         image: variant.images?.[0] || 'default-product.webp',
         size: variant.size,
         color: variant.color,
-        quantity: item.quantity,
+        orderedQty: item.quantity,
+        activeQty,
+        cancelledQty: item.cancelledQty || 0,
+        returnedQty: item.returnedQty || 0,
         price: item.price,
-        total
+        total,
+        message: item.message || null
       });
     }
 
-    res.render('user/order-details', {
+    return res.render('user/order-details', {
       order,
       activePage: 'orders',
       items,
@@ -390,103 +339,164 @@ exports.getOrderDetails = async (req, res) => {
 
   } catch (error) {
     console.error('GET ORDER DETAILS ERROR:', error);
-    res.status(HttpStatus.INTERNAL_SERVER_ERROR).render('user/500');
+    return res
+      .status(HttpStatus.INTERNAL_SERVER_ERROR)
+      .render('user/500');
   }
 };
+//   try {
+//     const { orderNumber } = req.params;
+//     const userId = req.user._id;
 
-/* ================= GET CANCEL / RETURN PAGE ================= */
+//     const order = await Order.findOne({
+//       orderNumber,
+//       user_id: userId
+//     }).lean();
+
+//     if (!order) {
+//       return res.status(404).render('user/404');
+//     }
+
+//     const items = [];
+
+//     for (const item of order.items) {
+//       const variant = await Variant.findById(item.variant_id).lean();
+//       if (!variant) continue;
+
+//       const product = await Product.findOne({
+//         product_id: variant.product_id
+//       }).lean();
+//       if (!product) continue;
+
+//       items.push({
+//         variant_id: item.variant_id,
+//         name: product.title,
+//         image: variant.images?.[0] || 'default-product.webp',
+//         size: variant.size,
+//         quantity: item.quantity
+//       });
+//     }
+
+//     const actionType =
+//       order.status === 'delivered' ? 'Return' : 'Cancel';
+
+//     res.render('user/order-cancel', {
+//       order,
+//       items,
+//       actionType
+//     });
+
+//   } catch (error) {
+//     console.error('GET CANCEL PAGE ERROR:', error);
+//     res.status(500).render('user/500');
+//   }
+// };
+
 exports.getCancelOrder = async (req, res) => {
   try {
     const { orderNumber } = req.params;
-    const userId = req.user._id;
+    const userId = req.userId;
 
     const order = await Order.findOne({
       orderNumber,
       user_id: userId
-    }).lean();
+    }).populate('items.variant_id');
 
     if (!order) {
-      return res.status(404).render('user/404');
-    }
-
-    const items = [];
-
-    for (const item of order.items) {
-      const variant = await Variant.findById(item.variant_id).lean();
-      if (!variant) continue;
-
-      const product = await Product.findOne({
-        product_id: variant.product_id
-      }).lean();
-      if (!product) continue;
-
-      items.push({
-        variant_id: item.variant_id,
-        name: product.title,
-        image: variant.images?.[0] || 'default-product.webp',
-        size: variant.size,
-        quantity: item.quantity
-      });
+      return res.redirect('/user/orders');
     }
 
     const actionType =
       order.status === 'delivered' ? 'Return' : 'Cancel';
 
-    res.render('user/order-cancel', {
+    const items = order.items
+      .filter(i => {
+        const remainingQty =
+          i.quantity - (i.cancelledQty || 0) - (i.returnedQty || 0);
+
+        if (remainingQty <= 0) return false;
+
+        if (actionType === 'Cancel') {
+          return ['placed', 'confirmed', 'shipped', 'cancelled'].includes(i.status);
+        }
+
+        if (actionType === 'Return') {
+          return ['delivered', 'returned'].includes(i.status);
+        }
+
+        return false;
+      })
+      .map(i => ({
+        variant_id: i.variant_id?._id,
+        name: i.variant_id?.name || '',
+        image: i.variant_id?.images?.[0] || '',
+        size: i.variant_id?.size || '',
+        quantity: i.quantity,
+        cancelledQty: i.cancelledQty || 0,
+        returnedQty: i.returnedQty || 0
+      }));
+
+    return res.render('user/order-cancel', {
       order,
       items,
       actionType
     });
 
   } catch (error) {
-    console.error('GET CANCEL PAGE ERROR:', error);
-    res.status(500).render('user/500');
+    console.error('GET CANCEL ORDER ERROR:', error);
+    return res.redirect('/user/orders');
   }
 };
 
-/* ================= POST CANCEL / RETURN ================= */
 exports.postCancelOrder = async (req, res) => {
-  try {
-    const { orderNumber } = req.params;
-    const userId = req.user._id;
-    const { items, reason, otherReason } = req.body;
+  const { orderNumber } = req.params;
+  const userId = req.user._id;
+  const { items = [] } = req.body;
 
-    if (!items || !reason) {
-      return res.status(400).send('Invalid request');
-    }
+  const order = await Order.findOne({ orderNumber, user_id: userId });
+  if (!order) return res.redirect('/user/orders');
 
-    const order = await Order.findOne({
-      orderNumber,
-      user_id: userId
-    });
+  const isReturn = order.status === 'delivered';
 
-    if (!order) {
-      return res.status(404).render('user/404');
-    }
+  for (const variantId of items) {
+    const qty = Number(req.body[`qty_${variantId}`]);
+    const message = req.body[`message_${variantId}`];
 
-    for (const variantId of items) {
-      const qty = Number(req.body[`qty_${variantId}`]);
+    const item = order.items.find(
+      i => i.variant_id.toString() === variantId
+    );
 
-      await Variant.updateOne(
-        { _id: variantId },
+    if (!item || qty <= 0) continue;
+
+    if (isReturn) {
+      item.returnedQty += qty;
+      item.status = 'returned';
+    } else {
+      item.cancelledQty += qty;
+      item.status = 'cancelled';
+
+      await Variant.findByIdAndUpdate(
+        variantId,
         { $inc: { stock: qty } }
       );
     }
 
-    order.status =
-      order.status === 'delivered'
-        ? 'returned'
-        : 'cancelled';
-
-    order.cancelReason =
-      reason === 'Other' ? otherReason : reason;
-
-    await order.save();
-
-    return res.redirect('/user/orders');
-
-  } catch (error) {
-    console.error('POST CANCEL ORDER ERROR:', error);
-    res.status(500).render('user/500');
+    item.message = message;
   }
+
+  const statuses = order.items.map(i => i.status);
+
+  if (statuses.every(s => s === 'cancelled'))
+    order.status = 'cancelled';
+  else if (statuses.some(s => s === 'cancelled'))
+    order.status = 'partially_cancelled';
+
+  if (statuses.every(s => s === 'returned'))
+    order.status = 'returned';
+  else if (statuses.some(s => s === 'returned'))
+    order.status = 'partially_returned';
+
+  await order.save();
+
+  res.redirect('/user/orders');
 };

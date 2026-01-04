@@ -35,6 +35,8 @@ router.post('/categories/:categoryId', verifyAdmin, adminController.saveCategory
 
 //ORDERS
 router.get('/orders',verifyAdmin,adminController.getOrders)
+router.get('orders/:orderNumber', adminController.getAdminOrderDetails);
+router.post('orders/:orderNumber/update', adminController.postUpdateOrderDetails);
 
 router.get('/logout', adminController.logout);
 

@@ -313,6 +313,89 @@ exports.getOrders = async (req, res) => {
   }
 };
 
+exports.getAdminOrderDetails = async (req, res) => {
+  try {
+    const { orderNumber } = req.params;
+
+    const order = await Order.findOne({ orderNumber }).lean();
+    if (!order) {
+      return res.status(404).render('admin/404');
+    }
+
+    const user = await User.findById(order.user_id)
+      .select('first_name last_name email')
+      .lean();
+
+    const items = [];
+
+    for (const item of order.items) {
+      const variant = await Variant.findById(item.variant_id).lean();
+      if (!variant) continue;
+
+      const product = await Product.findOne({
+        product_id: variant.product_id
+      }).lean();
+
+      items.push({
+        name: product?.title || 'Product',
+        image: variant.images?.[0] || 'default-product.webp',
+        size: variant.size,
+        color: variant.color,
+        quantity: item.quantity,
+        price: item.price,
+        total: item.quantity * item.price,
+        stockLeft: variant.stock
+      });
+    }
+
+    res.render('admin/order-details', {
+      order,
+      user,
+      items,
+      statuses: [
+        'placed',
+        'confirmed',
+        'shipped',
+        'delivered',
+        'cancelled',
+        'returned'
+      ],
+      currentPage: 'orders'
+    });
+
+  } catch (error) {
+    console.error('ADMIN ORDER DETAILS ERROR:', error);
+    res.status(500).render('admin/500');
+  }
+};
+
+exports.postUpdateOrderDetails = async (req, res) => {
+  try {
+    const { orderNumber } = req.params;
+    const { status, message } = req.body;
+
+    const order = await Order.findOne({ orderNumber });
+    if (!order) return res.status(404).render('admin/404');
+
+    order.status = status;
+
+    if (status === 'cancelled' || status === 'returned') {
+      order.items.forEach(item => {
+        item.status = status === 'cancelled' ? 'cancelled' : 'returned';
+        item.message = message;
+      });
+    }
+
+    await order.save();
+
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('ADMIN UPDATE ORDER ERROR:', error);
+    res.status(500).json({ success: false });
+  }
+};
+
+
 /* LOGOUT */
 exports.logout = (req, res) => {
   res.clearCookie('adminToken', {
