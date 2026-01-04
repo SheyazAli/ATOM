@@ -42,6 +42,12 @@ const orderItemSchema = new mongoose.Schema(
       default: 0
     },
 
+    returnStatus: {
+      type: String,
+      enum: ['none', 'pending', 'approved', 'rejected'],
+      default: 'none'
+    },
+
     message: {
       type: String,
       default: null
@@ -49,6 +55,7 @@ const orderItemSchema = new mongoose.Schema(
   },
   { _id: false }
 );
+
 
 
 

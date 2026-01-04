@@ -4,6 +4,7 @@ const Product = require(__basedir +'/db/productModel');
 const Order = require(__basedir +'/db/orderModel');
 const Variant = require(__basedir +'/db/variantModel');
 const Category = require(__basedir +'/db/categoryModel');
+const orderService = require(__basedir +'/services/orderService');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const HttpStatus = require(__basedir +'/constants/httpStatus')
@@ -77,8 +78,6 @@ exports.getCategories = async (req, res) => {
     const limit = 8;
     const skip = (page - 1) * limit;
     const search = req.query.search || '';
-
-    // 🔍 search by category name
     const query = {
       name: { $regex: search, $options: 'i' }
     };
@@ -89,7 +88,6 @@ exports.getCategories = async (req, res) => {
       .limit(limit)
       .lean();
 
-    // count products per category
     for (const category of categories) {
       category.productCount = await Product.countDocuments({
         category_id: category.category_id
@@ -252,6 +250,7 @@ exports.getOrders = async (req, res) => {
     if (status !== 'all') {
       query.status = status;
     }
+
     const orders = await Order.find(query)
       .sort({ created_at: -1 })
       .skip(skip)
@@ -260,7 +259,8 @@ exports.getOrders = async (req, res) => {
 
     const userIds = orders
       .map(o => o.user_id)
-      .filter(id => id); 
+      .filter(Boolean);
+
     const users = await User.find({ _id: { $in: userIds } })
       .select('first_name last_name email')
       .lean();
@@ -269,41 +269,40 @@ exports.getOrders = async (req, res) => {
     users.forEach(u => {
       userMap[u._id.toString()] = u;
     });
+
     for (const order of orders) {
       const user = userMap[order.user_id?.toString()];
-
       order.customerName = user
-  ? `${user.first_name} ${user.last_name}`
-  : 'Guest';
-
+        ? `${user.first_name} ${user.last_name}`
+        : 'Guest';
 
       order.itemsCount = order.items.reduce(
         (sum, i) => sum + i.quantity,
         0
       );
     }
-
-    const pendingReturns = await Order.countDocuments({
-      status: 'returned'
-    });
+    const pendingReturns =
+      await orderService.getPendingReturnCount();
 
     const totalOrders = await Order.countDocuments(query);
     const totalPages = Math.ceil(totalOrders / limit) || 1;
 
     return res.render('admin/orders', {
       orders,
+      pendingReturns,
       currentPage: 'orders',
       currentPageNum: page,
       totalPages,
       totalOrders,
       search,
       status,
-      pendingReturns,
       statuses: [
         'placed',
         'confirmed',
         'shipped',
         'delivered',
+        'partially_cancelled',
+        'partially_returned',
         'cancelled',
         'returned'
       ]
@@ -314,6 +313,7 @@ exports.getOrders = async (req, res) => {
     return res.status(500).render('admin/500');
   }
 };
+
 
 exports.getAdminOrderDetails = async (req, res) => {
   try {
@@ -421,6 +421,148 @@ exports.postUpdateOrderDetails = async (req, res) => {
       .json({ success: false });
   }
 };
+
+/*RETURN*/
+exports.getReturnRequests = async (req, res) => {
+  try {
+    const orders = await Order.find({
+      'items.returnStatus': 'pending'
+    })
+      .populate('user_id', 'first_name last_name email')
+      .populate('items.variant_id', 'name size')
+      .lean();
+
+    const returnRequests = [];
+
+    orders.forEach(order => {
+      order.items.forEach(item => {
+        if (item.returnStatus === 'pending') {
+          returnRequests.push({
+            orderId: order._id,
+            orderNumber: order.orderNumber,
+
+            orderedAt: order.created_at,
+            deliveredAt: order.updated_at,
+
+            user: order.user_id,
+
+            item: {
+              variantId: item.variant_id?._id,
+              name: item.variant_id?.name || 'Product',
+              size: item.variant_id?.size || '—',
+              price: item.price,
+              orderedQty: item.quantity,
+              returnedQty: item.returnedQty,
+              reason: item.message || '—',
+              returnRequestedAt: item.updated_at 
+            }
+          });
+        }
+      });
+    });
+
+    return res.render('admin/return-requests', {
+      returnRequests,
+      currentPage: 'orders'
+    });
+
+  } catch (error) {
+    console.error('❌ GET RETURN REQUESTS ERROR:', error);
+    return res.redirect('/admin/dashboard');
+  }
+};
+
+exports.approveReturn = async (req, res) => {
+  try {
+    const { orderId, variantId } = req.body;
+
+    await Order.updateOne(
+      { _id: orderId, 'items.variant_id': variantId },
+      {
+        $set: {
+          'items.$.returnStatus': 'approved',
+          'items.$.status': 'returned',
+          'items.$.message': 'Return approved by admin'
+        }
+      }
+    );
+    await Variant.updateOne(
+      { _id: variantId },
+      { $inc: { stock: 1 } }
+    );
+    const order = await Order.findById(orderId).lean();
+
+    if (!order) {
+      return res.redirect('/admin/returns');
+    }
+
+    const itemStatuses = order.items.map(i => i.status);
+
+    if (itemStatuses.every(s => s === 'returned')) {
+      await Order.updateOne(
+        { _id: orderId },
+        { $set: { status: 'returned' } }
+      );
+    }
+    else if (itemStatuses.some(s => s === 'returned')) {
+      await Order.updateOne(
+        { _id: orderId },
+        { $set: { status: 'partially_returned' } }
+      );
+    }
+
+    res.redirect('/admin/returns');
+
+  } catch (error) {
+    console.error('APPROVE RETURN ERROR:', error);
+    res.redirect('/admin/returns');
+  }
+};
+
+exports.rejectReturn = async (req, res) => {
+  try {
+    const { orderId, variantId, message } = req.body;
+
+    if (!message || !message.trim()) {
+      return res.redirect('/admin/returns');
+    }
+
+    /* ================= UPDATE ITEM ================= */
+    await Order.updateOne(
+      { _id: orderId, 'items.variant_id': variantId },
+      {
+        $set: {
+          'items.$.status': 'delivered',
+          'items.$.returnStatus': 'rejected',
+          'items.$.message': message
+        }
+      }
+    );
+
+    /* ================= RECALCULATE ORDER STATUS ================= */
+    const order = await Order.findById(orderId).lean();
+    if (!order) return res.redirect('/admin/returns');
+
+    const statuses = order.items.map(i => i.status);
+
+    const anyReturned = statuses.some(s => s === 'returned');
+
+    if (!anyReturned) {
+      // ✅ THIS fixes your DB issue
+      await Order.updateOne(
+        { _id: orderId },
+        { $set: { status: 'delivered' } }
+      );
+    }
+
+    res.redirect('/admin/returns');
+
+  } catch (error) {
+    console.error('REJECT RETURN ERROR:', error);
+    res.redirect('/admin/returns');
+  }
+};
+
 
 /* LOGOUT */
 exports.logout = (req, res) => {

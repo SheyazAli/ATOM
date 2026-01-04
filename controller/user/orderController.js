@@ -273,7 +273,6 @@ exports.getOrders = async (req, res) => {
   }
 };
 
-
 exports.getOrderDetails = async (req, res) => {
   try {
     const { orderNumber } = req.params;
@@ -315,12 +314,17 @@ exports.getOrderDetails = async (req, res) => {
         image: variant.images?.[0] || 'default-product.webp',
         size: variant.size,
         color: variant.color,
+
         orderedQty: item.quantity,
         activeQty,
         cancelledQty: item.cancelledQty || 0,
         returnedQty: item.returnedQty || 0,
+
         price: item.price,
         total,
+
+        // ✅ REQUIRED FIELDS (THIS IS THE FIX)
+        returnStatus: item.returnStatus || 'none',
         message: item.message || null
       });
     }
@@ -344,53 +348,7 @@ exports.getOrderDetails = async (req, res) => {
       .render('user/500');
   }
 };
-//   try {
-//     const { orderNumber } = req.params;
-//     const userId = req.user._id;
 
-//     const order = await Order.findOne({
-//       orderNumber,
-//       user_id: userId
-//     }).lean();
-
-//     if (!order) {
-//       return res.status(404).render('user/404');
-//     }
-
-//     const items = [];
-
-//     for (const item of order.items) {
-//       const variant = await Variant.findById(item.variant_id).lean();
-//       if (!variant) continue;
-
-//       const product = await Product.findOne({
-//         product_id: variant.product_id
-//       }).lean();
-//       if (!product) continue;
-
-//       items.push({
-//         variant_id: item.variant_id,
-//         name: product.title,
-//         image: variant.images?.[0] || 'default-product.webp',
-//         size: variant.size,
-//         quantity: item.quantity
-//       });
-//     }
-
-//     const actionType =
-//       order.status === 'delivered' ? 'Return' : 'Cancel';
-
-//     res.render('user/order-cancel', {
-//       order,
-//       items,
-//       actionType
-//     });
-
-//   } catch (error) {
-//     console.error('GET CANCEL PAGE ERROR:', error);
-//     res.status(500).render('user/500');
-//   }
-// };
 
 exports.getCancelOrder = async (req, res) => {
   try {
@@ -439,6 +397,7 @@ exports.getCancelOrder = async (req, res) => {
     return res.render('user/order-cancel', {
       order,
       items,
+      activePage: 'orders',
       actionType
     });
 
@@ -449,54 +408,124 @@ exports.getCancelOrder = async (req, res) => {
 };
 
 exports.postCancelOrder = async (req, res) => {
-  const { orderNumber } = req.params;
-  const userId = req.user._id;
-  const { items = [] } = req.body;
+  try {
+    const { orderNumber } = req.params;
+    const userId = req.user._id;
+    const { items = [] } = req.body;
 
-  const order = await Order.findOne({ orderNumber, user_id: userId });
-  if (!order) return res.redirect('/user/orders');
+    const order = await Order.findOne({
+      orderNumber,
+      user_id: userId
+    });
 
-  const isReturn = order.status === 'delivered';
+    if (!order) return res.redirect('/user/orders');
 
-  for (const variantId of items) {
-    const qty = Number(req.body[`qty_${variantId}`]);
-    const message = req.body[`message_${variantId}`];
+    const isReturn = order.status === 'delivered';
 
-    const item = order.items.find(
-      i => i.variant_id.toString() === variantId
-    );
+    for (const variantId of items) {
+      const qty = Number(req.body[`qty_${variantId}`]);
+      const message = req.body[`message_${variantId}`];
 
-    if (!item || qty <= 0) continue;
-
-    if (isReturn) {
-      item.returnedQty += qty;
-      item.status = 'returned';
-    } else {
-      item.cancelledQty += qty;
-      item.status = 'cancelled';
-
-      await Variant.findByIdAndUpdate(
-        variantId,
-        { $inc: { stock: qty } }
+      const item = order.items.find(
+        i => i.variant_id.toString() === variantId
       );
+
+      if (!item || qty <= 0) continue;
+
+
+      if (isReturn) {
+        item.returnedQty += qty;
+        item.status = 'returned';
+        item.returnStatus = 'pending';
+      }
+
+      else {
+        item.cancelledQty += qty;
+        item.status = 'cancelled';
+
+        await Variant.findByIdAndUpdate(
+          variantId,
+          { $inc: { stock: qty } }
+        );
+      }
+
+      item.message = message || null;
     }
 
-    item.message = message;
+    const statuses = order.items.map(i => i.status);
+    if (statuses.every(s => s === 'cancelled')) {
+      order.status = 'cancelled';
+    } else if (statuses.some(s => s === 'cancelled')) {
+      order.status = 'partially_cancelled';
+    }
+    if (statuses.every(s => s === 'returned')) {
+      order.status = 'returned';
+    } else if (statuses.some(s => s === 'returned')) {
+      order.status = 'partially_returned';
+    }
+
+    await order.save();
+    res.redirect('/user/orders');
+
+  } catch (error) {
+    console.error('POST CANCEL/RETURN ORDER ERROR:', error);
+    res.redirect('/user/orders');
   }
-
-  const statuses = order.items.map(i => i.status);
-
-  if (statuses.every(s => s === 'cancelled'))
-    order.status = 'cancelled';
-  else if (statuses.some(s => s === 'cancelled'))
-    order.status = 'partially_cancelled';
-
-  if (statuses.every(s => s === 'returned'))
-    order.status = 'returned';
-  else if (statuses.some(s => s === 'returned'))
-    order.status = 'partially_returned';
-
-  await order.save();
-
-  res.redirect('/user/orders');
 };
+
+//   const { orderNumber } = req.params;
+//   const userId = req.user._id;
+//   const { items = [] } = req.body;
+
+//   const order = await Order.findOne({ orderNumber, user_id: userId });
+//   if (!order) return res.redirect('/user/orders');
+
+//   const isReturn = ['delivered', 'partially_returned'].includes(order.status);
+
+//   for (const variantId of items) {
+//     const qty = Number(req.body[`qty_${variantId}`]);
+//     const message = req.body[`message_${variantId}`];
+
+//     const item = order.items.find(
+//       i => i.variant_id.toString() === variantId
+//     );
+
+//     if (!item || qty <= 0) continue;
+
+//     if (isReturn) {
+//       item.returnedQty += qty;
+//       item.status = 'returned';
+//     } else {
+//       item.cancelledQty += qty;
+//       item.status = 'cancelled';
+
+//       await Variant.findByIdAndUpdate(
+//         variantId,
+//         { $inc: { stock: qty } }
+//       );
+//     }
+
+//     item.message = message;
+//   }
+
+//   const statuses = order.items.map(i => i.status);
+
+//   /* CANCEL */
+//   if (statuses.every(s => s === 'cancelled')) {
+//     order.status = 'cancelled';
+//   } else if (statuses.some(s => s === 'cancelled')) {
+//     order.status = 'partially_cancelled';
+//   }
+
+//   /* RETURN */
+//   if (statuses.every(s => s === 'returned')) {
+//     order.status = 'returned';
+//     order.returnStatus = 'pending';
+//   } else if (statuses.some(s => s === 'returned')) {
+//     order.status = 'partially_returned';
+//     order.returnStatus = 'pending';
+//   }
+
+//   await order.save();
+//   res.redirect('/user/orders');
+// };

@@ -12,74 +12,97 @@
   <!-- Icons -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
 
-  <style>
-    body {
-      background: #f2e5e2;
-      font-family: "Inter", sans-serif;
-    }
+<style>
+  body {
+    background: #f2e5e2;
+    font-family: "Inter", sans-serif;
+  }
 
-    .content {
-      margin-left: 250px;
-      padding: 40px;
-    }
+  .content {
+    margin-left: 250px;
+    padding: 40px;
+  }
 
-    .table-card {
-      background: #fff;
-      border-radius: 18px;
-      padding: 25px 30px;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.08);
-    }
+  .table-card {
+    background: #fff;
+    border-radius: 18px;
+    padding: 25px 30px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+  }
 
-    .search-box {
-      background: #ded6d3;
-      border-radius: 12px;
-      padding: 10px 15px;
-      border: none;
-    }
+  .search-box {
+    background: #ded6d3;
+    border-radius: 12px;
+    padding: 10px 15px;
+    border: none;
+  }
 
-    .order-row {
-      cursor: pointer;
-      transition: background 0.2s ease;
-    }
+  .order-row {
+    cursor: pointer;
+    transition: background 0.2s ease;
+  }
 
-    .order-row:hover {
-      background: #f7f4f3;
-    }
+  .order-row:hover {
+    background: #f7f4f3;
+  }
 
-    .status-badge {
-      padding: 4px 12px;
-      border-radius: 20px;
-      font-size: 12px;
-      font-weight: 500;
-    }
+  .status-badge {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+  }
 
-    .badge-placed { background:#dbeafe; color:#1e40af; }
-    .badge-confirmed { background:#e0e7ff; color:#3730a3; }
-    .badge-shipped { background:#ede9fe; color:#5b21b6; }
-    .badge-delivered { background:#dcfce7; color:#166534; }
-    .badge-cancelled { background:#fee2e2; color:#991b1b; }
-    .badge-returned { background:#fff7ed; color:#9a3412; }
+  .badge-placed { background:#dbeafe; color:#1e40af; }
+  .badge-confirmed { background:#e0e7ff; color:#3730a3; }
+  .badge-shipped { background:#ede9fe; color:#5b21b6; }
+  .badge-delivered { background:#dcfce7; color:#166534; }
+  .badge-cancelled { background:#fee2e2; color:#991b1b; }
+  .badge-returned { background:#fff7ed; color:#9a3412; }
 
-    .return-btn {
-      background:#e0553f;
-      color:#fff;
-      border-radius:10px;
-      padding:8px 14px;
-      border:none;
-      position:relative;
-    }
+  .return-btn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
 
-    .return-badge {
-      position:absolute;
-      top:-6px;
-      right:-6px;
-      background:#dc2626;
-      color:#fff;
-      border-radius:50%;
-      font-size:11px;
-      padding:2px 6px;
-    }
-  </style>
+    padding: 10px 18px;
+    background: #0d8fd3;      
+    color: #fff;
+    border-radius: 12px;
+    border: none;
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  .return-btn:hover {
+    background: #0b7db8;
+    color: #fff;
+  }
+
+  .return-badge {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+
+    min-width: 26px;
+    height: 26px;
+
+    background: #22c55e;        
+    color: #fff;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    font-size: 13px;
+    font-weight: 700;
+
+    border-radius: 50%;
+    box-shadow: 0 0 0 3px #0d8fd3;
+  }
+</style>
+
 </head>
 
 <body>
@@ -95,7 +118,7 @@
       <small class="text-muted"><%= totalOrders %> total orders</small>
     </div>
 
-    <a href="/admin/orders/returns" class="return-btn">
+    <a href="/admin/returns" class="return-btn">
       View return requests
       <% if (pendingReturns > 0) { %>
         <span class="return-badge"><%= pendingReturns %></span>

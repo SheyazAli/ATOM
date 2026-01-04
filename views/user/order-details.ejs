@@ -44,6 +44,7 @@
       padding: 4px 10px;
       border-radius: 14px;
       font-weight: 500;
+      display: inline-block;
     }
 
     .badge-green { background:#dcfce7; color:#166534; }
@@ -106,19 +107,32 @@
                 Price: ₹<%= item.price %>
               </div>
 
+              <!-- CANCEL INFO -->
               <% if (item.cancelledQty > 0) { %>
                 <div class="mt-2 badge-status badge-red">
                   Cancelled Qty: <%= item.cancelledQty %>
                 </div>
               <% } %>
 
-              <% if (item.returnedQty > 0) { %>
+              <!-- RETURN INFO (FIXED LOGIC) -->
+              <% if (item.returnStatus === 'approved') { %>
                 <div class="mt-2 badge-status badge-yellow">
                   Returned Qty: <%= item.returnedQty %>
                 </div>
+
+              <% } else if (item.returnStatus === 'pending') { %>
+                <div class="mt-2 badge-status badge-yellow">
+                  Return request pending
+                </div>
+
+              <% } else if (item.returnStatus === 'rejected') { %>
+                <div class="mt-2 badge-status badge-red">
+                  Return request rejected
+                </div>
               <% } %>
 
-              <% if (item.message) { %>
+              <!-- ADMIN MESSAGE (ONLY WHEN REJECTED) -->
+              <% if (item.returnStatus === 'rejected' && item.message) { %>
                 <div class="alert alert-light mt-3 p-2">
                   <strong>Reason:</strong> <%= item.message %>
                 </div>
@@ -126,7 +140,7 @@
             </div>
 
             <div class="fw-semibold">
-              ₹<%= item.total %>
+              ₹<%= item.price * item.orderedQty %>
             </div>
           </div>
         </div>
