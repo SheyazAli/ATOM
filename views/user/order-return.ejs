@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Return Order | ATOM</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+  <style>
+    body { font-family:"Segoe UI", sans-serif; background:#fff; }
+    .account-wrapper { padding:60px 0 80px; }
+    .card-box {
+      background:#f9fafb;
+      border-radius:14px;
+      padding:22px;
+      margin-bottom:24px;
+    }
+    .product-img {
+      width:70px; height:90px;
+      object-fit:cover;
+      border-radius:10px;
+      border:1px solid #ddd;
+    }
+    .qty-btn {
+      width:32px; height:32px;
+      border-radius:50%;
+      border:1px solid #ccc;
+      background:#fff;
+    }
+  </style>
+</head>
+
+<body>
+
+<%- include('./userPartials/navbar') %>
+
+<div class="container account-wrapper">
+  <div class="row">
+
+    <%- include('./userPartials/sidebar') %>
+
+    <div class="col-lg-9 col-md-8">
+
+      <h4 class="mb-4">Return Items</h4>
+
+      <% if (!items || items.length === 0) { %>
+        <div class="alert alert-info">
+          No items available for return.
+        </div>
+        <a href="/user/orders" class="btn btn-outline-secondary">Back</a>
+      <% } else { %>
+
+      <form id="actionForm"
+            method="POST"
+            action="/user/orders/<%= order.orderNumber %>/return">
+
+        <% items.forEach(item => { %>
+          <div class="card-box">
+
+            <div class="d-flex align-items-center justify-content-between">
+
+              <div class="d-flex align-items-center">
+                <input type="checkbox"
+                       class="form-check-input me-3"
+                       name="items[]"
+                       value="<%= item.variant_id %>">
+
+                <img src="/uploads/<%= item.image %>" class="product-img me-3">
+
+                <div>
+                  <div class="fw-semibold"><%= item.name %></div>
+                  <div class="text-muted small">
+                    Size: <%= item.size %>
+                  </div>
+                </div>
+              </div>
+
+              <div class="d-flex align-items-center gap-2">
+                <button type="button"
+                        class="qty-btn"
+                        onclick="changeQty('<%= item.variant_id %>', -1)">−</button>
+
+                <input type="number"
+                       class="form-control text-center"
+                       style="width:60px"
+                       id="qty_<%= item.variant_id %>"
+                       name="qty_<%= item.variant_id %>"
+                       value="1"
+                       min="1"
+                       max="<%= item.quantity - item.returnedQty %>">
+
+                <button type="button"
+                        class="qty-btn"
+                        onclick="changeQty('<%= item.variant_id %>', 1)">+</button>
+              </div>
+            </div>
+
+            <textarea
+              class="form-control mt-3"
+              name="message_<%= item.variant_id %>"
+              placeholder="Reason for return"></textarea>
+
+          </div>
+        <% }) %>
+
+        <div class="d-flex gap-3">
+          <button type="button"
+                  class="btn btn-danger px-4"
+                  onclick="confirmAction()">
+            Return
+          </button>
+
+          <a href="/user/orders" class="btn btn-outline-secondary px-4">
+            Back
+          </a>
+        </div>
+
+      </form>
+      <% } %>
+
+    </div>
+  </div>
+</div>
+
+<%- include('./userPartials/footer') %>
+
+<script>
+function changeQty(id, delta) {
+  const input = document.getElementById('qty_' + id);
+  let value = Number(input.value) + delta;
+
+  if (value >= Number(input.min) && value <= Number(input.max)) {
+    input.value = value;
+  }
+}
+
+function confirmAction() {
+  Swal.fire({
+    title: 'Confirm return?',
+    text: 'Return request will be sent for approval',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'Yes, return'
+  }).then(result => {
+    if (result.isConfirmed) {
+      document.getElementById('actionForm').submit();
+    }
+  });
+}
+</script>
+
+</body>
+</html>

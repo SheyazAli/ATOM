@@ -344,53 +344,8 @@ exports.getOrderDetails = async (req, res) => {
       .render('user/500');
   }
 };
-//   try {
-//     const { orderNumber } = req.params;
-//     const userId = req.user._id;
 
-//     const order = await Order.findOne({
-//       orderNumber,
-//       user_id: userId
-//     }).lean();
-
-//     if (!order) {
-//       return res.status(404).render('user/404');
-//     }
-
-//     const items = [];
-
-//     for (const item of order.items) {
-//       const variant = await Variant.findById(item.variant_id).lean();
-//       if (!variant) continue;
-
-//       const product = await Product.findOne({
-//         product_id: variant.product_id
-//       }).lean();
-//       if (!product) continue;
-
-//       items.push({
-//         variant_id: item.variant_id,
-//         name: product.title,
-//         image: variant.images?.[0] || 'default-product.webp',
-//         size: variant.size,
-//         quantity: item.quantity
-//       });
-//     }
-
-//     const actionType =
-//       order.status === 'delivered' ? 'Return' : 'Cancel';
-
-//     res.render('user/order-cancel', {
-//       order,
-//       items,
-//       actionType
-//     });
-
-//   } catch (error) {
-//     console.error('GET CANCEL PAGE ERROR:', error);
-//     res.status(500).render('user/500');
-//   }
-// };
+//CANCEL
 
 exports.getCancelOrder = async (req, res) => {
   try {
@@ -439,6 +394,7 @@ exports.getCancelOrder = async (req, res) => {
     return res.render('user/order-cancel', {
       order,
       items,
+      activePage: 'orders',
       actionType
     });
 
@@ -500,3 +456,109 @@ exports.postCancelOrder = async (req, res) => {
 
   res.redirect('/user/orders');
 };
+
+//RETURN
+
+exports.getReturnOrder = async (req, res) => {
+  try {
+    const { orderNumber } = req.params;
+    const userId = req.userId;
+
+    const order = await Order.findOne({
+      orderNumber,
+      user_id: userId,
+      status: { $in: ['delivered', 'partially_returned', 'pending_returned'] }
+    }).populate('items.variant_id');
+
+    if (!order) {
+      return res.redirect('/user/orders');
+    }
+
+    const items = order.items
+      .filter(i => {
+        const remainingQty =
+          i.quantity - (i.cancelledQty || 0) - (i.returnedQty || 0);
+        if (remainingQty <= 0) return false;
+
+        return [
+          'delivered',
+          'returned',
+          'cancelled',
+          'pending_returned'
+        ].includes(i.status);
+      })
+      .map(i => ({
+        variant_id: i.variant_id?._id,
+        name: i.variant_id?.name || '',
+        image: i.variant_id?.images?.[0] || '',
+        size: i.variant_id?.size || '',
+        quantity: i.quantity,
+        cancelledQty: i.cancelledQty || 0,
+        returnedQty: i.returnedQty || 0
+      }));
+
+    return res.render('user/order-return', {
+      order,
+      activePage: 'orders',
+      items
+    });
+
+  } catch (error) {
+    console.error('GET RETURN ORDER ERROR:', error);
+    return res.redirect('/user/orders');
+  }
+};
+
+exports.postReturnOrder = async (req, res) => {
+  try {
+    const { orderNumber } = req.params;
+    const userId = req.userId;
+    const { items = [] } = req.body;
+
+    const order = await Order.findOne({
+      orderNumber,
+      user_id: userId
+    });
+
+    if (!order) {
+      return res.redirect('/user/orders');
+    }
+
+    for (const variantId of items) {
+      const qty = Number(req.body[`qty_${variantId}`]);
+      const message = req.body[`message_${variantId}`];
+
+      const item = order.items.find(
+        i => i.variant_id.toString() === variantId
+      );
+
+      if (!item || qty <= 0) continue;
+
+      const remainingQty =
+        item.quantity - (item.returnedQty || 0);
+
+      if (qty > remainingQty) continue;
+
+      item.returnedQty += qty;
+      item.returnStatus = 'pending'; 
+      item.message = message || 'Return requested';
+    }
+
+    const returnStates = order.items.map(i => i.returnStatus);
+
+    if (returnStates.every(s => s === 'pending')) {
+      order.status = 'pending_returned';
+    } else if (returnStates.some(s => s === 'pending')) {
+      order.status = 'partially_returned';
+    }
+
+    await order.save();
+    return res.redirect('/user/orders');
+
+  } catch (error) {
+    console.error('POST RETURN ORDER ERROR:', error);
+    return res.redirect('/user/orders');
+  }
+};
+
+

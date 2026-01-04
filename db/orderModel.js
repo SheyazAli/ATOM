@@ -20,17 +20,20 @@ const orderItemSchema = new mongoose.Schema(
     },
 
     status: {
-      type: String,
-      enum: [
-        'placed',
-        'confirmed',
-        'shipped',
-        'delivered',
-        'cancelled',
-        'returned'
-      ],
-      default: 'placed'
-    },
+  type: String,
+  enum: [
+    'placed',
+    'confirmed',
+    'shipped',
+    'delivered',
+    'cancelled',
+    'partially_cancelled',
+    'pending_returned',
+    'returned',
+    'partially_returned'
+  ],
+  default: 'placed'
+},
 
     cancelledQty: {
       type: Number,
@@ -41,6 +44,11 @@ const orderItemSchema = new mongoose.Schema(
       type: Number,
       default: 0
     },
+    returnStatus: {
+  type: String,
+  enum: ['none', 'pending', 'approved', 'rejected'],
+  default: 'none'
+},
 
     message: {
       type: String,
@@ -98,19 +106,20 @@ const orderSchema = new mongoose.Schema(
     total: Number,
 
     status: {
-      type: String,
-      enum: [
-        'placed',
-        'confirmed',
-        'shipped',
-        'delivered',
-        'partially_cancelled',
-        'partially_returned',
-        'cancelled',
-        'returned'
-      ],
-      default: 'placed'
-    }
+  type: String,
+  enum: [
+    'placed',
+    'confirmed',
+    'shipped',
+    'delivered',
+    'cancelled',
+    'partially_cancelled',
+    'pending_returned',
+    'returned',
+    'partially_returned'
+  ],
+  default: 'placed'
+}
   },
   {
     timestamps: {
