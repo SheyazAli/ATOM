@@ -221,6 +221,8 @@ exports.toggleUserStatus = async (req, res) => {
 }
 };
 
+/*ORDERS*/
+
 exports.getOrders = async (req, res) => {
   try {
     const page = parseInt(req.query.page, 10) || 1;
@@ -317,55 +319,54 @@ exports.getAdminOrderDetails = async (req, res) => {
   try {
     const { orderNumber } = req.params;
 
-    const order = await Order.findOne({ orderNumber }).lean();
+    const order = await Order.findOne({ orderNumber })
+      .populate('items.variant_id')
+      .lean();
+
     if (!order) {
-      return res.status(404).render('admin/404');
+      return res
+        .status(HttpStatus.NOT_FOUND)
+        .render('admin/404');
     }
 
     const user = await User.findById(order.user_id)
       .select('first_name last_name email')
       .lean();
 
-    const items = [];
+    const items = order.items.map(i => {
+      const cancelledQty = i.cancelledQty || 0;
+      const returnedQty = i.returnedQty || 0;
+      const remainingQty = i.quantity - cancelledQty - returnedQty;
 
-    for (const item of order.items) {
-      const variant = await Variant.findById(item.variant_id).lean();
-      if (!variant) continue;
+      return {
+        variant_id: i.variant_id?._id,
+        name: i.variant_id?.name || 'Product',
+        image: i.variant_id?.images?.[0] || 'default-product.webp',
+        size: i.variant_id?.size || '-',
+        color: i.variant_id?.color || '-',
+        quantity: i.quantity,
+        cancelledQty,
+        returnedQty,
+        remainingQty,
+        price: i.price,
+        total: i.price * i.quantity,
+        status: i.status,
+        message: i.message || ''
+      };
+    });
 
-      const product = await Product.findOne({
-        product_id: variant.product_id
-      }).lean();
-
-      items.push({
-        name: product?.title || 'Product',
-        image: variant.images?.[0] || 'default-product.webp',
-        size: variant.size,
-        color: variant.color,
-        quantity: item.quantity,
-        price: item.price,
-        total: item.quantity * item.price,
-        stockLeft: variant.stock
-      });
-    }
-
-    res.render('admin/order-details', {
+    return res.render('admin/order-details', {
       order,
       user,
       items,
-      statuses: [
-        'placed',
-        'confirmed',
-        'shipped',
-        'delivered',
-        'cancelled',
-        'returned'
-      ],
       currentPage: 'orders'
     });
 
   } catch (error) {
     console.error('ADMIN ORDER DETAILS ERROR:', error);
-    res.status(500).render('admin/500');
+    return res
+      .status(HttpStatus.INTERNAL_SERVER_ERROR)
+      .render('admin/500');
   }
 };
 
@@ -375,26 +376,51 @@ exports.postUpdateOrderDetails = async (req, res) => {
     const { status, message } = req.body;
 
     const order = await Order.findOne({ orderNumber });
-    if (!order) return res.status(404).render('admin/404');
+    if (!order) {
+      return res
+        .status(HttpStatus.NOT_FOUND)
+        .json({ success: false });
+    }
 
-    order.status = status;
+    if (['confirmed', 'shipped', 'delivered'].includes(status)) {
+      order.status = status;
 
-    if (status === 'cancelled' || status === 'returned') {
       order.items.forEach(item => {
-        item.status = status === 'cancelled' ? 'cancelled' : 'returned';
-        item.message = message;
+        if (['placed', 'confirmed'].includes(item.status)) {
+          item.status = status;
+        }
+      });
+    }
+
+    if (status === 'cancelled') {
+      order.status = 'cancelled';
+
+      order.items.forEach(item => {
+        const cancelledQty = item.cancelledQty || 0;
+        const returnedQty = item.returnedQty || 0;
+        const remainingQty = item.quantity - cancelledQty - returnedQty;
+
+        if (remainingQty > 0) {
+          item.cancelledQty += remainingQty;
+          item.status = 'cancelled';
+          item.message = message || 'Cancelled by admin';
+        }
       });
     }
 
     await order.save();
 
-    return res.json({ success: true });
+    return res
+      .status(HttpStatus.OK)
+      .json({ success: true });
+
   } catch (error) {
     console.error('ADMIN UPDATE ORDER ERROR:', error);
-    res.status(500).json({ success: false });
+    return res
+      .status(HttpStatus.INTERNAL_SERVER_ERROR)
+      .json({ success: false });
   }
 };
-
 
 /* LOGOUT */
 exports.logout = (req, res) => {

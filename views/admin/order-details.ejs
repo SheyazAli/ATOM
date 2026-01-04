@@ -8,32 +8,21 @@
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
   <style>
-    body {
-      background: #f2e5e2;
-      font-family: "Inter", sans-serif;
-    }
-
-    .content {
-      margin-left: 250px;
-      padding: 40px;
-    }
-
+    body { background:#f2e5e2; font-family:"Inter", sans-serif; }
+    .content { margin-left:250px; padding:40px; }
     .card-box {
-      background: #fff;
-      border-radius: 18px;
-      padding: 24px;
-      margin-bottom: 24px;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+      background:#fff;
+      border-radius:18px;
+      padding:24px;
+      margin-bottom:24px;
+      box-shadow:0 4px 15px rgba(0,0,0,.08);
     }
-
     .product-img {
-      width: 64px;
-      height: 80px;
-      object-fit: cover;
-      border-radius: 10px;
-      border: 1px solid #ddd;
+      width:64px; height:80px;
+      object-fit:cover;
+      border-radius:10px;
+      border:1px solid #ddd;
     }
-
     .badge-active { background:#dcfce7; color:#166534; }
     .badge-cancelled { background:#fee2e2; color:#991b1b; }
     .badge-returned { background:#fff7ed; color:#9a3412; }
@@ -50,11 +39,36 @@
     Order #<%= order.orderNumber %>
   </h2>
 
+  <!-- ORDER META -->
+  <div class="card-box">
+    <div class="row">
+      <div class="col-md-4">
+        <strong>User</strong><br>
+        <%= user.first_name %> <%= user.last_name %><br>
+        <%= user.email %>
+      </div>
+
+      <div class="col-md-4">
+        <strong>Shipping Address</strong><br>
+        <%= order.address.address_line_1 %><br>
+        <%= order.address.city %>, <%= order.address.state %><br>
+        <%= order.address.postal_code %>
+      </div>
+
+      <div class="col-md-4">
+        <strong>Order Info</strong><br>
+        Date: <%= new Date(order.created_at).toDateString() %><br>
+        Payment: <%= order.paymentMethod %><br>
+        Status: <%= order.status %>
+      </div>
+    </div>
+  </div>
+
   <!-- ITEMS -->
   <div class="card-box">
     <h6 class="mb-3">Items</h6>
 
-    <% order.items.forEach(item => { %>
+    <% items.forEach(item => { %>
       <div class="d-flex align-items-center gap-4 mb-3">
         <img src="/uploads/<%= item.image %>" class="product-img">
 
@@ -63,7 +77,9 @@
           <div class="small text-muted">
             Size: <%= item.size %> |
             Ordered: <%= item.quantity %> |
-            Stock Left: <%= item.stock %>
+            Cancelled: <%= item.cancelledQty %> |
+            Returned: <%= item.returnedQty %> |
+            Remaining: <%= item.remainingQty %>
           </div>
 
           <span class="badge
@@ -83,11 +99,18 @@
         </div>
 
         <div class="fw-semibold">
-          ₹<%= item.price * item.quantity %>
+          ₹<%= item.total %>
         </div>
       </div>
       <hr>
     <% }) %>
+  </div>
+
+  <!-- PRICE -->
+  <div class="card-box">
+    <strong>Subtotal:</strong> ₹<%= order.subtotal %><br>
+    <strong>Shipping:</strong> ₹<%= order.shipping %><br>
+    <strong>Total:</strong> ₹<%= order.total %>
   </div>
 
   <!-- UPDATE STATUS -->
@@ -95,7 +118,7 @@
     <h6 class="mb-3">Update Order Status</h6>
 
     <form id="updateOrderForm">
-      <select class="form-select mb-3" name="status" required>
+      <select class="form-select mb-3" name="status" required onchange="toggleReason(this.value)">
         <option value="confirmed">Confirmed</option>
         <option value="shipped">Shipped</option>
         <option value="delivered">Delivered</option>
@@ -103,10 +126,10 @@
       </select>
 
       <textarea
-        class="form-control mb-3"
+        class="form-control mb-3 d-none"
         name="message"
-        placeholder="Message / Reason (optional)"
-        rows="3"></textarea>
+        id="adminMessage"
+        placeholder="Reason for cancellation"></textarea>
 
       <button class="btn btn-danger">Save Changes</button>
     </form>
@@ -115,10 +138,15 @@
 </div>
 
 <script>
+function toggleReason(val) {
+  document.getElementById('adminMessage')
+    .classList.toggle('d-none', val !== 'cancelled');
+}
+
 document.getElementById('updateOrderForm').addEventListener('submit', e => {
   e.preventDefault();
 
-  fetch('', {
+  fetch('/admin/orders/<%= order.orderNumber %>/update', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
