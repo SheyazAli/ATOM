@@ -25,6 +25,7 @@
       border-radius: 12px;
       padding: 20px;
       transition: box-shadow 0.3s ease;
+      position: relative;
     }
 
     .address-card:hover {
@@ -43,7 +44,8 @@
     }
 
     .btn-outline-success,
-    .btn-outline-danger {
+    .btn-outline-danger,
+    .btn-outline-primary {
       border-radius: 12px;
       font-size: 14px;
     }
@@ -64,17 +66,13 @@
 
 <body>
 
-<!-- ================= HEADER ================= -->
 <%- include('./userPartials/navbar') %>
 
-<!-- ================= ACCOUNT/ADDRESS ================= -->
 <div class="container account-wrapper">
   <div class="row">
 
-    <!-- Sidebar -->
     <%- include('./userPartials/sidebar') %>
 
-    <!-- Addresses -->
     <div class="col-lg-9 col-md-8">
       <div class="d-flex justify-content-between align-items-center mb-4">
         <div class="page-title">My Addresses</div>
@@ -90,9 +88,11 @@
           <% addresses.forEach(addr => { %>
             <div class="col-md-6">
               <div class="address-card h-100">
+
                 <p class="fw-bold mb-1">
                   <%= addr.first_name %> <%= addr.last_name %>
                 </p>
+
                 <p><%= addr.address_line_1 %></p>
 
                 <% if (addr.address_line_2) { %>
@@ -106,37 +106,49 @@
                   <span class="badge bg-success mb-2">Default</span>
                 <% } %>
 
-                <div class="mt-3 d-flex gap-2">
-                  <a href="/user/address/<%= addr._id %>/edit"
-                     class="btn btn-outline-success btn-sm">
+                <div class="mt-3 d-flex flex-wrap gap-2">
+
+                  <!-- EDIT -->
+                  <a
+                    href="/user/address/<%= addr._id %>/edit"
+                    class="btn btn-outline-success btn-sm">
                     Edit
                   </a>
 
+                  <!-- DELETE -->
                   <button
                     class="btn btn-outline-danger btn-sm"
                     onclick="confirmDelete('<%= addr._id %>')">
                     Delete
                   </button>
+
+                  <!-- MAKE DEFAULT (ONLY IF NOT DEFAULT) -->
+                  <% if (!addr.is_default) { %>
+                    <button
+                      class="btn btn-outline-primary btn-sm"
+                      onclick="makeDefault('<%= addr._id %>')">
+                      Make Default
+                    </button>
+                  <% } %>
+
                 </div>
+
               </div>
             </div>
           <% }) %>
         </div>
       <% } %>
 
-      <!-- ================= PAGINATION ================= -->
       <% if (totalPages > 1) { %>
         <nav class="d-flex justify-content-center mt-5">
           <ul class="pagination">
 
-            <!-- Prev -->
             <li class="page-item <%= currentPage === 1 ? 'disabled' : '' %>">
               <a class="page-link" href="?page=<%= currentPage - 1 %>">
                 &laquo;
               </a>
             </li>
 
-            <!-- Page Numbers -->
             <% for (let i = 1; i <= totalPages; i++) { %>
               <li class="page-item <%= currentPage === i ? 'active' : '' %>">
                 <a class="page-link" href="?page=<%= i %>">
@@ -145,7 +157,6 @@
               </li>
             <% } %>
 
-            <!-- Next -->
             <li class="page-item <%= currentPage === totalPages ? 'disabled' : '' %>">
               <a class="page-link" href="?page=<%= currentPage + 1 %>">
                 &raquo;
@@ -160,13 +171,9 @@
   </div>
 </div>
 
-<!-- ================= FOOTER ================= -->
 <%- include('./userPartials/footer') %>
 
-<!-- Bootstrap JS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-
-<!-- SweetAlert -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <script>
@@ -191,6 +198,36 @@
               Swal.fire('Error', data.message, 'error');
             }
           });
+      }
+    });
+  }
+
+  function makeDefault(addressId) {
+    Swal.fire({
+      title: 'Make this address default?',
+      text: 'This address will be used as your default delivery address.',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Yes, make default',
+      cancelButtonText: 'Cancel'
+    }).then(result => {
+      if (result.isConfirmed) {
+        fetch(`/user/address/${addressId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ is_default: true })
+        })
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            Swal.fire('Updated!', 'Default address updated.', 'success')
+              .then(() => location.reload());
+          } else {
+            Swal.fire('Error', 'Failed to update default address.', 'error');
+          }
+        });
       }
     });
   }
