@@ -8,13 +8,12 @@ exports.getAddressPage = async (req, res) => {
 
     const query = { user_id: req.user._id };
 
-    // Fetch paginated addresses
     const addresses = await Address.find(query)
       .sort({ created_at: -1 })
       .skip((page - 1) * limit)
       .limit(limit);
 
-    // Count ONLY this user's addresses
+
     const totalAddresses = await Address.countDocuments(query);
 
     res.render('user/address', {

@@ -43,6 +43,10 @@ router.get('/returns',verifyAdmin,adminController.getReturnRequests);
 router.post('/returns/approve',verifyAdmin,adminController.approveReturn);
 router.post('/returns/reject',verifyAdmin,adminController.rejectReturn);
 
+//INVENTORY
+router.get('/inventory',verifyAdmin,noCache,adminController.getInventory);
+
+router.put('/inventory/:variantId',verifyAdmin,adminController.updateStock);
 
 router.get('/logout', adminController.logout);
 

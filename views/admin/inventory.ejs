@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Inventory | Admin</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <style>
+    body {
+      background: #f2e5e2;
+      font-family: "Inter", sans-serif;
+    }
+
+    .content {
+      margin-left: 250px;
+      padding: 40px;
+    }
+
+    .table-card {
+      background: #fff;
+      border-radius: 18px;
+      padding: 25px 30px;
+      box-shadow: 0 4px 15px rgba(0,0,0,.08);
+    }
+
+    .stock-low {
+      color: #b91c1c;
+      font-weight: 600;
+    }
+
+    .stock-ok {
+      color: #166534;
+      font-weight: 600;
+    }
+
+    .product-title {
+      font-weight: 600;
+    }
+  </style>
+</head>
+
+<body>
+
+<%- include('./adminPartials/adminSidebar') %>
+
+<div class="content">
+
+  <h3 class="fw-bold mb-4">Inventory / Stock Management</h3>
+  <form method="GET" class="row g-3 mb-4">
+  <div class="col-md-4">
+    <input
+      type="text"
+      name="search"
+      class="form-control"
+      placeholder="Search product"
+      value="<%= search || '' %>"
+    >
+  </div>
+
+  <div class="col-md-3">
+    <select name="size" class="form-select">
+      <option value="">All Sizes</option>
+      <% ['S','M','L','XL','XXL'].forEach(s => { %>
+        <option value="<%= s %>" <%= size === s ? 'selected' : '' %>>
+          <%= s %>
+        </option>
+      <% }) %>
+    </select>
+  </div>
+
+  <div class="col-md-3">
+    <select name="sort" class="form-select">
+      <option value="">Sort Variants</option>
+      <option value="stock_asc" <%= sort === 'stock_asc' ? 'selected' : '' %>>
+        Stock ↑
+      </option>
+      <option value="stock_desc" <%= sort === 'stock_desc' ? 'selected' : '' %>>
+        Stock ↓
+      </option>
+      <option value="size_asc" <%= sort === 'size_asc' ? 'selected' : '' %>>
+        Size A–Z
+      </option>
+      <option value="size_desc" <%= sort === 'size_desc' ? 'selected' : '' %>>
+        Size Z–A
+      </option>
+    </select>
+  </div>
+
+  <div class="col-md-2">
+    <button class="btn btn-dark w-100">Apply</button>
+  </div>
+</form>
+
+
+  <% products.forEach(product => { %>
+    <div class="table-card mb-4">
+
+      <div class="d-flex justify-content-between mb-3">
+        <div class="product-title">
+          <%= product.title %>
+        </div>
+        <div class="fw-semibold">
+          Total Stock: <%= product.totalStock %>
+        </div>
+      </div>
+
+      <table class="table align-middle">
+        <thead class="fw-semibold">
+          <tr>
+            <th>Color</th>
+            <th>Size</th>
+            <th>Stock</th>
+            <th width="260">Update</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          <% product.variants.forEach(v => { %>
+            <tr>
+              <td><%= v.color %></td>
+              <td><%= v.size %></td>
+              <td>
+                <span class="<%= v.stock <= 5 ? 'stock-low' : 'stock-ok' %>">
+                  <%= v.stock %>
+                </span>
+              </td>
+
+              <td>
+                <form
+                action="/admin/inventory/<%= v._id %>?_method=PUT"
+                method="POST"
+                >
+                  <input type="hidden" name="_method" value="PUT">
+
+                  <input
+                    type="number"
+                    name="change"
+                    class="form-control form-control-sm"
+                    placeholder="+ / - qty"
+                    required
+                  >
+
+                  <button class="btn btn-dark btn-sm">
+                    Update
+                  </button>
+                </form>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+
+    </div>
+  <% }) %>
+<% if (totalPages > 1) { %>
+  <nav class="d-flex justify-content-center mt-4">
+    <ul class="pagination">
+
+      <!-- Prev -->
+      <li class="page-item <%= page === 1 ? 'disabled' : '' %>">
+        <a
+          class="page-link"
+          href="?page=<%= page - 1 %>&search=<%= search %>&size=<%= size %>&sort=<%= sort %>">
+          &laquo;
+        </a>
+      </li>
+
+      <!-- Page Numbers -->
+      <% for (let i = 1; i <= totalPages; i++) { %>
+        <li class="page-item <%= page === i ? 'active' : '' %>">
+          <a
+            class="page-link"
+            href="?page=<%= i %>&search=<%= search %>&size=<%= size %>&sort=<%= sort %>">
+            <%= i %>
+          </a>
+        </li>
+      <% } %>
+
+      <!-- Next -->
+      <li class="page-item <%= page === totalPages ? 'disabled' : '' %>">
+        <a
+          class="page-link"
+          href="?page=<%= page + 1 %>&search=<%= search %>&size=<%= size %>&sort=<%= sort %>">
+          &raquo;
+        </a>
+      </li>
+
+    </ul>
+  </nav>
+<% } %>
+</div>
+
+</body>
+</html>

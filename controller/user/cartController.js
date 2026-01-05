@@ -56,7 +56,9 @@ exports.getCartPage = async (req, res) => {
 
   } catch (error) {
     console.error('GET CART PAGE ERROR:', error);
-    res.status(500).render('user/500');
+    return res
+    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+      .render('user/500');
   }
 };
 
@@ -69,8 +71,6 @@ exports.addToCart = async (req, res) => {
     if (!product_id || !variant_id) {
       return res.status(HttpStatus.BAD_REQUEST).json({ error: 'Invalid request' });
     }
-
-    // frontend sends string variant_id → convert here
     const variant = await Variant.findOne({ variant_id });
     if (!variant || variant.stock === 0) {
       return res.status(HttpStatus.BAD_REQUEST).json({ error: 'Variant out of stock' });
@@ -103,7 +103,7 @@ exports.addToCart = async (req, res) => {
     } else {
       cart.items.push({
         product_id,
-        variant_id: variant._id, // ✅ ObjectId stored
+        variant_id: variant._id, 
         quantity: 1,
         price_snapshot: product.sale_price
       });

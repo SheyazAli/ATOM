@@ -559,13 +559,10 @@ exports.getProducts = async (req, res) => {
       size = [],
       color = []
     } = req.query;
-
-    // normalize to arrays
     category = [].concat(category);
     size = [].concat(size);
     color = [].concat(color);
 
-    /* ---------------- VARIANT FILTER ---------------- */
 
     let variantFilter = {};
 
@@ -583,8 +580,6 @@ exports.getProducts = async (req, res) => {
       filteredProductIds = await Variant.distinct('product_id', variantFilter);
     }
 
-    /* ---------------- PRODUCT FILTER ---------------- */
-
     const productQuery = {
       status: true,
       title: { $regex: search, $options: 'i' }
@@ -595,14 +590,11 @@ exports.getProducts = async (req, res) => {
     }
 
     if (filteredProductIds) {
-      // no matching variants → no products
       if (!filteredProductIds.length) {
         filteredProductIds = ['__none__'];
       }
       productQuery.product_id = { $in: filteredProductIds };
     }
-
-    /* ---------------- SORT ---------------- */
 
     let sortOption = {};
     if (sort === 'priceLow') sortOption.sale_price = 1;
@@ -610,15 +602,11 @@ exports.getProducts = async (req, res) => {
     if (sort === 'az') sortOption.title = 1;
     if (sort === 'za') sortOption.title = -1;
 
-    /* ---------------- FETCH PRODUCTS ---------------- */
-
     const products = await Product.find(productQuery)
       .sort(sortOption)
       .skip(skip)
       .limit(limit)
       .lean();
-
-    /* ---------------- ENRICH PRODUCTS ---------------- */
 
     for (const product of products) {
       const variants = await Variant.find({
@@ -629,14 +617,10 @@ exports.getProducts = async (req, res) => {
       product.colorsCount = [...new Set(variants.map(v => v.color))].length;
     }
 
-    /* ---------------- PAGINATION ---------------- */
-
     const totalProducts = await Product.countDocuments(productQuery);
     const totalPages = Math.ceil(totalProducts / limit);
 
-    const categories = await Category.find({ status: true }).lean();
-
-    /* ---------------- RENDER ---------------- */
+    const categories = await Category.find({ status: true }).lean()
 
     res.render('user/products', {
       products,
@@ -652,7 +636,9 @@ exports.getProducts = async (req, res) => {
 
   } catch (error) {
     console.error('GET PRODUCTS ERROR:', error);
-    res.status(500).send('Server error');
+    return res
+      .status(HttpStatus.INTERNAL_SERVER_ERROR)
+      .render('user/500');
   }
 };
 exports.getProductDetails = async (req, res) => {
@@ -686,7 +672,7 @@ exports.getProductDetails = async (req, res) => {
       }
 
       colorMap[v.color].sizes.push({
-        variant_id: v.variant_id,   // ✅ REQUIRED
+        variant_id: v.variant_id,  
         size: v.size,
         stock: v.stock
       });

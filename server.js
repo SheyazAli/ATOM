@@ -8,7 +8,6 @@ Object.defineProperty(global, '__basedir', {
 const express = require('express');
 const session = require('express-session');
 const cookieParser = require('cookie-parser');
-const methodOverride = require('method-override');
 const adminRoutes = require('./routes/adminroutes');
 const userRoutes = require('./routes/userroutes');
 const path = require('path');
@@ -17,14 +16,16 @@ require('./config/passport');
 require('./config/mongoose');
 const errorHandler = require('./middleware/errorHandler');
 const navbarMiddleware = require('./middleware/navbarMiddleware');
-
+const methodOverride = require('method-override');
 
 const app = express();
 const port = process.env.PORT
+
+
 app.use(navbarMiddleware);
 app.use(passport.initialize());
 
-app.use(express.urlencoded({ extended: true }));
+app.use(express.urlencoded({ extended: true })); /// 
 app.use(express.json());
 
 app.use(methodOverride('_method'));

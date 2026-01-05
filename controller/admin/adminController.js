@@ -563,6 +563,109 @@ exports.rejectReturn = async (req, res) => {
   }
 };
 
+/*INVENTORY*/
+
+exports.getInventory = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = 3; 
+    const skip = (page - 1) * limit;
+
+    const search = (req.query.search || '').trim();
+    const size = req.query.size || '';
+    const sort = req.query.sort || '';
+    const productQuery = {};
+    if (search) {
+      productQuery.title = { $regex: search, $options: 'i' };
+    }
+
+    const totalProducts = await Product.countDocuments(productQuery);
+
+    const products = await Product.find(productQuery)
+      .sort({ created_at: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+    let variantSort = {};
+    if (sort === 'stock_asc') variantSort.stock = 1;
+    if (sort === 'stock_desc') variantSort.stock = -1;
+    if (sort === 'size_asc') variantSort.size = 1;
+    if (sort === 'size_desc') variantSort.size = -1;
+
+    for (const product of products) {
+      const variantQuery = {
+        product_id: product.product_id
+      };
+
+      if (size) {
+        variantQuery.size = size;
+      }
+
+      const variants = await Variant.find(variantQuery)
+        .sort(variantSort)
+        .lean();
+
+      product.variants = variants;
+
+      product.totalStock = variants.reduce(
+        (sum, v) => sum + (v.stock || 0),
+        0
+      );
+    }
+
+    const totalPages = Math.ceil(totalProducts / limit) || 1;
+
+    return res.render('admin/inventory', {
+      products,
+      currentPage: 'inventory',
+      page,
+      totalPages,
+      search,
+      size,
+      sort
+    });
+
+  } catch (error) {
+    console.error('GET INVENTORY ERROR:', error);
+    return res
+      .status(HttpStatus.INTERNAL_SERVER_ERROR)
+      .redirect('/admin/dashboard');
+  }
+};
+
+
+exports.updateStock = async (req, res) => {
+  try {
+    const { variantId } = req.params;
+    const { change } = req.body;
+    console.log('METHOD:', req.method);
+
+    const qty = Number(change);
+
+    if (isNaN(qty)) {
+      return res.redirect('/admin/inventory');
+    }
+
+    const variant = await Variant.findById(variantId);
+    if (!variant) {
+      return res.redirect('/admin/inventory');
+    }
+    if (variant.stock + qty < 0) {
+      return res.redirect('/admin/inventory');
+    }
+
+    variant.stock += qty;
+    await variant.save();
+
+    return res.redirect('/admin/inventory');
+
+  } catch (error) {
+    console.error('UPDATE STOCK ERROR:', error);
+    return res
+      .status(HttpStatus.INTERNAL_SERVER_ERROR)
+      .redirect('/admin/inventory');
+  }
+};
 
 /* LOGOUT */
 exports.logout = (req, res) => {

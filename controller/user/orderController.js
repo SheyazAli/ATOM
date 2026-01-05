@@ -322,8 +322,6 @@ exports.getOrderDetails = async (req, res) => {
 
         price: item.price,
         total,
-
-        // ✅ REQUIRED FIELDS (THIS IS THE FIX)
         returnStatus: item.returnStatus || 'none',
         message: item.message || null
       });
