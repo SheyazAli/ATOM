@@ -12,10 +12,12 @@
       background: #f2e5e2;
       font-family: "Inter", sans-serif;
     }
+
     .content {
       margin-left: 250px;
       padding: 40px;
     }
+
     .card-box {
       background: #fff;
       border-radius: 18px;
@@ -23,6 +25,7 @@
       box-shadow: 0 4px 15px rgba(0,0,0,0.08);
       max-width: 500px;
     }
+
     .save-btn {
       background: #5aa053;
       color: #fff;
@@ -30,6 +33,11 @@
       padding: 12px;
       border: none;
       width: 100%;
+    }
+
+    /* 👇 muted input when editing */
+    .edit-input {
+      color: #6c757d;
     }
   </style>
 </head>
@@ -39,25 +47,35 @@
 <%- include('./adminPartials/adminSidebar') %>
 
 <div class="content">
-  <h2 class="fw-bold mb-4"><%= category ? 'Edit' : 'Add' %> Category</h2>
+  <h2 class="fw-bold mb-4">
+    <%= category ? 'Edit Category' : 'Add Category' %>
+  </h2>
 
   <div class="card-box">
     <form
       method="POST"
-      action="<%= category ? `/admin/categories/${category.category_id}` : '/admin/categories' %>"
+      action="<%= category
+        ? `/admin/categories/${category.category_id}?_method=PUT`
+        : '/admin/categories'
+      %>"
     >
+
       <div class="mb-4">
         <label class="form-label fw-semibold">Category Name</label>
+
         <input
           type="text"
           name="name"
-          class="form-control"
+          class="form-control <%= category ? 'edit-input' : '' %>"
           value="<%= category?.name || '' %>"
+          placeholder="<%= category ? '' : 'Enter category name' %>"
           required
         >
       </div>
 
-      <button type="submit" class="save-btn">Save</button>
+      <button type="submit" class="save-btn">
+        Save
+      </button>
     </form>
   </div>
 </div>

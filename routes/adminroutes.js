@@ -31,7 +31,9 @@ router.get('/categories/add', verifyAdmin, adminController.getEditCategory);
 router.get('/categories/:categoryId/edit', verifyAdmin, adminController.getEditCategory);
 
 router.post('/categories', verifyAdmin, adminController.saveCategory);
-router.post('/categories/:categoryId', verifyAdmin, adminController.saveCategory);
+router.put('/categories/:categoryId', verifyAdmin, adminController.saveCategory);
+router.delete('/categories/:categoryId',verifyAdmin,adminController.deleteCategory);
+
 
 //ORDERS
 router.get('/orders',verifyAdmin,adminController.getOrders)

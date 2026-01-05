@@ -159,6 +159,39 @@ exports.saveCategory = async (req, res) => {
 
   res.redirect('/admin/categories');
 };
+exports.deleteCategory = async (req, res) => {
+  try {
+    const { categoryId } = req.params;
+
+    if (!categoryId) {
+      return res
+        .status(HttpStatus.BAD_REQUEST)
+        .json({ error: 'Category ID required' });
+    }
+
+    const deleted = await Category.findOneAndDelete({
+      category_id: categoryId
+    });
+
+    if (!deleted) {
+      return res
+        .status(HttpStatus.NOT_FOUND)
+        .json({ error: 'Category not found' });
+    }
+
+    return res
+      .status(HttpStatus.OK)
+      .json({ success: true });
+
+  } catch (error) {
+    console.error('DELETE CATEGORY ERROR:', error);
+
+    return res
+      .status(HttpStatus.INTERNAL_SERVER_ERROR)
+      .json({ error: 'Server error' });
+  }
+};
+
 
 /*USER*/
 exports.getUsers = async (req, res) => {

@@ -135,7 +135,7 @@
             <!-- ACTIONS -->
             <td class="text-center">
               <a
-                href="/admin/categories/<%= cat._id %>/edit"
+                href="/admin/categories/<%= cat.category_id %>/edit"
                 class="btn btn-sm btn-outline-primary me-2"
               >
                 <i class="bi bi-pencil"></i>
@@ -143,12 +143,12 @@
 
               <button
                 class="btn btn-sm btn-outline-danger"
-                onclick="deleteCategory('<%= cat._id %>')"
+                onclick="deleteCategory('<%= cat.category_id %>')"
               >
                 <i class="bi bi-trash"></i>
               </button>
             </td>
-          </tr>
+                      </tr>
         <% }) %>
       </tbody>
     </table>
