@@ -42,7 +42,8 @@ router.post('/profile/verify-otp', verifyUser, userController.postProfileOtp);
 router.post('/profile/resend-otp', verifyUser, userController.resendProfileOtp);
 
 router.get('/profile/update-password',verifyUser,userController.getUpdatePassword);
-router.post('/profile/update-password',verifyUser,userController.postUpdatePassword); //
+//router.post('/profile/update-password',verifyUser,userController.postUpdatePassword); 
+router.put('/profile/update-password',verifyUser,userController.putUpdatePassword);
 
 router.get('/address', verifyUser, addressController.getAddressPage);
 router.get('/address/add', verifyUser, addressController.getAddAddress);

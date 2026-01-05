@@ -94,13 +94,33 @@ exports.postEditProfile = async (req, res) => {
 
   res.redirect('/user/profile');
 };
-exports.postUpdatePassword = async (req, res) => {
-  try {
-    const { newPassword, confirmPassword } = req.body;
 
-    if (!newPassword || !confirmPassword) {
+exports.putUpdatePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword, confirmPassword } = req.body;
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
       return res.render('user/update-password', {
         error: 'All fields are required'
+      });
+    }
+
+    const user = await User.findById(req.user._id).select('+password');
+
+    if (!user) {
+      return res.render('user/update-password', {
+        error: 'User not found'
+      });
+    }
+
+    const isMatch = await bcrypt.compare(
+      currentPassword,
+      user.password
+    );
+
+    if (!isMatch) {
+      return res.render('user/update-password', {
+        error: 'Invalid current password'
       });
     }
 
@@ -118,28 +138,30 @@ exports.postUpdatePassword = async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
+    // Store temporarily until OTP verification
     req.session.profileUpdate = {
       password: hashedPassword
     };
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    console.log(otp)
 
     req.session.otp = otp;
     req.session.otpExpires = Date.now() + 2 * 60 * 1000;
     req.session.otpAttempts = 0;
 
-    await sendOtpMail(req.user.email, otp);
+    await sendOtpMail(user.email, otp);
 
-    res.redirect('/user/profile/verify-otp');
+    return res.redirect('/user/profile/verify-otp');
 
   } catch (error) {
     console.error('UPDATE PASSWORD ERROR:', error);
-    res.render('user/update-password', {
+
+    return res.render('user/update-password', {
       error: 'Something went wrong. Try again.'
     });
   }
 };
+
 exports.getUpdatePassword = (req, res) => {
   res.render('user/update-password', { error: null });
 };
@@ -714,108 +736,6 @@ exports.getProductDetails = async (req, res) => {
   }
 };
 
-//   try {
-//     console.log('🔥 GET CHECKOUT HIT');
-
-//     const userId = req.user._id;
-//     console.log('👤 USER ID:', userId.toString());
-
-//     const cartDoc = await Cart.findOne({ user_id: userId }).lean();
-
-//     console.log('🛒 RAW CART DOC:', cartDoc);
-
-//     if (!cartDoc || !cartDoc.items.length) {
-//       console.log('❌ CART EMPTY — REDIRECTING TO CART');
-//       return res.redirect('/user/cart');
-//     }
-
-//     let items = [];
-//     let subtotal = 0;
-
-//     console.log('🧾 CART ITEMS COUNT:', cartDoc.items.length);
-
-//     for (const item of cartDoc.items) {
-//       console.log('➡️ PROCESSING CART ITEM:', item);
-
-//       console.log('🔎 LOOKING FOR VARIANT ID:', item.variant_id);
-
-//       const variant = await Variant.findOne({
-//         variant_id: item.variant_id
-//       }).lean();
-
-//       if (!variant) {
-//         console.log('❌ VARIANT NOT FOUND:', item.variant_id);
-//         continue;
-//       }
-
-//       console.log('✅ VARIANT FOUND:', variant._id);
-
-//       const product = await Product.findOne({
-//         product_id: variant.product_id,
-//         status: true
-//       }).lean();
-
-//       if (!product) {
-//         console.log('❌ PRODUCT NOT FOUND FOR VARIANT:', variant.product_id);
-//         continue;
-//       }
-
-//       console.log('✅ PRODUCT FOUND:', product.title);
-
-//       const itemTotal = item.price_snapshot * item.quantity;
-//       subtotal += itemTotal;
-
-//       items.push({
-//         name: product.title,
-//         image: variant.images?.[0] || 'default-product.webp',
-//         variant: `${variant.size} · ${variant.color}`,
-//         quantity: item.quantity,
-//         price: item.price_snapshot,
-//         itemTotal
-//       });
-//     }
-
-//     console.log('📦 FINAL CHECKOUT ITEMS COUNT:', items.length);
-//     console.log('💰 SUBTOTAL:', subtotal);
-
-//     // TEMP: keep redirect disabled until debug complete
-//     // if (!items.length) {
-//     //   console.log('❌ NO VALID ITEMS — REDIRECTING TO CART');
-//     //   return res.redirect('/user/cart');
-//     // }
-
-//     const discount = 0;
-//     const shipping = 0;
-//     const total = subtotal - discount + shipping;
-
-//     const addresses = await Address.find({ user_id: userId }).lean();
-//     const defaultAddress =
-//       addresses.find(a => a.is_default) || addresses[0] || null;
-
-//     console.log('🏠 ADDRESSES FOUND:', addresses.length);
-
-//     return res.render('user/checkout', {
-//       cart: { items },
-//       summary: {
-//         subtotal,
-//         discount,
-//         shipping,
-//         total
-//       },
-//       user: {
-//         name: `${req.user.first_name} ${req.user.last_name}`
-//       },
-//       addresses,
-//       defaultAddress
-//     });
-
-//   } catch (error) {
-//     console.error('🔥 GET CHECKOUT ERROR:', error);
-//     return res
-//       .status(HttpStatus.INTERNAL_SERVER_ERROR)
-//       .render('user/500');
-//   }
-// };
 
 exports.getCheckout = async (req, res) => {
   try {
