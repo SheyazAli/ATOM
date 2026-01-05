@@ -803,9 +803,12 @@ exports.getCheckout = async (req, res) => {
 
 
 exports.logout = (req, res) => {
-  res.clearCookie('userToken',{
+  res.clearCookie('userToken', {
     httpOnly: true,
+    secure: true,      
+    sameSite: 'strict',
     path: '/'
   });
-  res.redirect('/user/home')
-}
+
+  res.redirect('/user/home');
+};

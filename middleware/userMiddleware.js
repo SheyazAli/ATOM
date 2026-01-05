@@ -65,3 +65,10 @@ exports.noCache = (req, res, next) => {
   );
   next();
 };
+
+exports.blockIfLoggedIn = (req, res, next) => {
+  if (req.cookies.userToken) {
+    return res.redirect('/user/home');
+  }
+  next();
+};

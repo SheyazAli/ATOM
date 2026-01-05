@@ -5,12 +5,12 @@ const addressController = require(__basedir +'/controller/user/addressController
 const cartController = require(__basedir +'/controller/user/cartController')
 const orderController = require(__basedir +'/controller/user/orderController')
 const productStatus = require(__basedir +'/middleware/checkProductActive')
-const { verifyUser, noCache } = require(__basedir +'/middleware/userMiddleware');
+const { verifyUser, noCache, blockIfLoggedIn } = require(__basedir +'/middleware/userMiddleware');
 const passport = require('passport');
 
 router.get('/home',userController.getHome);
 //AUTH
-router.get('/login',userController.getLogin)
+router.get('/login',noCache, blockIfLoggedIn, userController.getLogin)
 router.post('/login',userController.postLogin)
 
 router.get('/forgot-password',userController.getForgotPassword);
@@ -21,7 +21,7 @@ router.post('/reset-password', userController.postResetPassword); //
 
 router.post('/resend-otp', userController.passwordResendOtp);
 
-router.get('/signup',userController.getSignup);
+router.get('/signup',noCache, blockIfLoggedIn, userController.getSignup);
 router.post('/signup',userController.postSignup)
 
 router.get('/google',passport.authenticate('google', {scope: ['profile', 'email']}));
