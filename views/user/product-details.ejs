@@ -10,7 +10,7 @@
   <style>
     body { background:#fff; }
 
-    /* ---------- IMAGE SECTION (FIXED) ---------- */
+    /* IMAGE */
     .image-wrapper {
       width: 100%;
       aspect-ratio: 5 / 7;
@@ -22,7 +22,6 @@
       height: 100%;
       object-fit: cover;
       cursor: zoom-in;
-      display: block;
     }
 
     .thumb {
@@ -30,49 +29,51 @@
       aspect-ratio: 5 / 7;
       object-fit: cover;
       cursor: pointer;
-      border: none;
     }
 
-    /* ---------- OPTIONS ---------- */
+    /* OPTIONS */
     .option-box {
       border: 1px solid #ccc;
       padding: 10px 16px;
       margin-right: 8px;
       cursor: pointer;
-      text-align: center;
       min-width: 70px;
+      text-align: center;
     }
 
     .option-active { border: 2px solid #000; }
-    .option-disabled { opacity: 0.4; pointer-events: none; }
+    .option-disabled { opacity: .4; pointer-events:none; }
 
-    .stock-text { font-size: 12px; margin-top: 4px; }
-    .low-stock { color: #c0392b; }
-    .out-stock { color: #999; }
+    .stock-text { font-size: 12px; }
+    .low-stock { color:#c0392b; }
+    .out-stock { color:#999; }
 
-    /* ---------- EXTRAS ---------- */
-    .rating-stars i { color: #f5a623; }
-    .coupon-box {
-      border: 1px dashed #198754;
-      padding: 10px;
-      border-radius: 6px;
-      background: #f0fff7;
-      font-size: 14px;
-    }
+    /* RATINGS */
+    .rating-stars i { color:#f5a623; }
 
-    .review-card {
-      border-bottom: 1px solid #eee;
-      padding: 12px 0;
-    }
-
-    /* ---------- ZOOM MODAL ---------- */
+    /* ZOOM MODAL */
     .modal-content { background:#000; }
-    .zoom-container { overflow:hidden; }
+
+    .zoom-container {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      cursor: grab;
+    }
+
     .zoom-img {
       width: 100%;
       height: 100%;
-      object-fit: cover;
-      transition: transform .25s ease;
+      object-fit: contain;
+      transition: transform .15s ease;
+      transform-origin: center center;
+    }
+
+    .zoom-close {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      z-index: 10;
     }
   </style>
 </head>
@@ -86,39 +87,32 @@
   <!-- BREADCRUMB -->
   <nav class="breadcrumb mb-4">
     <a class="breadcrumb-item text-decoration-none" href="/user/home">Home</a>
-
-    <% if (category) { %>
-      <a class="breadcrumb-item text-decoration-none"
-         href="/user/products?category=<%= category.category_id %>">
-        <%= category.name %>
-      </a>
-    <% } else { %>
-      <a class="breadcrumb-item text-decoration-none" href="/user/products">
-        Products
-      </a>
-    <% } %>
-
+    <a class="breadcrumb-item text-decoration-none" href="/user/products">Products</a>
     <span class="breadcrumb-item active"><%= product.title %></span>
   </nav>
 
   <div class="row">
+
     <!-- LEFT : IMAGES -->
     <div class="col-lg-6">
       <div class="image-wrapper mb-3">
-        <img id="mainImage" class="main-img">
+        <img id="mainImage"
+             class="main-img"
+             data-bs-toggle="modal"
+             data-bs-target="#zoomModal">
       </div>
-      <div id="thumbs" class="d-flex gap-2 mt-2"></div>
+      <div id="thumbs" class="d-flex gap-2"></div>
     </div>
 
     <!-- RIGHT : DETAILS -->
     <div class="col-lg-6">
       <h3><%= product.title %></h3>
 
-      <div class="d-flex align-items-center mb-2 rating-stars">
-        <% for(let i=1;i<=5;i++){ %>
+      <div class="rating-stars mb-2">
+        <% for(let i=0;i<5;i++){ %>
           <i class="bi bi-star-fill"></i>
         <% } %>
-        <span class="ms-2 text-muted">(4.6 / 5 · 128 reviews)</span>
+        <span class="text-muted ms-2">(4.6 / 5)</span>
       </div>
 
       <div class="mb-3">
@@ -128,11 +122,6 @@
         <span class="fs-4 fw-bold ms-2">
           ₹ <%= product.sale_price %>
         </span>
-      </div>
-
-      <div class="coupon-box mb-3">
-        🎉 Use code <strong>ATOM10</strong> & get <strong>10% OFF</strong><br>
-        💳 Extra ₹200 off on prepaid orders
       </div>
 
       <h6>Color</h6>
@@ -155,6 +144,7 @@
         ❤️ MOVE TO WISHLIST
       </button>
     </div>
+
   </div>
 </div>
 
@@ -162,36 +152,21 @@
 <div class="container pb-5">
   <h4 class="fw-semibold mb-3">Customer Reviews</h4>
 
-  <div class="review-card">
+  <div class="border-bottom pb-2 mb-2">
     <strong>Rahul</strong>
     <div class="rating-stars">
       <i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i>
       <i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i>
       <i class="bi bi-star-fill"></i>
     </div>
-    <p class="mb-0 text-muted">Quality is excellent. Fits perfectly!</p>
-  </div>
-
-  <div class="review-card">
-    <strong>Anjali</strong>
-    <div class="rating-stars">
-      <i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i>
-      <i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i>
-      <i class="bi bi-star"></i>
-    </div>
-    <p class="mb-0 text-muted">Nice fabric but delivery was late.</p>
+    <p class="text-muted mb-0">Quality is excellent.</p>
   </div>
 </div>
 
 <!-- RELATED PRODUCTS -->
-<div class="container pb-5 mt-5">
+<div class="container pb-5">
   <h4 class="fw-semibold mb-4">Related Products</h4>
-
   <div class="row g-4">
-    <% if (!relatedProducts.length) { %>
-      <p class="text-muted">No related products found.</p>
-    <% } %>
-
     <% relatedProducts.forEach(p => { %>
       <div class="col-lg-3 col-md-4 col-sm-6">
         <a href="/user/product/<%= p.product_id %>" class="text-decoration-none text-dark">
@@ -214,17 +189,15 @@
 <!-- ZOOM MODAL -->
 <div class="modal fade" id="zoomModal">
   <div class="modal-dialog modal-fullscreen">
-    <div class="modal-content">
-      <button class="btn btn-light position-absolute top-0 end-0 m-3"
+    <div class="modal-content position-relative">
+
+      <button class="btn btn-light zoom-close"
               data-bs-dismiss="modal">✕</button>
 
-      <div class="d-flex align-items-center justify-content-center h-100">
-        <button class="btn btn-light me-3" onclick="prev()">‹</button>
-        <div class="zoom-container" id="zoomContainer">
-          <img id="zoomImg" class="zoom-img">
-        </div>
-        <button class="btn btn-light ms-3" onclick="next()">›</button>
+      <div class="zoom-container" id="zoomContainer">
+        <img id="zoomImg" class="zoom-img">
       </div>
+
     </div>
   </div>
 </div>
@@ -251,21 +224,18 @@
 
   function renderSizes(color) {
     const sizeList = colorMap[color].sizes;
-
     sizes.innerHTML = sizeList.map(v => `
       <div class="option-box ${v.stock === 0 ? 'option-disabled' : ''}"
            data-variant="${v.variant_id}">
         ${v.size}
         <div class="stock-text ${v.stock === 0 ? 'out-stock' : 'low-stock'}">
-          ${v.stock === 0
-            ? 'Out of stock'
-            : v.stock < 4 ? `Only ${v.stock} left` : ''}
+          ${v.stock === 0 ? 'Out of stock' : v.stock < 4 ? `Only ${v.stock} left` : ''}
         </div>
       </div>
     `).join('');
   }
 
-  document.getElementById('sizes').addEventListener('click', e => {
+  document.getElementById('sizes').onclick = e => {
     const box = e.target.closest('.option-box');
     if (!box || box.classList.contains('option-disabled')) return;
 
@@ -274,7 +244,7 @@
 
     box.classList.add('option-active');
     selectedVariant = box.dataset.variant;
-  });
+  };
 
   document.querySelectorAll('.color-box').forEach(b => {
     b.onclick = () => {
@@ -297,30 +267,36 @@
 
     fetch('/user/cart/add', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {'Content-Type':'application/json'},
       body: JSON.stringify({
         product_id: "<%= product.product_id %>",
         variant_id: selectedVariant
       })
-    })
-    .then(res => res.json())
-    .then(data => {
-      if (data.error) alert(data.error);
-      else window.location.href = '/user/cart';
-    });
+    }).then(() => location.href='/user/cart');
   };
-
-  function setImage(i){ currentIndex=i; mainImage.src='/uploads/'+images[i]; }
 
   document.querySelector(`[data-color="${currentColor}"]`)
     .classList.add('option-active');
 
   renderImages(currentColor);
   renderSizes(currentColor);
+
+  /* ZOOM */
+  zoomModal.addEventListener('shown.bs.modal', () => {
+    zoomImg.src = mainImage.src;
+    scale = 1;
+    zoomImg.style.transform = 'scale(1)';
+  });
+
+  zoomContainer.addEventListener('wheel', e => {
+    e.preventDefault();
+    scale = Math.min(Math.max(1, scale + e.deltaY * -0.0015), 4);
+    zoomImg.style.transform = `scale(${scale})`;
+  }, { passive:false });
 </script>
 
-
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
 <%- include('./userPartials/footer') %>
 </body>
 </html>

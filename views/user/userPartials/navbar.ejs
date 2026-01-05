@@ -35,16 +35,30 @@
     }
 
     /* SEARCH */
+    .nav-search-wrapper {
+      position: relative;
+    }
+
     .nav-search {
       width: 220px;
       border-radius: 20px;
-      padding: 6px 14px;
+      padding: 6px 36px 6px 14px;
     }
 
-    /* RIGHT ICONS */
-    .nav-icons a {
+    .search-btn {
+      position: absolute;
+      top: 50%;
+      right: 10px;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: #666;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    .search-btn:hover {
       color: #000;
-      font-size: 18px;
     }
 
     /* MOBILE FIX */
@@ -62,7 +76,7 @@
 
     <!-- LOGO -->
     <a class="navbar-brand" href="/user/home">
-      <img src="/uploads/Atom logo white bg with name.png" alt="ATOM" height="60">
+      <img src="/uploads/Atom logo white bg with name.png" alt="ATOM">
     </a>
 
     <button class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#menu">
@@ -73,54 +87,25 @@
 
       <!-- CENTER MENU -->
       <ul class="navbar-nav nav-center">
-
-        <!-- T-SHIRTS = ALL PRODUCTS -->
+        <li class="nav-item"><a class="nav-link" href="/user/products">T-Shirts</a></li>
         <li class="nav-item">
-          <a class="nav-link" href="/user/products">
-            T-Shirts
-          </a>
+          <a class="nav-link" href="/user/products?category=<%= navCategories.hoodiId %>">Hoodies</a>
         </li>
-
-        <!-- HOODIES (Hoodi in DB) -->
         <li class="nav-item">
-          <a class="nav-link"
-             href="/user/products?category=<%= navCategories.hoodiId %>">
-            Hoodies
-          </a>
+          <a class="nav-link" href="/user/products?category=<%= navCategories.poloId %>">Polos</a>
         </li>
-
-        <!-- POLOS -->
         <li class="nav-item">
-          <a class="nav-link"
-             href="/user/products?category=<%= navCategories.poloId %>">
-            Polos
-          </a>
+          <a class="nav-link" href="/user/products?category=<%= navCategories.oversizedId %>">Oversized</a>
         </li>
-
-        <!-- OVERSIZED -->
-        <li class="nav-item">
-          <a class="nav-link"
-             href="/user/products?category=<%= navCategories.oversizedId %>">
-            Oversized
-          </a>
-        </li>
-
-        <!-- WINTER COLLECTION = HOODI + SWEATSHIRT -->
         <li class="nav-item">
           <a class="nav-link"
              href="/user/products?category=<%= navCategories.hoodiId %>&category=<%= navCategories.sweatshirtId %>">
             Winter Collection
           </a>
         </li>
-
-        <!-- SALE -->
         <li class="nav-item">
-          <a class="nav-link text-success"
-             href="/user/products?sale=true">
-            Sale
-          </a>
+          <a class="nav-link text-success" href="/user/products?sale=true">Sale</a>
         </li>
-
       </ul>
 
       <!-- RIGHT -->
@@ -128,11 +113,18 @@
             method="GET"
             action="/user/products">
 
-        <input
-          type="text"
-          name="search"
-          class="form-control nav-search"
-          placeholder="Search products">
+        <!-- SEARCH WITH ICON -->
+        <div class="nav-search-wrapper">
+          <input
+            type="text"
+            name="search"
+            class="form-control nav-search"
+            placeholder="Search products"
+          >
+          <button type="submit" class="search-btn" aria-label="Search">
+            <i class="bi bi-search"></i>
+          </button>
+        </div>
 
         <a href="/user/profile"><i class="bi bi-person"></i></a>
         <a href="/user/cart"><i class="bi bi-bag"></i></a>

@@ -16,7 +16,9 @@ router.post('/login',userController.postLogin)
 router.get('/forgot-password',userController.getForgotPassword);
 router.post('/forgot-password', userController.postForgotPassword);
 router.get('/reset-password', userController.getResetPassword);
-router.post('/reset-password', userController.postResetPassword);
+router.post('/reset-password', userController.postResetPassword); //
+//router.put('/reset-password', userController.resetPassword);
+
 router.post('/resend-otp', userController.passwordResendOtp);
 
 router.get('/signup',userController.getSignup);
@@ -40,13 +42,13 @@ router.post('/profile/verify-otp', verifyUser, userController.postProfileOtp);
 router.post('/profile/resend-otp', verifyUser, userController.resendProfileOtp);
 
 router.get('/profile/update-password',verifyUser,userController.getUpdatePassword);
-router.post('/profile/update-password',verifyUser,userController.postUpdatePassword);
+router.post('/profile/update-password',verifyUser,userController.postUpdatePassword); //
 
 router.get('/address', verifyUser, addressController.getAddressPage);
 router.get('/address/add', verifyUser, addressController.getAddAddress);
 router.post('/address', verifyUser, addressController.postAddAddress);
 router.get('/address/:id/edit',verifyUser,addressController.getEditAddress);
-router.put('/address/:id', verifyUser, addressController.updateAddress);
+router.put('/address/:id', verifyUser, addressController.updateAddress); 
 router.delete('/address/:id', verifyUser, addressController.deleteAddress);
 
 //PRODUCTS
@@ -71,7 +73,7 @@ router.get('/orders/:orderNumber/invoice',verifyUser,orderController.downloadInv
 router.get('/orders',verifyUser, orderController.getOrders)
 router.get('/orders/:orderNumber',verifyUser,orderController.getOrderDetails);
 router.get('/orders/:orderNumber/cancel',verifyUser,orderController.getCancelOrder);
-router.post('/orders/:orderNumber/cancel',verifyUser, orderController.postCancelOrder)
+router.post('/orders/:orderNumber/cancel',verifyUser, orderController.postCancelOrder)//
 
 
 router.get('/logout',userController.logout)

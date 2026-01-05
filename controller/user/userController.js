@@ -546,10 +546,12 @@ exports.postResetPassword = async (req, res) => {
 };
 
 //PRODUCTS
+
+
 exports.getProducts = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
-    const limit = 12;
+    const limit = 8;
     const skip = (page - 1) * limit;
 
     let {

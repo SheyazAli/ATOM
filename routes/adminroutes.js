@@ -36,12 +36,12 @@ router.post('/categories/:categoryId', verifyAdmin, adminController.saveCategory
 //ORDERS
 router.get('/orders',verifyAdmin,adminController.getOrders)
 router.get('/orders/:orderNumber', adminController.getAdminOrderDetails);
-router.post('/orders/:orderNumber/update', adminController.postUpdateOrderDetails);
+router.post('/orders/:orderNumber/update', adminController.postUpdateOrderDetails); //
 
 //RETURNS
 router.get('/returns',verifyAdmin,adminController.getReturnRequests);
-router.post('/returns/approve',verifyAdmin,adminController.approveReturn);
-router.post('/returns/reject',verifyAdmin,adminController.rejectReturn);
+router.post('/returns/approve',verifyAdmin,adminController.approveReturn); //
+router.post('/returns/reject',verifyAdmin,adminController.rejectReturn); //
 
 //INVENTORY
 router.get('/inventory',verifyAdmin,noCache,adminController.getInventory);
