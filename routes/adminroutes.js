@@ -4,6 +4,7 @@ const upload = require(__basedir +'/middleware/upload');
 
 const adminController = require(__basedir +'/controller/admin/adminController');
 const productController = require(__basedir +'/controller/admin/productController');
+const couponController = require(__basedir +'/controller/admin/couponController');
 const { verifyAdmin, noCache } = require(__basedir +'/middleware/adminMiddleware');
 
 
@@ -47,8 +48,15 @@ router.post('/returns/reject',verifyAdmin,adminController.rejectReturn); //
 
 //INVENTORY
 router.get('/inventory',verifyAdmin,noCache,adminController.getInventory);
-
 router.put('/inventory/:variantId',verifyAdmin,adminController.updateStock);
+
+//COUPON
+router.get('/coupons',verifyAdmin,couponController.getCoupons);
+router.get('/coupons/new',verifyAdmin,couponController.getAddCoupon);
+router.post('/coupons',verifyAdmin,couponController.createCoupon);
+router.get('/coupons/:id/edit',verifyAdmin,couponController.getEditCoupon);
+router.put('/coupons/:id',verifyAdmin,couponController.updateCoupon);
+
 
 router.get('/logout', adminController.logout);
 
