@@ -7,6 +7,7 @@ const Category = require(__basedir +'/db/categoryModel');
 const Cart  = require(__basedir +'/db/cartModel')
 const Variant = require(__basedir +'/db/variantModel');
 const HttpStatus = require(__basedir +'/constants/httpStatus')
+const Wishlist = require(__basedir + '/db/WishlistModel')
 
 exports.getCartPage = async (req, res) => {
   try {
@@ -39,6 +40,7 @@ exports.getCartPage = async (req, res) => {
           color: variant.color,
           stock: variant.stock,
           quantity: item.quantity,
+          price_snapshot: item.price_snapshot,
           itemTotal
         });
       }
@@ -61,7 +63,6 @@ exports.getCartPage = async (req, res) => {
       .render('user/500');
   }
 };
-
 
 exports.addToCart = async (req, res) => {
   try {
@@ -185,5 +186,81 @@ exports.removeCartItem = async (req, res) => {
   } catch (error) {
     console.error('REMOVE CART ITEM ERROR:', error);
     res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ error: 'Server error' });
+  }
+};
+
+exports.addToWishlistFromCart = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { cartItemId } = req.body;
+
+    if (!cartItemId) {
+      return res
+        .status(HttpStatus.BAD_REQUEST)
+        .json({ error: 'Invalid request' });
+    }
+
+    const cart = await Cart.findOne({ user_id: userId });
+    if (!cart) {
+      return res
+        .status(HttpStatus.NOT_FOUND)
+        .json({ error: 'Cart not found' });
+    }
+
+    const cartItem = cart.items.id(cartItemId);
+    if (!cartItem) {
+      return res
+        .status(HttpStatus.NOT_FOUND)
+        .json({ error: 'Cart item not found' });
+    }
+
+    const variant = await Variant.findById(cartItem.variant_id);
+    if (!variant) {
+      return res
+        .status(HttpStatus.BAD_REQUEST)
+        .json({ error: 'Variant not found' });
+    }
+
+    const product = await Product.findOne({
+      product_id: cartItem.product_id,
+      status: true
+    }).lean();
+
+    if (!product) {
+      return res
+        .status(HttpStatus.BAD_REQUEST)
+        .json({ error: 'Product not available' });
+    }
+
+    let wishlist = await Wishlist.findOne({ user_id: userId });
+    if (!wishlist) {
+      wishlist = new Wishlist({ user_id: userId, items: [] });
+    }
+
+    const exists = wishlist.items.find(
+      i => i.variant_id.toString() === variant._id.toString()
+    );
+
+    if (exists) {
+      return res
+        .status(HttpStatus.BAD_REQUEST)
+        .json({ error: 'Already in wishlist' });
+    }
+
+    wishlist.items.push({
+      product_id: product.product_id,
+      variant_id: variant._id,
+      price_snapshot: cartItem.price_snapshot
+    });
+
+    await wishlist.save();
+
+    res.status(HttpStatus.OK).json({ success: true });
+
+  } catch (error) {
+    console.error('ADD TO WISHLIST FROM CART ERROR:', error);
+    res
+      .status(HttpStatus.INTERNAL_SERVER_ERROR)
+      .json({ error: 'Server error' });
   }
 };

@@ -10,6 +10,7 @@ const Variant = require(__basedir +'/db/variantModel');
 const { sendOtpMail } = require(__basedir +'/Services/emailService')
 const { generateReferralCode } = require(__basedir +'/Services/referralService');
 const HttpStatus = require(__basedir +'/constants/httpStatus')
+const Wishlist = require(__basedir + '/db/WishlistModel')
 
 
 // HOME PAGE

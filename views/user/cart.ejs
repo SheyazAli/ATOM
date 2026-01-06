@@ -57,7 +57,6 @@
     border-radius:4px;
     cursor:pointer;
     font-weight:600;
-    transition: opacity 0.1s;
   }
 
   .qty-btn:disabled {
@@ -73,7 +72,6 @@
     top:20px;
   }
 
-  /* NEW: Coupon */
   .coupon-box {
     display:flex;
     gap:8px;
@@ -87,28 +85,12 @@
     border-radius:6px;
     border:1px solid #ddd;
   }
-
-  .coupon-box button {
-    font-size:14px;
-    padding:8px 14px;
-    border-radius:6px;
-  }
-
-  .related-card img {
-    aspect-ratio:5/7;
-    object-fit:cover;
-    max-height:260px;
-  }
-
-  .related-card .card-body { padding:10px 12px; }
-  .related-card h6 { font-size:14px; margin-bottom:4px; }
-  .related-card span { font-size:14px; }
-  .related-card .text-muted { font-size:12px; }
 </style>
 
 <div class="container py-4">
   <div class="row">
 
+    <!-- SIDEBAR -->
     <div class="col-lg-3 col-md-4">
       <div class="promo-card mb-4">
         <div>USE CODE</div>
@@ -128,6 +110,7 @@
       </div>
     </div>
 
+    <!-- CART ITEMS -->
     <div class="col-lg-6 col-md-8">
       <h5 class="fw-semibold mb-3">Cart</h5>
 
@@ -152,13 +135,13 @@
 
             <div class="d-flex align-items-center gap-2 mb-2">
               <button class="qty-btn minus" data-delta="-1">−</button>
-               <span class="qty"><%= item.quantity %></span>         <!--  item.quantity -->
+              <span class="qty"><%= item.quantity %></span>
               <button class="qty-btn plus" data-delta="1">+</button>
             </div>
 
             <div class="small">
               <a href="javascript:void(0)"
-                 onclick="addToWishlist('<%= item.cartItemId %>')"
+                 onclick="addToWishlistFromCart('<%= item.cartItemId %>')"
                  class="me-3 text-decoration-none">
                 <i class="bi bi-heart"></i> Wishlist
               </a>
@@ -174,35 +157,50 @@
       <% }) %>
     </div>
 
+    <!-- ORDER SUMMARY -->
     <div class="col-lg-3">
       <div class="summary-box">
+
+        <!-- COUPON -->
         <div class="coupon-box">
-          <input type="text" placeholder="Enter coupon code">
-          <button class="btn btn-outline-dark">Apply</button>
+          <input id="couponInput" type="text" placeholder="Enter coupon code">
+          <button class="btn btn-outline-dark" onclick="applyCoupon()">Apply</button>
         </div>
+
         <h6 class="fw-semibold">Order Summary</h6>
 
         <div class="d-flex justify-content-between mb-2">
-          <span>Subtotal</span>
-           <span id="subtotal">₹ <%= subtotal %></span>      <!-- Subtotal -->
+          <span>Order Subtotal</span>
+          <span id="subtotal">₹ 0</span>
+        </div>
+
+        <div class="d-flex justify-content-between mb-2">
+          <span>Shipping</span>
+          <span class="text-success">FREE</span>
+        </div>
+
+        <div class="d-flex justify-content-between mb-2">
+          <span>Coupon Discount</span>
+          <span id="discount">₹ 0</span>
         </div>
 
         <hr>
 
         <div class="d-flex justify-content-between mb-3">
           <strong>Total</strong>
-          <strong id="grandTotal">₹ <%= subtotal %></strong>
+          <strong id="grandTotal">₹ 0</strong>
         </div>
 
-          <a href="/user/checkout" class="btn btn-dark w-100">
-            Proceed to Checkout
-          </a>
+        <a href="/user/checkout" class="btn btn-dark w-100">
+          Proceed to Checkout
+        </a>
 
       </div>
     </div>
 
   </div>
 
+  <!-- RELATED PRODUCTS -->
   <div class="mt-5">
     <h4 class="fw-semibold mb-4">You may also like</h4>
     <div class="row g-4">
@@ -222,111 +220,109 @@
       <% }) %>
     </div>
   </div>
+
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', () => {
-  document.addEventListener('click', (e) => {
-    const btn = e.target.closest('.qty-btn');
-    if (btn) {
-      // Find the closest parent .cart-card
-      const card = btn.closest('.cart-card');
-      const delta = Number(btn.dataset.delta);
-      if (card && delta !== 0) {
-        changeQty(card, delta);
-      }
-    }
-  });
+document.addEventListener('click', e => {
+  const btn = e.target.closest('.qty-btn');
+  if (!btn) return;
 
+  const card = btn.closest('.cart-card');
+  const delta = Number(btn.dataset.delta);
+
+  if (!card || !delta) return;
+
+  changeQty(card, delta);
+});
+let cartState = [];
+let couponDiscount = 0;
+
+document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.cart-card').forEach(card => {
+    cartState.push({
+      id: card.dataset.cartId,
+      price: Number(card.dataset.price),
+      stock: Number(card.dataset.stock),
+      qty: Number(card.querySelector('.qty').innerText)
+    });
     syncButtons(card);
   });
-
-  recalculateSubtotal(); 
+  renderSummary();
 });
 
-function formatCurrency(amount) {
-    return `₹ ${parseFloat(amount).toFixed(0)}`; 
-}
-
 async function changeQty(card, delta) {
-  const stock = Number(card.dataset.stock);
-  const cartItemId = card.dataset.cartId;
-  const qtyEl = card.querySelector('.qty');
-  const buttons = card.querySelectorAll('.qty-btn');
+  const item = cartState.find(i => i.id === card.dataset.cartId);
+  if (!item) return;
 
-  const oldQty = Number(qtyEl.innerText);
-  const tempNewQty = oldQty + delta;
+  const newQty = item.qty + delta;
+  if (newQty < 1 || newQty > item.stock) return;
 
-  if (tempNewQty < 1 || tempNewQty > stock) {
-    return;
-  }
-  buttons.forEach(btn => btn.disabled = true);
-  
-  try {
-    const response = await fetch(`/user/cart/item/${cartItemId}`, {
-      method:'PATCH',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({ delta })
-    });
+  const res = await fetch(`/user/cart/item/${item.id}`, {
+    method:'PATCH',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({ delta })
+  });
 
-    const data = await response.json();
-    if (response.ok && data.success) {
-      qtyEl.innerText = data.newQty; 
-      syncButtons(card);
-      recalculateSubtotal(); 
-    } else {
-      alert(data.error || 'Failed to update quantity. Please try again.');
-      syncButtons(card);
-    }
-  } catch (error) {
-    console.error('Fetch error:', error);
-    alert('A network error occurred. Please check your connection.');
-    syncButtons(card);
-  }
+  const data = await res.json();
+  if (!data.success) return alert(data.error);
+
+  item.qty = data.newQty;
+  card.querySelector('.qty').innerText = data.newQty;
+  syncButtons(card);
+  renderSummary();
 }
 
-function recalculateSubtotal() {
-  let subtotal = 0;
-  document.querySelectorAll('.cart-card').forEach(card => {
-    const price = parseFloat(card.dataset.price) || 0; 
-    const qtyEl = card.querySelector('.qty');
-    if (qtyEl) {
-      const qty = parseInt(qtyEl.textContent.trim()) || 0;
-      subtotal += price * qty;
-    }
-  });
-  
-  const formattedTotal = formatCurrency(subtotal);
-  const subtotalEl = document.getElementById('subtotal');
-  const grandTotalEl = document.getElementById('grandTotal');
-  
-  if (subtotalEl) subtotalEl.textContent = formattedTotal;
-  if (grandTotalEl) grandTotalEl.textContent = formattedTotal;
+function calculateSubtotal() {
+  return cartState.reduce((sum, i) => sum + i.price * i.qty, 0);
+}
+
+function renderSummary() {
+  const subtotal = calculateSubtotal();
+  const total = subtotal - couponDiscount;
+
+  document.getElementById('subtotal').innerText = `₹ ${subtotal}`;
+  document.getElementById('discount').innerText = `₹ ${couponDiscount}`;
+  document.getElementById('grandTotal').innerText = `₹ ${total}`;
+}
+
+function applyCoupon() {
+  const code = document.getElementById('couponInput').value.trim().toUpperCase();
+
+  if (!code) return alert('Enter coupon code');
+
+  if (code === 'ATOM10') {
+    couponDiscount = Math.floor(calculateSubtotal() * 0.1);
+  } else {
+    couponDiscount = 0;
+    return alert('Invalid coupon');
+  }
+
+  renderSummary();
 }
 
 function syncButtons(card) {
-  const qty = Number(card.querySelector('.qty').innerText);
-  const stock = Number(card.dataset.stock);
-  
-  // Re-enable and apply limits
-  card.querySelector('.minus').disabled = qty <= 1;
-  card.querySelector('.plus').disabled  = qty >= stock;
+  const item = cartState.find(i => i.id === card.dataset.cartId);
+  card.querySelector('.minus').disabled = item.qty <= 1;
+  card.querySelector('.plus').disabled  = item.qty >= item.stock;
 }
 
 function removeItem(id) {
-  if (confirm('Are you sure you want to remove this item?')) {
-    fetch(`/user/cart/item/${id}`, { method:'DELETE' })
-      .then(()=>location.reload());
-  }
+  if (!confirm('Remove this item?')) return;
+
+  fetch(`/user/cart/item/${id}`, { method:'DELETE' })
+    .then(res => res.json())
+    .then(data => data.success ? location.reload() : alert(data.error));
 }
 
-function addToWishlist(id) {
+function addToWishlistFromCart(cartItemId) {
   fetch('/user/wishlist/add-from-cart', {
     method:'POST',
     headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({ cartItemId:id })
-  }).then(()=>location.reload());
+    body:JSON.stringify({ cartItemId })
+  })
+  .then(res => res.json())
+  .then(data => data.success ? location.reload() : alert(data.error));
 }
 </script>
 

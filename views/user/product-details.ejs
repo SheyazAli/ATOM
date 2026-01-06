@@ -10,7 +10,6 @@
   <style>
     body { background:#fff; }
 
-    /* IMAGE */
     .image-wrapper {
       width: 100%;
       aspect-ratio: 5 / 7;
@@ -31,7 +30,6 @@
       cursor: pointer;
     }
 
-    /* OPTIONS */
     .option-box {
       border: 1px solid #ccc;
       padding: 10px 16px;
@@ -48,10 +46,8 @@
     .low-stock { color:#c0392b; }
     .out-stock { color:#999; }
 
-    /* RATINGS */
     .rating-stars i { color:#f5a623; }
 
-    /* ZOOM MODAL */
     .modal-content { background:#000; }
 
     .zoom-container {
@@ -93,7 +89,7 @@
 
   <div class="row">
 
-    <!-- LEFT : IMAGES -->
+    <!-- LEFT -->
     <div class="col-lg-6">
       <div class="image-wrapper mb-3">
         <img id="mainImage"
@@ -104,7 +100,7 @@
       <div id="thumbs" class="d-flex gap-2"></div>
     </div>
 
-    <!-- RIGHT : DETAILS -->
+    <!-- RIGHT -->
     <div class="col-lg-6">
       <h3><%= product.title %></h3>
 
@@ -140,26 +136,13 @@
         ADD TO CART
       </button>
 
-      <button class="btn btn-outline-dark w-100">
+      <button
+        id="wishlistBtn"
+        class="btn btn-outline-dark w-100"
+        <%= isOutOfStock ? 'disabled' : '' %>>
         ❤️ MOVE TO WISHLIST
       </button>
     </div>
-
-  </div>
-</div>
-
-<!-- REVIEWS -->
-<div class="container pb-5">
-  <h4 class="fw-semibold mb-3">Customer Reviews</h4>
-
-  <div class="border-bottom pb-2 mb-2">
-    <strong>Rahul</strong>
-    <div class="rating-stars">
-      <i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i>
-      <i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i>
-      <i class="bi bi-star-fill"></i>
-    </div>
-    <p class="text-muted mb-0">Quality is excellent.</p>
   </div>
 </div>
 
@@ -206,25 +189,22 @@
   const colorMap = <%- JSON.stringify(colorMap) %>;
   let currentColor = "<%= defaultColor %>";
   let images = [];
-  let currentIndex = 0;
-  let scale = 1;
   let selectedVariant = null;
+  let scale = 1;
 
   function renderImages(color) {
     images = colorMap[color].images || [];
     if (!images.length) return;
 
-    currentIndex = 0;
     mainImage.src = '/uploads/' + images[0];
-
     thumbs.innerHTML = images.map((img,i)=>
-      `<img src="/uploads/${img}" class="thumb" onclick="setImage(${i})">`
+      `<img src="/uploads/${img}" class="thumb"
+            onclick="mainImage.src='/uploads/${img}'">`
     ).join('');
   }
 
   function renderSizes(color) {
-    const sizeList = colorMap[color].sizes;
-    sizes.innerHTML = sizeList.map(v => `
+    sizes.innerHTML = colorMap[color].sizes.map(v => `
       <div class="option-box ${v.stock === 0 ? 'option-disabled' : ''}"
            data-variant="${v.variant_id}">
         ${v.size}
@@ -244,6 +224,7 @@
 
     box.classList.add('option-active');
     selectedVariant = box.dataset.variant;
+    wishlistBtn.disabled = false;
   };
 
   document.querySelectorAll('.color-box').forEach(b => {
@@ -254,30 +235,42 @@
       b.classList.add('option-active');
       currentColor = b.dataset.color;
       selectedVariant = null;
+      wishlistBtn.disabled = true;
       renderImages(currentColor);
       renderSizes(currentColor);
     };
   });
 
-  document.getElementById('addToCartBtn').onclick = () => {
-    if (!selectedVariant) {
-      alert('Please select size');
-      return;
-    }
+  addToCartBtn.onclick = () => {
+    if (!selectedVariant) return alert('Please select size');
 
     fetch('/user/cart/add', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({
-        product_id: "<%= product.product_id %>",
-        variant_id: selectedVariant
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        product_id:"<%= product.product_id %>",
+        variant_id:selectedVariant
       })
-    }).then(() => location.href='/user/cart');
+    }).then(()=>location.href='/user/cart');
   };
 
-  document.querySelector(`[data-color="${currentColor}"]`)
-    .classList.add('option-active');
+  wishlistBtn.onclick = async () => {
+    if (!selectedVariant) return alert('Please select size');
 
+    await fetch('/user/wishlist/add', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        product_id:"<%= product.product_id %>",
+        variant_id:selectedVariant
+      })
+    });
+
+    alert('Added to wishlist ❤️');
+  };
+
+  /* INIT */
+  document.querySelector(`[data-color="${currentColor}"]`).classList.add('option-active');
   renderImages(currentColor);
   renderSizes(currentColor);
 
@@ -296,7 +289,6 @@
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-
 <%- include('./userPartials/footer') %>
 </body>
 </html>
