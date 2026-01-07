@@ -222,22 +222,27 @@
   </div>
 
 </div>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
 
 <script>
+let cartState = [];
+let couponDiscount = <%= appliedCoupon?.discount || 0 %>;
+let appliedCouponCode = "<%= appliedCoupon?.coupon_code || '' %>";
+
+
 document.addEventListener('click', e => {
   const btn = e.target.closest('.qty-btn');
   if (!btn) return;
 
   const card = btn.closest('.cart-card');
   const delta = Number(btn.dataset.delta);
-
   if (!card || !delta) return;
 
   changeQty(card, delta);
 });
-let cartState = [];
-let couponDiscount = 0;
 
+/* INIT */
 document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.cart-card').forEach(card => {
     cartState.push({
@@ -248,8 +253,25 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     syncButtons(card);
   });
+
+
+  if (appliedCouponCode) {
+    document.querySelector('.coupon-box').innerHTML = `
+      <div class="d-flex justify-content-between w-100 align-items-center">
+        <span class="fw-semibold text-success">
+          Coupon Applied: ${appliedCouponCode}
+        </span>
+        <button class="btn btn-sm btn-outline-danger"
+          onclick="removeCouponUI(true)">
+          Remove
+        </button>
+      </div>
+    `;
+  }
+
   renderSummary();
 });
+
 
 async function changeQty(card, delta) {
   const item = cartState.find(i => i.id === card.dataset.cartId);
@@ -270,6 +292,11 @@ async function changeQty(card, delta) {
   item.qty = data.newQty;
   card.querySelector('.qty').innerText = data.newQty;
   syncButtons(card);
+
+  if (appliedCouponCode) {
+    await removeCouponUI(false);
+  }
+
   renderSummary();
 }
 
@@ -286,19 +313,37 @@ function renderSummary() {
   document.getElementById('grandTotal').innerText = `₹ ${total}`;
 }
 
-function applyCoupon() {
+
+async function applyCoupon() {
   const code = document.getElementById('couponInput').value.trim().toUpperCase();
-
-  if (!code) return alert('Enter coupon code');
-
-  if (code === 'ATOM10') {
-    couponDiscount = Math.floor(calculateSubtotal() * 0.1);
-  } else {
-    couponDiscount = 0;
-    return alert('Invalid coupon');
+  if (!code) {
+    Swal.fire('Coupon required', 'Please enter a coupon code', 'warning');
+    return;
   }
 
-  renderSummary();
+  const subtotal = calculateSubtotal();
+
+  const res = await fetch('/user/coupon/apply', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({ code, subtotal })
+  });
+
+  const data = await res.json();
+  if (!data.success) {
+    Swal.fire('Coupon Error', data.error, 'error');
+    return;
+  }
+
+  couponDiscount = data.coupon.discount;
+  appliedCouponCode = data.coupon.couponCode;
+
+  location.reload(); 
+}
+
+async function removeCouponUI(showAlert = true) {
+  await fetch('/user/coupon/remove', { method:'DELETE' });
+  location.reload();
 }
 
 function syncButtons(card) {
@@ -306,24 +351,7 @@ function syncButtons(card) {
   card.querySelector('.minus').disabled = item.qty <= 1;
   card.querySelector('.plus').disabled  = item.qty >= item.stock;
 }
-
-function removeItem(id) {
-  if (!confirm('Remove this item?')) return;
-
-  fetch(`/user/cart/item/${id}`, { method:'DELETE' })
-    .then(res => res.json())
-    .then(data => data.success ? location.reload() : alert(data.error));
-}
-
-function addToWishlistFromCart(cartItemId) {
-  fetch('/user/wishlist/add-from-cart', {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({ cartItemId })
-  })
-  .then(res => res.json())
-  .then(data => data.success ? location.reload() : alert(data.error));
-}
 </script>
+
 
 <%- include('./userPartials/footer') %>

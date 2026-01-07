@@ -2,9 +2,12 @@ const User = require(__basedir +'/db/user');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const Address = require(__basedir +'/db/address');
+const path = require('path');
+const fs = require('fs');
 const Product = require(__basedir +'/db/productModel');
 const Category = require(__basedir +'/db/categoryModel');
 const Cart  = require(__basedir +'/db/cartModel')
+const Coupon = require(__basedir +'/db/couponModel')
 const Order = require(__basedir +'/db/orderModel');
 const Variant = require(__basedir +'/db/variantModel');
 const HttpStatus = require(__basedir +'/constants/httpStatus')
@@ -19,9 +22,7 @@ exports.placeOrderCOD = async (req, res) => {
 
     const cart = await Cart.findOne({ user_id: userId });
     if (!cart || !cart.items.length) {
-      return res
-        .status(HttpStatus.BAD_REQUEST)
-        .json({ error: 'CART_EMPTY' });
+      return res.status(HttpStatus.BAD_REQUEST).json({ error: 'CART_EMPTY' });
     }
 
     const address = await Address.findOne({
@@ -30,20 +31,16 @@ exports.placeOrderCOD = async (req, res) => {
     }).lean();
 
     if (!address) {
-      return res
-        .status(HttpStatus.BAD_REQUEST)
-        .json({ error: 'INVALID_ADDRESS' });
+      return res.status(HttpStatus.BAD_REQUEST).json({ error: 'INVALID_ADDRESS' });
     }
 
     let subtotal = 0;
     const items = [];
+
     for (const item of cart.items) {
       const variant = await Variant.findById(item.variant_id);
-
       if (!variant || variant.stock < item.quantity) {
-        return res
-          .status(HttpStatus.BAD_REQUEST)
-          .json({ error: 'STOCK_ISSUE' });
+        return res.status(HttpStatus.BAD_REQUEST).json({ error: 'STOCK_ISSUE' });
       }
 
       subtotal += item.price_snapshot * item.quantity;
@@ -52,7 +49,7 @@ exports.placeOrderCOD = async (req, res) => {
         variant_id: variant._id,
         price: item.price_snapshot,
         quantity: item.quantity,
-        status: 'placed' 
+        status: 'placed'
       });
     }
 
@@ -63,6 +60,27 @@ exports.placeOrderCOD = async (req, res) => {
       );
     }
 
+    let discount = 0;
+    let couponSnapshot = null;
+
+    if (cart.applied_coupon) {
+      discount = cart.applied_coupon.discount;
+
+      couponSnapshot = {
+        coupon_id: cart.applied_coupon.coupon_id,
+        coupon_code: cart.applied_coupon.coupon_code
+      };
+      await Coupon.updateOne(
+        { _id: cart.applied_coupon.coupon_id },
+        {
+          $addToSet: { user_ids: userId },
+          $inc: { used_count: 1 }
+        }
+      );
+    }
+
+    const total = Math.max(subtotal - discount, 0);
+
     const order = await Order.create({
       orderNumber: generateOrderNumber(),
       user_id: userId,
@@ -71,19 +89,21 @@ exports.placeOrderCOD = async (req, res) => {
       address,
       items,
       subtotal,
+      discount,
+      coupon: couponSnapshot,
       shipping: 0,
-      total: subtotal,
+      total,
       status: 'placed'
     });
 
     cart.items = [];
+    cart.applied_coupon = null;
     await cart.save();
 
     res.redirect(`/user/orders/${order.orderNumber}/success`);
 
   } catch (error) {
     console.error('PLACE COD ERROR:', error);
-
     res
       .status(HttpStatus.INTERNAL_SERVER_ERROR)
       .json({ error: 'INTERNAL_SERVER_ERROR' });
@@ -118,11 +138,17 @@ exports.orderSuccessPage = async (req, res) => {
       item.variant = `${variant.size} · ${variant.color}`;
     }
 
+    // ✅ IMPORTANT: normalize coupon fields
+    order.discount = order.discount || 0;
+    order.coupon = order.coupon || null;
+
     return res.render('user/order-success', { order });
 
   } catch (error) {
     console.error('ORDER SUCCESS PAGE ERROR:', error);
-    return res.status(HttpStatus.INTERNAL_SERVER_ERROR).render('user/500');
+    return res
+      .status(HttpStatus.INTERNAL_SERVER_ERROR)
+      .render('user/500');
   }
 };
 
@@ -131,30 +157,18 @@ exports.downloadInvoice = async (req, res) => {
     const { orderNumber } = req.params;
     const userId = req.user._id;
 
-    const order = await Order.findOne({
-      orderNumber,
-      user_id: userId
-    }).lean();
-
-    if (!order) {
-      return res.status(HttpStatus.NOT_FOUND).render('user/404');
-    }
+    const order = await Order.findOne({ orderNumber, user_id: userId }).lean();
+    if (!order) return res.status(404).render('user/404');
 
     for (const item of order.items) {
       const variant = await Variant.findById(item.variant_id).lean();
-      if (!variant) continue;
-
-      const product = await Product.findOne({
-        product_id: variant.product_id
-      }).lean();
-      if (!product) continue;
-
+      const product = await Product.findOne({ product_id: variant.product_id }).lean();
       item.name = product.title;
       item.variant = `${variant.size} · ${variant.color}`;
       item.total = item.price * item.quantity;
     }
 
-    const doc = new PDFDocument({ margin: 40 });
+    const doc = new PDFDocument({ size: 'A4', margin: 40 });
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader(
@@ -164,49 +178,147 @@ exports.downloadInvoice = async (req, res) => {
 
     doc.pipe(res);
 
-    doc.fontSize(18).text('INVOICE', { align: 'center' }).moveDown();
+    const logoPath = path.join(
+      __basedir,
+      'uploads',
+      'Atom logo white bg with name.png'
+    );
 
-    doc.fontSize(12)
-      .text(`Order ID: ${order.orderNumber}`)
-      .text(`Date: ${new Date(order.created_at).toDateString()}`)
-      .text(`Payment Method: ${order.paymentMethod.toUpperCase()}`)
-      .moveDown();
+    if (fs.existsSync(logoPath)) {
+      doc.image(logoPath, 40, 35, { width: 100 });
+    }
 
-    doc.fontSize(13).text('Shipping Address', { underline: true }).moveDown(0.5);
+    doc
+      .fontSize(22)
+      .text('INVOICE', 0, 45, { align: 'right' });
 
-    doc.fontSize(11)
-      .text(order.address.building_name)
-      .text(order.address.address_line_1)
-      .text(`${order.address.city}, ${order.address.state} ${order.address.postal_code}`)
-      .text(order.address.country)
-      .text(`Phone: ${order.address.phone_number}`);
+    doc
+      .fontSize(10)
+      .text(`Order ID: ${order.orderNumber}`, { align: 'right' })
+      .text(`Date: ${new Date(order.created_at).toDateString()}`, { align: 'right' })
+      .text(`Payment: ${order.paymentMethod.toUpperCase()}`, { align: 'right' });
 
-    doc.moveDown();
+    doc.moveDown(2);
+    doc.moveTo(40, doc.y).lineTo(555, doc.y).stroke();
 
-    doc.fontSize(13).text('Items', { underline: true }).moveDown(0.5);
+    doc.moveDown(1);
+
+const LEFT_X = 40;
+let billToY = doc.y + 10;
+
+doc
+  .fontSize(11)
+  .text('BILL TO', LEFT_X, billToY, { underline: true });
+
+billToY += 16;
+
+doc
+  .fontSize(11)
+  .font('Helvetica-Bold')
+  .text(
+    `${order.address.first_name || ''} ${order.address.last_name || ''}`.trim(),
+    LEFT_X,
+    billToY
+  );
+
+billToY += 14;
+
+doc
+  .font('Helvetica')
+  .fontSize(10)
+  .text(order.address.building_name, LEFT_X, billToY);
+
+billToY += 13;
+
+doc.text(order.address.address_line_1, LEFT_X, billToY);
+billToY += 13;
+
+doc.text(
+  `${order.address.city}, ${order.address.state} ${order.address.postal_code}`,
+  LEFT_X,
+  billToY
+);
+billToY += 13;
+
+doc.text(order.address.country, LEFT_X, billToY);
+billToY += 13;
+
+doc.text(`Phone: ${order.address.phone_number}`, LEFT_X, billToY);
+
+doc.y = billToY + 20;
+
+    doc.moveDown(1.5);
+
+
+    const tableTop = doc.y;
+
+    doc.fontSize(10).text('Product', 40, tableTop);
+    doc.text('Qty', 330, tableTop);
+    doc.text('Price', 390, tableTop);
+    doc.text('Total', 470, tableTop);
+
+    doc.moveTo(40, tableTop + 12).lineTo(555, tableTop + 12).stroke();
+
+    let y = tableTop + 20;
 
     order.items.forEach(item => {
-      doc.fontSize(11)
-        .text(item.name)
-        .text(`Variant: ${item.variant}`)
-        .text(`Qty: ${item.quantity}`)
-        .text(`Price: ₹${item.price}`)
-        .text(`Total: ₹${item.total}`)
-        .moveDown();
+      doc
+        .fontSize(10)
+        .text(`${item.name}\n${item.variant}`, 40, y, { width: 270 })
+        .text(item.quantity, 330, y)
+        .text(`₹${item.price}`, 390, y)
+        .text(`₹${item.total}`, 470, y);
+
+      y += 38;
     });
 
-    doc.fontSize(12)
-      .text(`Subtotal: ₹${order.subtotal}`)
-      .text(`Shipping: ₹${order.shipping || 0}`)
-      .moveDown(0.5);
+    doc.moveDown(2);
 
-    doc.fontSize(14).text(`Grand Total: ₹${order.total}`, { underline: true });
+    const boxX = 360;
+    const boxY = doc.y;
+
+    doc.rect(boxX - 10, boxY - 10, 205, 120).stroke();
+
+    doc
+      .fontSize(10)
+      .text(`Subtotal: ₹${order.subtotal}`, boxX, boxY)
+      .moveDown(0.4);
+
+    doc.text(`Shipping: ₹${order.shipping || 0}`, boxX).moveDown(0.4);
+
+    if (order.discount > 0 && order.coupon?.coupon_code) {
+      doc
+        .fillColor('#0a7d34')
+        .text(`Coupon: ${order.coupon.coupon_code}`, boxX)
+        .text(`Discount: - ₹${order.discount}`, boxX)
+        .fillColor('black')
+        .moveDown(0.4);
+    }
+
+    doc
+      .fontSize(12)
+      .text(`Grand Total: ₹${order.total}`, boxX, doc.y, {
+        underline: true
+      });
+
+    doc
+      .fontSize(9)
+      .fillColor('gray')
+      .text(
+        'This is a system generated invoice. No signature required.',
+        40,
+        780,
+        { align: 'center' }
+      )
+      .fillColor('black');
 
     doc.end();
 
-  } catch (error) {
-    console.error('INVOICE ERROR:', error);
-    return res.status(HttpStatus.INTERNAL_SERVER_ERROR).render('user/500');
+  } catch (err) {
+    console.error('INVOICE ERROR:', err);
+    return res
+  .status(HttpStatus.INTERNAL_SERVER_ERROR)
+  .render('user/500');
   }
 };
 
@@ -346,7 +458,6 @@ exports.getOrderDetails = async (req, res) => {
       .render('user/500');
   }
 };
-
 
 exports.getCancelOrder = async (req, res) => {
   try {

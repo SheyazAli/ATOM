@@ -109,6 +109,29 @@
           <input type="radio" disabled> Cards / UPI / Wallet (Coming Soon)
         </label>
       </div>
+      <div class="checkout-card">
+        <h6 class="fw-semibold mb-3">Available Coupons</h6>
+
+        <select class="form-select" id="couponSelect">
+          <option value="">Select coupon</option>
+          <% coupons.forEach(c => { %>
+            <option value="<%= c.code %>" <%= c.disabled ? 'disabled' : '' %>>
+              <%= c.code %> - <%= c.description %>
+              <%= c.disabled ? '(' + c.reason + ')' : '' %>
+            </option>
+          <% }) %>
+        </select>
+
+        <button class="btn btn-dark w-100 mt-2" id="applyCouponBtn">
+          Apply Coupon
+        </button>
+
+        <% if (appliedCoupon) { %>
+          <button class="btn btn-outline-danger w-100 mt-2" id="removeCouponBtn">
+            Remove Coupon
+          </button>
+        <% } %>
+      </div>
 
     </div>
 
@@ -116,63 +139,73 @@
     <div class="col-lg-5">
       <div class="summary-box">
 
-  <h6 class="fw-semibold mb-3">Order Summary</h6>
+        <h6 class="fw-semibold mb-3">Order Summary</h6>
 
-  <% cart.items.forEach(item => { %>
-    <div class="d-flex mb-3">
-      <img src="/uploads/<%= item.image %>" width="60" class="rounded">
-      <div class="ms-3">
-        <div><%= item.name %></div>
-        <div class="text-muted small"><%= item.variant %></div>
-        <div class="text-muted small">Qty × <%= item.quantity %></div>
+        <% cart.items.forEach(item => { %>
+          <div class="d-flex mb-3">
+            <img src="/uploads/<%= item.image %>" width="60" class="rounded">
+            <div class="ms-3">
+              <div><%= item.name %></div>
+              <div class="text-muted small"><%= item.variant %></div>
+              <div class="text-muted small">Qty × <%= item.quantity %></div>
+            </div>
+            <div class="ms-auto fw-semibold">
+              ₹ <%= item.itemTotal %>
+            </div>
+          </div>
+        <% }) %>
+
+        <hr>
+
+        <!-- SUBTOTAL -->
+        <div class="d-flex justify-content-between mb-2">
+          <span>Item Total</span>
+          <span>₹ <%= summary.subtotal %></span>
+        </div>
+
+        <!-- COUPON DISCOUNT -->
+        <% if (summary.discount > 0) { %>
+          <div class="d-flex justify-content-between mb-2">
+            <span>
+              Coupon Discount
+              <% if (appliedCoupon?.couponCode) { %>
+                (<%= appliedCoupon.couponCode %>)
+              <% } %>
+            </span>
+            <span class="text-success">
+              - ₹ <%= summary.discount %>
+            </span>
+          </div>
+        <% } %>
+
+        <!-- SHIPPING -->
+        <div class="d-flex justify-content-between mb-2">
+          <span>Shipping</span>
+          <span class="text-success">
+            <%= summary.shipping === 0 ? 'Free' : '₹ ' + summary.shipping %>
+          </span>
+        </div>
+
+        <hr>
+
+        <!-- TOTAL -->
+        <div class="d-flex justify-content-between fs-5 fw-bold">
+          <span>Total</span>
+          <span>₹ <%= summary.total %></span>
+        </div>
+
+        <!-- PAY FORM -->
+        <form method="POST" action="/user/checkout/pay">
+          <input type="hidden" name="paymentMethod" value="cod">
+          <input type="hidden" name="address_id" id="addressInput">
+          <button class="pay-btn" type="submit">Pay now</button>
+        </form>
+
+        <form action="/user/cart" method="get">
+          <button class="cart-btn">Back to cart</button>
+        </form>
+
       </div>
-      <div class="ms-auto fw-semibold">
-        ₹ <%= item.itemTotal %>
-      </div>
-    </div>
-  <% }) %>
-
-  <hr>
-
-  <div class="d-flex justify-content-between mb-2">
-    <span>Item Total</span>
-    <span>₹ <%= summary.subtotal %></span>
-  </div>
-
-  <div class="d-flex justify-content-between mb-2">
-    <span>Discount</span>
-    <span class="text-success">
-      - ₹ <%= summary.discount %>
-    </span>
-  </div>
-
-  <div class="d-flex justify-content-between mb-2">
-    <span>Shipping</span>
-    <span class="text-success">
-      <%= summary.shipping === 0 ? 'Free' : '₹ ' + summary.shipping %>
-    </span>
-  </div>
-
-  <hr>
-
-  <div class="d-flex justify-content-between fs-5 fw-bold">
-    <span>Total</span>
-    <span>₹ <%= summary.total %></span>
-  </div>
-
-  <!-- PAY FORM -->
-  <form method="POST" action="/user/checkout/pay">
-    <input type="hidden" name="paymentMethod" value="cod">
-    <input type="hidden" name="address_id" id="addressInput">
-
-    <button class="pay-btn" type="submit">Pay now</button>
-  </form>
-
-  <form action="/user/cart" method="get">
-    <button class="cart-btn">Back to cart</button>
-  </form>
-
-</div>
     </div>
 
   </div>
@@ -204,5 +237,28 @@
     `;
   });
 </script>
+<script>
+  document.getElementById('applyCouponBtn')?.addEventListener('click', async () => {
+    const code = document.getElementById('couponSelect').value;
+    if (!code) return alert('Select a coupon');
+
+    const res = await fetch('/user/coupon/apply', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code })
+    });
+
+    const data = await res.json();
+    if (data.error) return alert(data.error);
+
+    location.reload();
+  });
+
+  document.getElementById('removeCouponBtn')?.addEventListener('click', async () => {
+    await fetch('/user/coupon/remove', { method: 'DELETE' });
+    location.reload();
+  });
+</script>
+
 
 <%- include('./userPartials/footer') %>
