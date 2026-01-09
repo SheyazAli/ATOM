@@ -1,0 +1,151 @@
+<%- include('./userPartials/navbar') %>
+
+<style>
+  body { background:#fafafa; }
+
+  .failed-icon {
+    width:64px;
+    height:64px;
+    border-radius:50%;
+    background:#fdeaea;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    margin:0 auto 16px;
+    color:#dc3545;
+    font-size:30px;
+  }
+
+  .checkout-card {
+    background:#fff;
+    border-radius:12px;
+    padding:20px;
+    margin-bottom:16px;
+    border:1px solid #eaeaea;
+  }
+
+  .summary-box {
+    background:#fff;
+    border-radius:12px;
+    padding:20px;
+    border:1px solid #eaeaea;
+  }
+
+  .row-line {
+    display:flex;
+    justify-content:space-between;
+    font-size:14px;
+    margin:8px 0;
+  }
+
+  .total {
+    font-size:16px;
+    font-weight:600;
+  }
+
+  .btn-dark,
+  .btn-outline-dark {
+    border-radius:10px;
+    padding:12px 16px;
+  }
+</style>
+
+<div class="container py-5">
+
+  <!-- HEADER -->
+  <div class="text-center mb-4">
+    <div class="failed-icon">✕</div>
+    <h4 class="fw-semibold">Payment Failed</h4>
+    <p class="text-muted">
+      Your payment was not completed. No amount has been deducted.
+    </p>
+  </div>
+
+  <div class="row">
+
+    <!-- LEFT -->
+    <div class="col-lg-7">
+
+      <div class="checkout-card">
+        <h6 class="fw-semibold mb-3">What happened?</h6>
+
+        <ul class="text-muted small mb-0">
+          <li>Payment was cancelled or declined</li>
+          <li>No order was placed</li>
+          <li>Your cart items are still محفوظ</li>
+        </ul>
+      </div>
+
+      <div class="checkout-card">
+        <h6 class="fw-semibold mb-3">Shipping Address</h6>
+
+        <p class="mb-1"><strong><%= address.building_name %></strong></p>
+        <p class="mb-1"><%= address.address_line_1 %></p>
+        <p class="mb-1">
+          <%= address.city %>, <%= address.state %>
+          <%= address.postal_code %>
+        </p>
+        <p class="mb-1"><%= address.country %></p>
+        <p class="mb-0">Phone: <%= address.phone_number %></p>
+      </div>
+
+    </div>
+
+    <!-- RIGHT -->
+    <div class="col-lg-5">
+      <div class="summary-box">
+
+        <h6 class="fw-semibold mb-3">Order Summary</h6>
+
+        <% cart.items.forEach(item => { %>
+          <div class="row-line">
+            <span>
+              <%= item.name %> × <%= item.quantity %>
+            </span>
+            <span>₹ <%= item.price_snapshot * item.quantity %></span>
+          </div>
+        <% }) %>
+
+        <hr>
+
+        <div class="row-line">
+          <span>Subtotal</span>
+          <span>₹ <%= summary.subtotal %></span>
+        </div>
+
+        <% if (summary.discount > 0) { %>
+          <div class="row-line">
+            <span>Discount</span>
+            <span class="text-success">- ₹ <%= summary.discount %></span>
+          </div>
+        <% } %>
+
+        <div class="row-line total">
+          <span>Total</span>
+          <span>₹ <%= summary.total %></span>
+        </div>
+
+        <div class="mt-4 d-grid gap-2">
+
+          <!-- PLACE ORDER WITH COD -->
+          <form method="POST" action="/user/checkout/pay">
+            <input type="hidden" name="paymentMethod" value="cod">
+            <input type="hidden" name="address_id" value="<%= address.address_id %>">
+            <button class="btn btn-dark w-100">
+              Place Order with Cash on Delivery
+            </button>
+          </form>
+
+          <a href="/user/checkout" class="btn btn-outline-dark">
+            Retry Payment
+          </a>
+
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<%- include('./userPartials/footer') %>

@@ -4,6 +4,7 @@ const userController = require(__basedir +'/controller/user/userController');
 const addressController = require(__basedir +'/controller/user/addressController');
 const cartController = require(__basedir +'/controller/user/cartController')
 const orderController = require(__basedir +'/controller/user/orderController')
+const paymentController = require(__basedir +'/controller/user/paymentController')
 const productStatus = require(__basedir +'/middleware/checkProductActive')
 const wishlistController = require(__basedir +'/controller/user/wishlistController')
 const { verifyUser, noCache, blockIfLoggedIn } = require(__basedir +'/middleware/userMiddleware');
@@ -72,7 +73,12 @@ router.delete('//wishlist/remove',verifyUser,wishlistController.removeFromWishli
 
 //checkuot
 router.get('/checkout',verifyUser,userController.getCheckout)
-router.post('/checkout/pay', verifyUser, orderController.placeOrderCOD);
+
+router.post('/checkout/pay', verifyUser, paymentController.placeOrderCOD);
+router.post('/checkout/stripe/create-session',verifyUser,paymentController.createStripeSession);
+router.get('/checkout/stripe/success',verifyUser,paymentController.stripeSuccess);
+router.get('/checkout/stripe/cancel',verifyUser,paymentController.stripeCancel);
+
 
 //ORDER
 router.get('/orders/:orderNumber/success', verifyUser, orderController.orderSuccessPage);

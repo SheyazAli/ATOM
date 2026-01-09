@@ -7,18 +7,15 @@ const orderItemSchema = new mongoose.Schema(
       ref: 'Variant',
       required: true
     },
-
     price: {
       type: Number,
       required: true
     },
-
     quantity: {
       type: Number,
       required: true,
       min: 1
     },
-
     status: {
       type: String,
       enum: [
@@ -31,16 +28,13 @@ const orderItemSchema = new mongoose.Schema(
       ],
       default: 'placed'
     },
-
     cancelledQty: { type: Number, default: 0 },
     returnedQty: { type: Number, default: 0 },
-
     returnStatus: {
       type: String,
       enum: ['none', 'pending', 'approved', 'rejected'],
       default: 'none'
     },
-
     message: {
       type: String,
       default: null
@@ -55,6 +49,12 @@ const orderSchema = new mongoose.Schema(
       type: String,
       unique: true,
       index: true
+    },
+
+    stripeSessionId: {
+      type: String,
+      unique: true,
+      sparse: true
     },
 
     user_id: {
@@ -80,7 +80,7 @@ const orderSchema = new mongoose.Schema(
 
     paymentMethod: {
       type: String,
-      enum: ['cod', 'razorpay', 'wallet'],
+      enum: ['cod', 'card', 'wallet'],
       required: true
     },
 
@@ -90,7 +90,6 @@ const orderSchema = new mongoose.Schema(
       default: 'pending'
     },
 
-    /* 💸 PRICE BREAKUP */
     subtotal: {
       type: Number,
       required: true

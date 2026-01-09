@@ -6,6 +6,7 @@ const Variant = require(__basedir +'/db/variantModel');
 const Category = require(__basedir +'/db/categoryModel');
 const orderService = require(__basedir +'/services/orderService');
 const bcrypt = require('bcryptjs');
+const Coupon = require(__basedir +'/db/couponModel')
 const jwt = require('jsonwebtoken');
 const HttpStatus = require(__basedir +'/constants/httpStatus')
 const sharp = require('sharp');
@@ -347,7 +348,6 @@ exports.getOrders = async (req, res) => {
   }
 };
 
-
 exports.getAdminOrderDetails = async (req, res) => {
   try {
     const { orderNumber } = req.params;
@@ -392,6 +392,13 @@ exports.getAdminOrderDetails = async (req, res) => {
       order,
       user,
       items,
+      price: {
+        subtotal: order.subtotal,
+        discount: order.discount || 0,
+        couponCode: order.coupon?.coupon_code || null,
+        shipping: order.shipping || 0,
+        total: order.total
+      },
       currentPage: 'orders'
     });
 

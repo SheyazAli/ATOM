@@ -2,67 +2,13 @@
 
 <style>
   body { background:#fafafa; }
-
-  .checkout-card {
-    background:#fff;
-    border-radius:12px;
-    padding:20px;
-    margin-bottom:16px;
-    border:1px solid #eaeaea;
-  }
-
+  .checkout-card { background:#fff; border-radius:12px; padding:20px; margin-bottom:16px; border:1px solid #eaeaea; }
   .address p { margin:4px 0; font-size:14px; }
-
-  .payment-option {
-    border:1px solid #e5e7eb;
-    border-radius:10px;
-    padding:14px;
-    display:flex;
-    align-items:center;
-    gap:10px;
-    cursor:pointer;
-    margin-bottom:10px;
-    font-size:14px;
-  }
-
+  .payment-option { border:1px solid #e5e7eb; border-radius:10px; padding:14px; display:flex; align-items:center; gap:10px; cursor:pointer; margin-bottom:10px; font-size:14px; }
   .payment-option input { accent-color:#111; }
-
-  .payment-option.disabled {
-    opacity:.5;
-    cursor:not-allowed;
-  }
-
-  .summary-box {
-    background:#fff;
-    border-radius:12px;
-    padding:20px;
-    border:1px solid #eaeaea;
-    position:sticky;
-    top:20px;
-  }
-
-  .pay-btn {
-    width:100%;
-    margin-top:20px;
-    background:#5cb85c;
-    color:#fff;
-    border:none;
-    border-radius:10px;
-    padding:14px;
-    font-size:15px;
-    cursor:pointer;
-  }
-
-  .cart-btn {
-    width:100%;
-    margin-top:10px;
-    background:#111827;
-    color:#fff;
-    border:none;
-    border-radius:10px;
-    padding:14px;
-    font-size:15px;
-  }
+  .summary-box { background:#fff; border-radius:12px; padding:20px; border:1px solid #eaeaea; position:sticky; top:20px; }
+  .pay-btn { width:100%; margin-top:20px; background:#5cb85c; color:#fff; border:none; border-radius:10px; padding:14px; font-size:15px; cursor:pointer; }
+  .cart-btn { width:100%; margin-top:10px; background:#111827; color:#fff; border:none; border-radius:10px; padding:14px; font-size:15px; }
 </style>
 
 <div class="container py-4">
@@ -72,7 +18,7 @@
     <div class="col-lg-7">
 
       <!-- ADDRESS -->
-      <div class="checkout-card address">
+      <div class="checkout-card">
         <h6 class="fw-semibold mb-3">Ship to</h6>
 
         <div id="selectedAddress">
@@ -105,34 +51,34 @@
           Cash on Delivery (COD)
         </label>
 
-        <label class="payment-option disabled">
-          <input type="radio" disabled> Cards / UPI / Wallet (Coming Soon)
+        <label class="payment-option">
+          <input type="radio" name="paymentMethodRadio" value="stripe">
+          Card
         </label>
       </div>
+
+      <!-- COUPONS -->
       <div class="checkout-card">
         <h6 class="fw-semibold mb-3">Available Coupons</h6>
 
         <select class="form-select" id="couponSelect">
           <option value="">Select coupon</option>
           <% coupons.forEach(c => { %>
-            <option value="<%= c.code %>" <%= c.disabled ? 'disabled' : '' %>>
+            <option
+              value="<%= c.code %>"
+              <%= appliedCoupon && appliedCoupon.coupon_code === c.code ? 'selected' : '' %>
+              <%= c.disabled ? 'disabled' : '' %>>
               <%= c.code %> - <%= c.description %>
-              <%= c.disabled ? '(' + c.reason + ')' : '' %>
             </option>
           <% }) %>
         </select>
 
-        <button class="btn btn-dark w-100 mt-2" id="applyCouponBtn">
-          Apply Coupon
-        </button>
+        <button class="btn btn-dark w-100 mt-2" id="applyCouponBtn">Apply Coupon</button>
 
         <% if (appliedCoupon) { %>
-          <button class="btn btn-outline-danger w-100 mt-2" id="removeCouponBtn">
-            Remove Coupon
-          </button>
+          <button class="btn btn-outline-danger w-100 mt-2" id="removeCouponBtn">Remove Coupon</button>
         <% } %>
       </div>
-
     </div>
 
     <!-- RIGHT -->
@@ -149,57 +95,39 @@
               <div class="text-muted small"><%= item.variant %></div>
               <div class="text-muted small">Qty × <%= item.quantity %></div>
             </div>
-            <div class="ms-auto fw-semibold">
-              ₹ <%= item.itemTotal %>
-            </div>
+            <div class="ms-auto fw-semibold">₹ <%= item.itemTotal %></div>
           </div>
         <% }) %>
 
         <hr>
 
-        <!-- SUBTOTAL -->
         <div class="d-flex justify-content-between mb-2">
           <span>Item Total</span>
           <span>₹ <%= summary.subtotal %></span>
         </div>
 
-        <!-- COUPON DISCOUNT -->
         <% if (summary.discount > 0) { %>
           <div class="d-flex justify-content-between mb-2">
-            <span>
-              Coupon Discount
-              <% if (appliedCoupon?.couponCode) { %>
-                (<%= appliedCoupon.couponCode %>)
-              <% } %>
-            </span>
-            <span class="text-success">
-              - ₹ <%= summary.discount %>
-            </span>
+            <span>Coupon (<%= appliedCoupon.coupon_code %>)</span>
+            <span class="text-success">- ₹ <%= summary.discount %></span>
           </div>
         <% } %>
 
-        <!-- SHIPPING -->
+        <!-- SHIPPING (ALWAYS FREE) -->
         <div class="d-flex justify-content-between mb-2">
           <span>Shipping</span>
-          <span class="text-success">
-            <%= summary.shipping === 0 ? 'Free' : '₹ ' + summary.shipping %>
-          </span>
+          <span class="text-success">Free</span>
         </div>
 
         <hr>
 
-        <!-- TOTAL -->
         <div class="d-flex justify-content-between fs-5 fw-bold">
           <span>Total</span>
           <span>₹ <%= summary.total %></span>
         </div>
 
-        <!-- PAY FORM -->
-        <form method="POST" action="/user/checkout/pay">
-          <input type="hidden" name="paymentMethod" value="cod">
-          <input type="hidden" name="address_id" id="addressInput">
-          <button class="pay-btn" type="submit">Pay now</button>
-        </form>
+        <!-- ✅ SINGLE PAY BUTTON -->
+        <button id="payNowBtn" class="pay-btn">Pay now</button>
 
         <form action="/user/cart" method="get">
           <button class="cart-btn">Back to cart</button>
@@ -212,44 +140,76 @@
 </div>
 
 <script>
-  const addresses = <%- JSON.stringify(addresses) %>;
   const addressSelect = document.getElementById('addressSelect');
-  const addressInput = document.getElementById('addressInput');
-  const addressContainer = document.getElementById('selectedAddress');
+  const payBtn = document.getElementById('payNowBtn');
 
-  addressInput.value = addressSelect.value;
+  function getSelectedPayment() {
+    const checked = document.querySelector('input[name="paymentMethodRadio"]:checked');
+    return checked ? checked.value : 'cod';
+  }
+
+  function getAddressId() {
+    return addressSelect.value;
+  }
 
   addressSelect.addEventListener('change', () => {
     if (addressSelect.value === 'add_new') {
       window.location.href = '/user/address/add';
+    }
+  });
+
+  payBtn.addEventListener('click', async () => {
+    const paymentMethod = getSelectedPayment();
+    const addressId = getAddressId();
+
+    if (!addressId || addressId === 'add_new') {
+      alert('Please select a valid address');
       return;
     }
 
-    addressInput.value = addressSelect.value;
+    // COD FLOW (PURE FORM POST)
+    if (paymentMethod === 'cod') {
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = '/user/checkout/pay';
 
-    const addr = addresses.find(a => a.address_id === addressSelect.value);
-    addressContainer.innerHTML = `
-      <p><strong><%= user.name %></strong></p>
-      <p>${addr.building_name}</p>
-      <p>${addr.address_line_1}</p>
-      <p>${addr.city}, ${addr.state} ${addr.postal_code}</p>
-      <p>${addr.country}</p>
-    `;
+      const addr = document.createElement('input');
+      addr.type = 'hidden';
+      addr.name = 'address_id';
+      addr.value = addressId;
+
+      form.appendChild(addr);
+      document.body.appendChild(form);
+      form.submit();
+      return;
+    }
+
+    // STRIPE FLOW
+    const res = await fetch('/user/checkout/stripe/create-session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ address_id: addressId })
+    });
+
+    const data = await res.json();
+    if (data.url) {
+      window.location.href = data.url;
+    } else {
+      alert(data.error || 'Payment failed');
+    }
   });
 </script>
+
 <script>
   document.getElementById('applyCouponBtn')?.addEventListener('click', async () => {
     const code = document.getElementById('couponSelect').value;
     if (!code) return alert('Select a coupon');
 
-    const res = await fetch('/user/coupon/apply', {
+    await fetch('/user/coupon/apply', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ code })
     });
-
-    const data = await res.json();
-    if (data.error) return alert(data.error);
 
     location.reload();
   });
@@ -259,6 +219,5 @@
     location.reload();
   });
 </script>
-
 
 <%- include('./userPartials/footer') %>

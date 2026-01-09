@@ -42,16 +42,6 @@ const couponSchema = new mongoose.Schema(
       required: true
     },
 
-    usage_limit: {
-      type: Number,
-      default: 1
-    },
-
-    used_count: {
-      type: Number,
-      default: 0
-    },
-
     user_ids: [
       {
         type: mongoose.Schema.Types.ObjectId,

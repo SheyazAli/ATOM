@@ -401,6 +401,9 @@ exports.getOrderDetails = async (req, res) => {
         .render('user/404');
     }
 
+    const discount = order.discount || 0;
+    const couponCode = order.coupon?.coupon_code || null;
+
     let items = [];
     let itemTotal = 0;
 
@@ -445,7 +448,8 @@ exports.getOrderDetails = async (req, res) => {
       items,
       price: {
         itemTotal,
-        discount: 0,
+        discount,
+        couponCode,
         shipping: order.shipping || 0,
         finalAmount: order.total
       }

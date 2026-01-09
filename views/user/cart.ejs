@@ -230,7 +230,7 @@ let cartState = [];
 let couponDiscount = <%= appliedCoupon?.discount || 0 %>;
 let appliedCouponCode = "<%= appliedCoupon?.coupon_code || '' %>";
 
-
+/* QTY BUTTON HANDLER */
 document.addEventListener('click', e => {
   const btn = e.target.closest('.qty-btn');
   if (!btn) return;
