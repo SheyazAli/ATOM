@@ -4,6 +4,7 @@ const Product = require(__basedir +'/db/productModel');
 const Order = require(__basedir +'/db/orderModel');
 const Variant = require(__basedir +'/db/variantModel');
 const Category = require(__basedir +'/db/categoryModel');
+const Wallet = require(__basedir +'/db/walletModel');
 const orderService = require(__basedir +'/services/orderService');
 const bcrypt = require('bcryptjs');
 const Coupon = require(__basedir +'/db/couponModel')
@@ -11,6 +12,7 @@ const jwt = require('jsonwebtoken');
 const HttpStatus = require(__basedir +'/constants/httpStatus')
 const sharp = require('sharp');
 const fs = require('fs');
+const mongoose = require('mongoose');
 const path = require('path');
 
 
@@ -512,44 +514,90 @@ exports.getReturnRequests = async (req, res) => {
   }
 };
 
+
 exports.approveReturn = async (req, res) => {
   try {
     const { orderId, variantId } = req.body;
 
-    await Order.updateOne(
-      { _id: orderId, 'items.variant_id': variantId },
-      {
-        $set: {
-          'items.$.returnStatus': 'approved',
-          'items.$.status': 'returned',
-          'items.$.message': 'Return approved by admin'
-        }
-      }
-    );
-    await Variant.updateOne(
-      { _id: variantId },
-      { $inc: { stock: 1 } }
-    );
-    const order = await Order.findById(orderId).lean();
+    const order = await Order.findById(orderId);
+    if (!order) return res.redirect('/admin/returns');
 
-    if (!order) {
+    const item = order.items.find(
+      i => i.variant_id.toString() === variantId
+    );
+
+    if (!item || item.returnStatus === 'approved') {
       return res.redirect('/admin/returns');
     }
 
-    const itemStatuses = order.items.map(i => i.status);
+    //  Approve return
+    item.returnStatus = 'approved';
+    item.status = 'returned';
+    item.message = 'Return approved by admin';
 
-    if (itemStatuses.every(s => s === 'returned')) {
-      await Order.updateOne(
-        { _id: orderId },
-        { $set: { status: 'returned' } }
+    await Variant.updateOne(
+      { _id: variantId },
+      { $inc: { stock: item.returnedQty } }
+    );
+
+    //  Refund calculation
+    let refundAmount = item.returnedQty * item.price;
+
+    if (order.discount && order.discount > 0) {
+      const totalQty = order.items.reduce(
+        (sum, i) => sum + i.quantity,
+        0
       );
+
+      if (totalQty > 0) {
+        const discountPerUnit = order.discount / totalQty;
+        const discountForThisReturn = discountPerUnit * item.returnedQty;
+
+        refundAmount = refundAmount - discountForThisReturn;
+      }
     }
-    else if (itemStatuses.some(s => s === 'returned')) {
-      await Order.updateOne(
-        { _id: orderId },
-        { $set: { status: 'partially_returned' } }
-      );
+
+    // Money safety
+    refundAmount = Math.max(0, Number(refundAmount.toFixed(2)));
+
+
+    //  COD unpaid safeguard
+    // if (order.paymentMethod === 'cod' && order.paymentStatus !== 'paid') {
+    //   refundAmount = 0;
+    // }
+
+    if (refundAmount > 0) {
+      let wallet = await Wallet.findOne({ user_id: order.user_id });
+
+      if (!wallet) {
+        wallet = await Wallet.create({
+          user_id: order.user_id,
+          balance: 0,
+          transactionHistory: []
+        });
+      }
+
+      wallet.balance += refundAmount;
+      wallet.transactionHistory.push({
+        amount: refundAmount,
+        transaction_id: `REF-${order.orderNumber}-${variantId}`,
+        payment_method: 'refund',
+        type: 'credit'
+      });
+
+      await wallet.save();
     }
+
+    //  Update order status
+    const statuses = order.items.map(i => i.status);
+
+    if (statuses.every(s => s === 'returned')) {
+      order.status = 'returned';
+    } else if (statuses.some(s => s === 'returned')) {
+      order.status = 'partially_returned';
+    }
+
+    await order.save();
 
     res.redirect('/admin/returns');
 
@@ -558,6 +606,8 @@ exports.approveReturn = async (req, res) => {
     res.redirect('/admin/returns');
   }
 };
+
+
 
 exports.rejectReturn = async (req, res) => {
   try {
@@ -672,7 +722,6 @@ exports.getInventory = async (req, res) => {
       .redirect('/admin/dashboard');
   }
 };
-
 
 exports.updateStock = async (req, res) => {
   try {

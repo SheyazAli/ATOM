@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Wallet | ATOM</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- Bootstrap -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
+
+  <style>
+    body {
+      font-family: "Segoe UI", sans-serif;
+      background: #fff;
+      color: #111;
+    }
+
+    .account-wrapper {
+      padding: 60px 0 80px;
+    }
+
+    .page-title {
+      font-size: 28px;
+      font-weight: 600;
+      margin-bottom: 25px;
+    }
+
+    .wallet-balance-card {
+      background: #f8f9fa;
+      border-radius: 14px;
+      padding: 30px;
+    }
+
+    .wallet-balance {
+      font-size: 32px;
+      font-weight: 700;
+    }
+
+    .txn-card {
+      background: #ffffff;
+      border-radius: 12px;
+      padding: 18px 20px;
+      border: 1px solid #eee;
+    }
+
+    .txn-amount.credit {
+      color: #198754;
+      font-weight: 600;
+    }
+
+    .txn-amount.debit {
+      color: #dc3545;
+      font-weight: 600;
+    }
+
+    .btn-outline-success {
+      border-radius: 12px;
+    }
+  </style>
+</head>
+
+<body>
+
+<%- include('./userPartials/navbar') %>
+
+<div class="container account-wrapper">
+  <div class="row">
+
+    <%- include('./userPartials/sidebar') %>
+
+    <div class="col-lg-9 col-md-8">
+
+      <div class="page-title">Wallet</div>
+
+      <!-- Wallet Balance -->
+      <div class="wallet-balance-card mb-5 d-flex justify-content-between align-items-center flex-wrap gap-3">
+        <div>
+          <div class="text-muted mb-1">Wallet Balance</div>
+          <div class="wallet-balance">₹ <%= walletBalance.toFixed(2) %></div>
+          <small class="text-muted">Use wallet balance during checkout</small>
+        </div>
+
+        <a href="/user/wallet/add-money" class="btn btn-outline-success px-4">
+          <i class="bi bi-plus-lg"></i> Add Money
+        </a>
+      </div>
+
+      <!-- Transaction History -->
+      <h5 class="mb-3">Transaction History</h5>
+
+      <% if (!transactions || transactions.length === 0) { %>
+        <p class="text-muted">No transactions found.</p>
+      <% } else { %>
+        <div class="d-flex flex-column gap-3">
+  <% transactions.forEach(txn => { %>
+    <div class="txn-card d-flex justify-content-between align-items-center">
+      <div>
+        <!-- Payment Method -->
+        <div class="fw-semibold text-dark text-uppercase">
+          <%= txn.payment_method %>
+        </div>
+
+        <!-- Transaction ID -->
+        <small class="text-muted">
+          <%= txn.transaction_id %>
+        </small>
+      </div>
+
+      <div class="txn-amount <%= txn.type === 'credit' ? 'credit' : 'debit' %>">
+        <%= txn.type === 'credit' ? '+' : '-' %> ₹ <%= txn.amount.toFixed(2) %>
+      </div>
+    </div>
+  <% }) %>
+</div>
+
+      <% } %>
+
+    </div>
+  </div>
+</div>
+
+<%- include('./userPartials/footer') %>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

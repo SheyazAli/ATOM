@@ -89,8 +89,13 @@ router.get('/orders/:orderNumber',verifyUser,orderController.getOrderDetails);
 router.get('/orders/:orderNumber/cancel',verifyUser,orderController.getCancelOrder);
 router.post('/orders/:orderNumber/cancel',verifyUser, orderController.postCancelOrder)
 
+//COUPON
 router.post('/coupon/apply',verifyUser,userController.applyCoupon);
 router.delete('/coupon/remove',verifyUser,userController.removeCoupon);
+
+//WALLET
+
+router.get('/wallet',verifyUser,userController.getWallet)
 
 router.get('/logout',userController.logout)
 

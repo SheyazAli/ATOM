@@ -6,6 +6,7 @@ const Product = require(__basedir +'/db/productModel');
 const Category = require(__basedir +'/db/categoryModel');
 const Order = require(__basedir +'/db/orderModel');
 const Coupon = require(__basedir +'/db/couponModel')
+const Wallet = require(__basedir +'/db/walletModel');
 const Cart  = require(__basedir +'/db/cartModel')
 const Variant = require(__basedir +'/db/variantModel');
 const { sendOtpMail } = require(__basedir +'/Services/emailService')
@@ -22,25 +23,23 @@ exports.getHome = (req, res) => {
 };
 
 // PROFILE PAGE
-exports.getProfile = async (req, res) => {
+exports.getProfile = async (req, res, next) => {
   try {
-    const user = req.user;
     if (!req.user) {
-  return res.redirect('/user/login');
-}
+      return res.redirect('/user/login');
+    }
+
+    const user = req.user;
 
     const defaultAddressDoc = await Address.findOne({
-      user_id: user._id,  
+      user_id: user._id,
       is_default: true
     }).lean();
 
     let defaultAddress = 'No default address set';
 
     if (defaultAddressDoc) {
-      defaultAddress =
-        `${defaultAddressDoc.building_name}, ` +
-        `${defaultAddressDoc.city}, ` +
-        `${defaultAddressDoc.state}`;
+      defaultAddress = `${defaultAddressDoc.building_name}, ${defaultAddressDoc.city}, ${defaultAddressDoc.state}`;
     }
 
     res.render('user/profile', {
@@ -48,12 +47,15 @@ exports.getProfile = async (req, res) => {
       defaultAddress,
       activePage: 'profile'
     });
+
   } catch (error) {
-  error.statusCode =
-    error.statusCode || HttpStatus.INTERNAL_SERVER_ERROR;
-  next(error);
-}
+    error.statusCode =
+      error.statusCode || HttpStatus.INTERNAL_SERVER_ERROR;
+    next(error);
+  }
 };
+
+
 exports.getEditProfile = async (req, res) => {
   res.render('user/edit-profile', {
     user: req.user,
@@ -571,8 +573,40 @@ exports.postResetPassword = async (req, res) => {
   res.redirect('/user/profile');
 };
 
-//PRODUCTS
+//WALLET
 
+exports.getWallet = async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.redirect('/user/login');
+    }
+
+    const userId = req.user._id; // ✅ FIX
+
+    let wallet = await Wallet.findOne({ user_id: userId }).lean();
+
+    if (!wallet) {
+      wallet = {
+        balance: 0,
+        transactionHistory: []
+      };
+    }
+
+    res.render('user/wallet', {
+      walletBalance: wallet.balance,
+      transactions: wallet.transactionHistory.sort(
+        (a, b) => new Date(b.date) - new Date(a.date)
+      ),
+      activePage: 'wallet'
+    });
+
+  } catch (error) {
+    console.error('GET WALLET ERROR:', error);
+    res.redirect('/user/profile');
+  }
+};
+
+//PRODUCTS
 
 exports.getProducts = async (req, res) => {
   try {
