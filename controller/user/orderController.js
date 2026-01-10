@@ -12,6 +12,7 @@ const Order = require(__basedir +'/db/orderModel');
 const Variant = require(__basedir +'/db/variantModel');
 const HttpStatus = require(__basedir +'/constants/httpStatus')
 const PDFDocument = require('pdfkit');
+const { processRefund } = require(__basedir +'/services/refundService');
 const { generateOrderNumber } = require(__basedir +'/Services/orderNumberService')
 
 
@@ -545,14 +546,11 @@ exports.postCancelOrder = async (req, res) => {
 
       if (!item || qty <= 0) continue;
 
-
       if (isReturn) {
         item.returnedQty += qty;
         item.status = 'returned';
         item.returnStatus = 'pending';
-      }
-
-      else {
+      } else {
         item.cancelledQty += qty;
         item.status = 'cancelled';
 
@@ -560,17 +558,25 @@ exports.postCancelOrder = async (req, res) => {
           variantId,
           { $inc: { stock: qty } }
         );
+        await processRefund({
+          order,
+          item,
+          refundQty: qty,
+          reason: 'refund'
+        });
       }
 
       item.message = message || null;
     }
 
     const statuses = order.items.map(i => i.status);
+
     if (statuses.every(s => s === 'cancelled')) {
       order.status = 'cancelled';
     } else if (statuses.some(s => s === 'cancelled')) {
       order.status = 'partially_cancelled';
     }
+
     if (statuses.every(s => s === 'returned')) {
       order.status = 'returned';
     } else if (statuses.some(s => s === 'returned')) {
@@ -585,60 +591,3 @@ exports.postCancelOrder = async (req, res) => {
     res.redirect('/user/orders');
   }
 };
-
-//   const { orderNumber } = req.params;
-//   const userId = req.user._id;
-//   const { items = [] } = req.body;
-
-//   const order = await Order.findOne({ orderNumber, user_id: userId });
-//   if (!order) return res.redirect('/user/orders');
-
-//   const isReturn = ['delivered', 'partially_returned'].includes(order.status);
-
-//   for (const variantId of items) {
-//     const qty = Number(req.body[`qty_${variantId}`]);
-//     const message = req.body[`message_${variantId}`];
-
-//     const item = order.items.find(
-//       i => i.variant_id.toString() === variantId
-//     );
-
-//     if (!item || qty <= 0) continue;
-
-//     if (isReturn) {
-//       item.returnedQty += qty;
-//       item.status = 'returned';
-//     } else {
-//       item.cancelledQty += qty;
-//       item.status = 'cancelled';
-
-//       await Variant.findByIdAndUpdate(
-//         variantId,
-//         { $inc: { stock: qty } }
-//       );
-//     }
-
-//     item.message = message;
-//   }
-
-//   const statuses = order.items.map(i => i.status);
-
-//   /* CANCEL */
-//   if (statuses.every(s => s === 'cancelled')) {
-//     order.status = 'cancelled';
-//   } else if (statuses.some(s => s === 'cancelled')) {
-//     order.status = 'partially_cancelled';
-//   }
-
-//   /* RETURN */
-//   if (statuses.every(s => s === 'returned')) {
-//     order.status = 'returned';
-//     order.returnStatus = 'pending';
-//   } else if (statuses.some(s => s === 'returned')) {
-//     order.status = 'partially_returned';
-//     order.returnStatus = 'pending';
-//   }
-
-//   await order.save();
-//   res.redirect('/user/orders');
-// };

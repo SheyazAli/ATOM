@@ -11,9 +11,11 @@ const Coupon = require(__basedir +'/db/couponModel')
 const jwt = require('jsonwebtoken');
 const HttpStatus = require(__basedir +'/constants/httpStatus')
 const sharp = require('sharp');
+const ExcelJS = require('exceljs');
 const fs = require('fs');
 const mongoose = require('mongoose');
 const path = require('path');
+const { processRefund } = require(__basedir +'/services/refundService');
 
 
 /* SHOW LOGIN */
@@ -71,7 +73,7 @@ exports.postLogin = async (req, res) => {
   });
 
 
-  res.redirect('/admin/products');
+  res.redirect('/admin/revenue');
 };
 
 /*CAT*/
@@ -346,7 +348,9 @@ exports.getOrders = async (req, res) => {
 
   } catch (error) {
     console.error('GET ADMIN ORDERS ERROR:', error);
-    return res.status(500).render('admin/500');
+      return res
+      .status(HttpStatus.INTERNAL_SERVER_ERROR)
+      .render('admin/500');
   }
 };
 
@@ -424,16 +428,23 @@ exports.postUpdateOrderDetails = async (req, res) => {
         .json({ success: false });
     }
 
+    // CONFIRMED / SHIPPED / DELIVERED
     if (['confirmed', 'shipped', 'delivered'].includes(status)) {
       order.status = status;
 
       order.items.forEach(item => {
-        if (['placed', 'confirmed'].includes(item.status)) {
+        if (['placed', 'confirmed', 'shipped'].includes(item.status)) {
           item.status = status;
         }
       });
+
+      // 🔥 IMPORTANT: Mark payment as PAID when delivered (COD case)
+      if (status === 'delivered') {
+        order.paymentStatus = 'paid';
+      }
     }
 
+    // CANCELLED
     if (status === 'cancelled') {
       order.status = 'cancelled';
 
@@ -463,6 +474,7 @@ exports.postUpdateOrderDetails = async (req, res) => {
       .json({ success: false });
   }
 };
+
 
 /*RETURN*/
 exports.getReturnRequests = async (req, res) => {
@@ -530,7 +542,6 @@ exports.approveReturn = async (req, res) => {
       return res.redirect('/admin/returns');
     }
 
-    //  Approve return
     item.returnStatus = 'approved';
     item.status = 'returned';
     item.message = 'Return approved by admin';
@@ -539,56 +550,13 @@ exports.approveReturn = async (req, res) => {
       { _id: variantId },
       { $inc: { stock: item.returnedQty } }
     );
+    await processRefund({
+      order,
+      item,
+      refundQty: item.returnedQty,
+      reason: 'refund'
+    });
 
-    //  Refund calculation
-    let refundAmount = item.returnedQty * item.price;
-
-    if (order.discount && order.discount > 0) {
-      const totalQty = order.items.reduce(
-        (sum, i) => sum + i.quantity,
-        0
-      );
-
-      if (totalQty > 0) {
-        const discountPerUnit = order.discount / totalQty;
-        const discountForThisReturn = discountPerUnit * item.returnedQty;
-
-        refundAmount = refundAmount - discountForThisReturn;
-      }
-    }
-
-    // Money safety
-    refundAmount = Math.max(0, Number(refundAmount.toFixed(2)));
-
-
-    //  COD unpaid safeguard
-    // if (order.paymentMethod === 'cod' && order.paymentStatus !== 'paid') {
-    //   refundAmount = 0;
-    // }
-
-    if (refundAmount > 0) {
-      let wallet = await Wallet.findOne({ user_id: order.user_id });
-
-      if (!wallet) {
-        wallet = await Wallet.create({
-          user_id: order.user_id,
-          balance: 0,
-          transactionHistory: []
-        });
-      }
-
-      wallet.balance += refundAmount;
-      wallet.transactionHistory.push({
-        amount: refundAmount,
-        transaction_id: `REF-${order.orderNumber}-${variantId}`,
-        payment_method: 'refund',
-        type: 'credit'
-      });
-
-      await wallet.save();
-    }
-
-    //  Update order status
     const statuses = order.items.map(i => i.status);
 
     if (statuses.every(s => s === 'returned')) {
@@ -598,7 +566,6 @@ exports.approveReturn = async (req, res) => {
     }
 
     await order.save();
-
     res.redirect('/admin/returns');
 
   } catch (error) {
@@ -755,6 +722,146 @@ exports.updateStock = async (req, res) => {
       .redirect('/admin/inventory');
   }
 };
+
+exports.getRevenue = async (req, res) => {
+  try {
+    const { from, to, download } = req.query;
+
+    const dateFilter = {};
+    if (from) dateFilter.$gte = new Date(from);
+    if (to) {
+      const end = new Date(to);
+      end.setHours(23, 59, 59, 999);
+      dateFilter.$lte = end;
+    }
+
+    const query = {};
+    if (Object.keys(dateFilter).length) {
+      query.created_at = dateFilter;
+    }
+
+    const orders = await Order.find(query).lean();
+
+    let totalRevenue = 0;
+    let totalDiscount = 0;
+
+    // VALUE BUCKETS (₹)
+    let paidValue = 0;
+    let pendingValue = 0;
+    let refundedValue = 0;
+    let cancelledValue = 0;
+
+    const dailyRevenue = {};
+
+    orders.forEach(order => {
+      const isPaid = order.paymentStatus === 'paid';
+
+      order.items.forEach(item => {
+        const price = item.price;
+
+        const cancelledQty = item.cancelledQty || 0;
+        const returnedQty = item.returnedQty || 0;
+        const deliveredQty =
+          item.quantity - cancelledQty - returnedQty;
+
+        // ---- VALUE SPLIT ----
+        const deliveredValue = deliveredQty * price;
+        const cancelledValueItem = cancelledQty * price;
+        const returnedValueItem = returnedQty * price;
+
+        if (isPaid) {
+          paidValue += deliveredValue;
+          refundedValue += returnedValueItem;
+        } else {
+          pendingValue += deliveredValue;
+        }
+
+        cancelledValue += cancelledValueItem;
+
+        // ---- REVENUE TREND (ONLY DELIVERED & PAID) ----
+        if (isPaid && deliveredValue > 0) {
+          totalRevenue += deliveredValue;
+          totalDiscount += order.discount || 0;
+
+          const day = new Date(order.created_at).toLocaleDateString();
+          dailyRevenue[day] =
+            (dailyRevenue[day] || 0) + deliveredValue;
+        }
+      });
+    });
+
+    const netRevenue = totalRevenue - totalDiscount;
+
+    const totalPieValue =
+      paidValue + pendingValue + refundedValue + cancelledValue || 1;
+
+    const paymentStats = {
+      paid: ((paidValue / totalPieValue) * 100).toFixed(2),
+      pending: ((pendingValue / totalPieValue) * 100).toFixed(2),
+      refunded: ((refundedValue / totalPieValue) * 100).toFixed(2),
+      cancelled: ((cancelledValue / totalPieValue) * 100).toFixed(2)
+    };
+
+    // ===== EXCEL EXPORT (unchanged) =====
+    if (download === 'excel') {
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet('Revenue Report');
+
+      sheet.columns = [
+        { header: 'Order Number', key: 'orderNumber', width: 15 },
+        { header: 'Date', key: 'date', width: 18 },
+        { header: 'Payment Method', key: 'paymentMethod', width: 15 },
+        { header: 'Payment Status', key: 'paymentStatus', width: 15 },
+        { header: 'Subtotal', key: 'subtotal', width: 12 },
+        { header: 'Discount', key: 'discount', width: 12 },
+        { header: 'Total', key: 'total', width: 12 }
+      ];
+
+      orders.forEach(o => {
+        sheet.addRow({
+          orderNumber: o.orderNumber,
+          date: new Date(o.created_at).toDateString(),
+          paymentMethod: o.paymentMethod,
+          paymentStatus: o.paymentStatus,
+          subtotal: o.subtotal,
+          discount: o.discount,
+          total: o.total
+        });
+      });
+
+      res.setHeader(
+        'Content-Type',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      );
+      res.setHeader(
+        'Content-Disposition',
+        'attachment; filename=revenue-report.xlsx'
+      );
+
+      return workbook.xlsx.write(res);
+    }
+
+    return res.render('admin/revenue', {
+      metrics: {
+        totalRevenue,
+        totalDiscount,
+        netRevenue,
+        totalOrders: orders.length
+      },
+      paymentStats,
+      dailyRevenue,
+      from,
+      to,
+      currentPage: 'revenue'
+    });
+
+  } catch (error) {
+    console.error('GET REVENUE ERROR:', error);
+    return res.status(500).render('admin/500');
+  }
+};
+
+
 
 /* LOGOUT */
 exports.logout = (req, res) => {
