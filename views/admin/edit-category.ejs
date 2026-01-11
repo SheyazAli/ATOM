@@ -8,37 +8,28 @@
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
   <style>
-    body {
-      background: #f2e5e2;
-      font-family: "Inter", sans-serif;
-    }
-
-    .content {
-      margin-left: 250px;
-      padding: 40px;
-    }
+    body { background:#f2e5e2; font-family:Inter,sans-serif; }
+    .content { margin-left:250px; padding:40px; }
 
     .card-box {
-      background: #fff;
-      border-radius: 18px;
-      padding: 30px;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.08);
-      max-width: 500px;
+      background:#fff;
+      border-radius:18px;
+      padding:30px;
+      box-shadow:0 4px 15px rgba(0,0,0,0.08);
+      max-width:600px;
     }
 
     .save-btn {
-      background: #5aa053;
-      color: #fff;
-      border-radius: 12px;
-      padding: 12px;
-      border: none;
-      width: 100%;
+      background:#5aa053;
+      color:#fff;
+      border-radius:12px;
+      padding:12px;
+      border:none;
+      width:100%;
     }
 
-    /* 👇 muted input when editing */
-    .edit-input {
-      color: #6c757d;
-    }
+    .edit-input { color:#6c757d; }
+    .offer-box { display:none; }
   </style>
 </head>
 
@@ -60,17 +51,103 @@
       %>"
     >
 
+      <!-- CATEGORY NAME -->
       <div class="mb-4">
         <label class="form-label fw-semibold">Category Name</label>
-
         <input
           type="text"
           name="name"
           class="form-control <%= category ? 'edit-input' : '' %>"
           value="<%= category?.name || '' %>"
-          placeholder="<%= category ? '' : 'Enter category name' %>"
           required
         >
+      </div>
+
+      <!-- APPLY OFFER TOGGLE -->
+      <div class="form-check form-switch mb-4">
+        <input
+          class="form-check-input"
+          type="checkbox"
+          id="offerToggle"
+          name="hasOffer"
+          <%= category?.hasOffer ? 'checked' : '' %>
+        >
+        <label class="form-check-label fw-semibold">
+          Apply Category Offer?
+        </label>
+      </div>
+
+      <!-- OFFER SECTION -->
+      <div class="offer-box border rounded-3 p-3 mb-4" id="offerBox">
+
+        <h6 class="fw-bold mb-3">Category Offer Details</h6>
+
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            <label class="form-label">Discount Type</label>
+            <select name="discount_type" class="form-select">
+              <option value="">Select</option>
+              <option value="percentage" <%= category?.offer?.discount_type==='percentage'?'selected':'' %>>Percentage</option>
+              <option value="flat" <%= category?.offer?.discount_type==='flat'?'selected':'' %>>Flat</option>
+              <option value="bogo" <%= category?.offer?.discount_type==='bogo'?'selected':'' %>>BOGO</option>
+            </select>
+          </div>
+
+          <div class="col-md-6 mb-3">
+            <label class="form-label">Discount Value</label>
+            <input
+              type="number"
+              name="discount_value"
+              class="form-control"
+              value="<%= category?.offer?.discount_value || '' %>"
+            >
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            <label class="form-label">Minimum Purchase</label>
+            <input
+              type="number"
+              name="minimum_purchase"
+              class="form-control"
+              value="<%= category?.offer?.minimum_purchase || 0 %>"
+            >
+          </div>
+
+          <div class="col-md-6 mb-3">
+            <label class="form-label">Maximum Discount</label>
+            <input
+              type="number"
+              name="maximum_discount"
+              class="form-control"
+              value="<%= category?.offer?.maximum_discount || 0 %>"
+            >
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Expiry Date</label>
+          <input
+            type="date"
+            name="expiry_date"
+            class="form-control"
+            value="<%= category?.offer?.expiry_date
+              ? category.offer.expiry_date.toISOString().split('T')[0]
+              : '' %>"
+          >
+        </div>
+
+        <div class="form-check form-switch">
+          <input
+            class="form-check-input"
+            type="checkbox"
+            name="offer_active"
+            <%= category?.offer?.active !== false ? 'checked' : '' %>
+          >
+          <label class="form-check-label">Offer Active</label>
+        </div>
+
       </div>
 
       <button type="submit" class="save-btn">
@@ -84,12 +161,24 @@
 <script>
   Swal.fire({
     icon: 'error',
-    title: 'Duplicate Category',
+    title: 'Error',
     text: '<%= error %>',
     confirmButtonColor: '#5aa053'
   });
 </script>
 <% } %>
+
+<script>
+  const toggle = document.getElementById('offerToggle');
+  const box = document.getElementById('offerBox');
+
+  function syncOfferUI() {
+    box.style.display = toggle.checked ? 'block' : 'none';
+  }
+
+  toggle.addEventListener('change', syncOfferUI);
+  syncOfferUI();
+</script>
 
 </body>
 </html>

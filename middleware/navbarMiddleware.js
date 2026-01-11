@@ -1,15 +1,16 @@
-const Category = require(__basedir +'/db/categoryModel');
+const Category = require(__basedir + '/db/categoryModel');
 
 module.exports = async function navbarMiddleware(req, res, next) {
   try {
-    const categories = await Category.find({ status: true });
+    const categories = await Category.find({ status: true }).lean();
 
     const findCategoryId = (name) =>
-      categories.find(c => c.name === name)?.category_id;
+      categories.find(c => c.name.toLowerCase() === name.toLowerCase())
+        ?.category_id;
 
     res.locals.navCategories = {
       poloId: findCategoryId('Polo'),
-      hoodiId: findCategoryId('Hoodi'),     
+      hoodiId: findCategoryId('Hoodi'),
       oversizedId: findCategoryId('Oversized'),
       sweatshirtId: findCategoryId('Sweatshirt')
     };

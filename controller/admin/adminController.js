@@ -4,18 +4,21 @@ const Product = require(__basedir +'/db/productModel');
 const Order = require(__basedir +'/db/orderModel');
 const Variant = require(__basedir +'/db/variantModel');
 const Category = require(__basedir +'/db/categoryModel');
+const Wallet = require(__basedir +'/db/walletModel');
 const orderService = require(__basedir +'/services/orderService');
 const bcrypt = require('bcryptjs');
+const Coupon = require(__basedir +'/db/couponModel')
 const jwt = require('jsonwebtoken');
 const HttpStatus = require(__basedir +'/constants/httpStatus')
 const sharp = require('sharp');
+const ExcelJS = require('exceljs');
 const fs = require('fs');
+const mongoose = require('mongoose');
 const path = require('path');
+const { processRefund } = require(__basedir +'/services/refundService');
 
 
-/* SHOW LOGIN */
 exports.getLogin = (req, res) => {
-  // If already logged in → redirect
   if (req.cookies.adminToken) {
     return res.redirect('/admin/user');
   }
@@ -23,7 +26,6 @@ exports.getLogin = (req, res) => {
   res.render('admin/login');
 };
 
-/* HANDLE LOGIN */
 exports.postLogin = async (req, res) => {
   const { email, password } = req.body;
 
@@ -68,7 +70,7 @@ exports.postLogin = async (req, res) => {
   });
 
 
-  res.redirect('/admin/products');
+  res.redirect('/admin/revenue');
 };
 
 /*CAT*/
@@ -78,6 +80,7 @@ exports.getCategories = async (req, res) => {
     const limit = 8;
     const skip = (page - 1) * limit;
     const search = req.query.search || '';
+
     const query = {
       name: { $regex: search, $options: 'i' }
     };
@@ -92,6 +95,11 @@ exports.getCategories = async (req, res) => {
       category.productCount = await Product.countDocuments({
         category_id: category.category_id
       });
+
+      category.offerActive =
+        category.hasOffer &&
+        category.offer &&
+        category.offer.active === true;
     }
 
     const totalCategories = await Category.countDocuments(query);
@@ -107,58 +115,135 @@ exports.getCategories = async (req, res) => {
 
   } catch (error) {
     console.error('GET CATEGORIES ERROR:', error);
-    return res.redirect('/admin');
+    return res.redirect('/admin/revenue');
   }
 };
+
 exports.getEditCategory = async (req, res) => {
-  const { categoryId } = req.params;
+  try {
+    const { categoryId } = req.params;
 
-  const category = categoryId
-    ? await Category.findOne({ category_id: categoryId }).lean()
-    : null;
-
-  res.render('admin/edit-category', {
-    category,
-    error: null,
-    currentPage: 'categories'
-  });
-};
-exports.saveCategory = async (req, res) => {
-  const { name } = req.body;
-  const { categoryId } = req.params;
-
-  // Normalize name
-  const trimmedName = name.trim();
-
-  // Check duplicate (exclude self in edit)
-  const duplicate = await Category.findOne({
-    name: { $regex: `^${trimmedName}$`, $options: 'i' },
-    ...(categoryId && { category_id: { $ne: categoryId } })
-  });
-
-  if (duplicate) {
     const category = categoryId
       ? await Category.findOne({ category_id: categoryId }).lean()
       : null;
 
     return res.render('admin/edit-category', {
       category,
-      error: 'Category name already exists',
+      error: null,
+      currentPage: 'categories'
+    });
+
+  } catch (error) {
+    console.error('GET EDIT CATEGORY ERROR:', error);
+    return res.redirect('/admin/categories');
+  }
+};
+
+exports.saveCategory = async (req, res) => {
+  try {
+    const { name } = req.body;
+    const { categoryId } = req.params;
+
+    const trimmedName = name.trim();
+
+    // ---------- DUPLICATE CHECK ----------
+    const duplicate = await Category.findOne({
+      name: { $regex: `^${trimmedName}$`, $options: 'i' },
+      ...(categoryId && { category_id: { $ne: categoryId } })
+    });
+
+    if (duplicate) {
+      const category = categoryId
+        ? await Category.findOne({ category_id: categoryId }).lean()
+        : null;
+
+      return res.render('admin/edit-category', {
+        category,
+        error: 'Category name already exists',
+        currentPage: 'categories'
+      });
+    }
+
+    // ---------- OFFER DATA ----------
+    const hasOffer = req.body.hasOffer === 'on';
+    let offerData = null;
+
+    if (hasOffer) {
+      offerData = {
+        discount_type: req.body.discount_type,
+        discount_value: Number(req.body.discount_value) || 0,
+        minimum_purchase: Number(req.body.minimum_purchase) || 0,
+        maximum_discount: Number(req.body.maximum_discount) || 0,
+        expiry_date: req.body.expiry_date
+          ? new Date(req.body.expiry_date)
+          : null,
+        active: req.body.offer_active === 'on'
+      };
+    }
+
+    // ---------- SAVE CATEGORY ----------
+    let category;
+
+    if (categoryId) {
+      category = await Category.findOneAndUpdate(
+        { category_id: categoryId },
+        { name: trimmedName, hasOffer, offer: offerData },
+        { new: true }
+      );
+    } else {
+      category = await Category.create({
+        name: trimmedName,
+        hasOffer,
+        offer: offerData
+      });
+    }
+
+    // ---------- UPDATE PRODUCTS ----------
+    const products = await Product.find({
+      category_id: category.category_id,
+      status: true
+    });
+
+    for (const product of products) {
+      let categoryOfferPrice = 0;
+
+      // 🟢 APPLY / UPDATE CATEGORY OFFER
+      if (hasOffer && offerData?.active) {
+        if (offerData.discount_type === 'percentage') {
+          categoryOfferPrice =
+            product.regular_price -
+            (product.regular_price * offerData.discount_value) / 100;
+        }
+
+        if (offerData.discount_type === 'flat') {
+          categoryOfferPrice =
+            product.regular_price - offerData.discount_value;
+        }
+
+        categoryOfferPrice = Math.max(0, Math.round(categoryOfferPrice));
+      }
+
+      // 🔴 REMOVE OFFER → RESET TO 0
+      product.category_offer_price = categoryOfferPrice;
+
+      // ❗ DO NOT TOUCH sale_price
+      await product.save();
+    }
+
+    return res.redirect('/admin/categories');
+
+  } catch (error) {
+    console.error('SAVE CATEGORY ERROR:', error);
+
+    return res.render('admin/edit-category', {
+      category: req.body,
+      error: 'Something went wrong',
       currentPage: 'categories'
     });
   }
-
-  if (categoryId) {
-    await Category.findOneAndUpdate(
-      { category_id: categoryId },
-      { name: trimmedName }
-    );
-  } else {
-    await Category.create({ name: trimmedName });
-  }
-
-  res.redirect('/admin/categories');
 };
+
+
 exports.deleteCategory = async (req, res) => {
   try {
     const { categoryId } = req.params;
@@ -343,10 +428,11 @@ exports.getOrders = async (req, res) => {
 
   } catch (error) {
     console.error('GET ADMIN ORDERS ERROR:', error);
-    return res.status(500).render('admin/500');
+      return res
+      .status(HttpStatus.INTERNAL_SERVER_ERROR)
+      .render('admin/500');
   }
 };
-
 
 exports.getAdminOrderDetails = async (req, res) => {
   try {
@@ -392,6 +478,13 @@ exports.getAdminOrderDetails = async (req, res) => {
       order,
       user,
       items,
+      price: {
+        subtotal: order.subtotal,
+        discount: order.discount || 0,
+        couponCode: order.coupon?.coupon_code || null,
+        shipping: order.shipping || 0,
+        total: order.total
+      },
       currentPage: 'orders'
     });
 
@@ -419,12 +512,18 @@ exports.postUpdateOrderDetails = async (req, res) => {
       order.status = status;
 
       order.items.forEach(item => {
-        if (['placed', 'confirmed'].includes(item.status)) {
+        if (['placed', 'confirmed', 'shipped'].includes(item.status)) {
           item.status = status;
         }
       });
+
+
+      if (status === 'delivered') {
+        order.paymentStatus = 'paid';
+      }
     }
 
+ 
     if (status === 'cancelled') {
       order.status = 'cancelled';
 
@@ -454,6 +553,7 @@ exports.postUpdateOrderDetails = async (req, res) => {
       .json({ success: false });
   }
 };
+
 
 /*RETURN*/
 exports.getReturnRequests = async (req, res) => {
@@ -505,45 +605,46 @@ exports.getReturnRequests = async (req, res) => {
   }
 };
 
+
 exports.approveReturn = async (req, res) => {
   try {
     const { orderId, variantId } = req.body;
 
-    await Order.updateOne(
-      { _id: orderId, 'items.variant_id': variantId },
-      {
-        $set: {
-          'items.$.returnStatus': 'approved',
-          'items.$.status': 'returned',
-          'items.$.message': 'Return approved by admin'
-        }
-      }
-    );
-    await Variant.updateOne(
-      { _id: variantId },
-      { $inc: { stock: 1 } }
-    );
-    const order = await Order.findById(orderId).lean();
+    const order = await Order.findById(orderId);
+    if (!order) return res.redirect('/admin/returns');
 
-    if (!order) {
+    const item = order.items.find(
+      i => i.variant_id.toString() === variantId
+    );
+
+    if (!item || item.returnStatus === 'approved') {
       return res.redirect('/admin/returns');
     }
 
-    const itemStatuses = order.items.map(i => i.status);
+    item.returnStatus = 'approved';
+    item.status = 'returned';
+    item.message = 'Return approved by admin';
 
-    if (itemStatuses.every(s => s === 'returned')) {
-      await Order.updateOne(
-        { _id: orderId },
-        { $set: { status: 'returned' } }
-      );
-    }
-    else if (itemStatuses.some(s => s === 'returned')) {
-      await Order.updateOne(
-        { _id: orderId },
-        { $set: { status: 'partially_returned' } }
-      );
+    await Variant.updateOne(
+      { _id: variantId },
+      { $inc: { stock: item.returnedQty } }
+    );
+    await processRefund({
+      order,
+      item,
+      refundQty: item.returnedQty,
+      reason: 'refund'
+    });
+
+    const statuses = order.items.map(i => i.status);
+
+    if (statuses.every(s => s === 'returned')) {
+      order.status = 'returned';
+    } else if (statuses.some(s => s === 'returned')) {
+      order.status = 'partially_returned';
     }
 
+    await order.save();
     res.redirect('/admin/returns');
 
   } catch (error) {
@@ -560,7 +661,6 @@ exports.rejectReturn = async (req, res) => {
       return res.redirect('/admin/returns');
     }
 
-    /* ================= UPDATE ITEM ================= */
     await Order.updateOne(
       { _id: orderId, 'items.variant_id': variantId },
       {
@@ -572,7 +672,6 @@ exports.rejectReturn = async (req, res) => {
       }
     );
 
-    /* ================= RECALCULATE ORDER STATUS ================= */
     const order = await Order.findById(orderId).lean();
     if (!order) return res.redirect('/admin/returns');
 
@@ -581,7 +680,7 @@ exports.rejectReturn = async (req, res) => {
     const anyReturned = statuses.some(s => s === 'returned');
 
     if (!anyReturned) {
-      // ✅ THIS fixes your DB issue
+
       await Order.updateOne(
         { _id: orderId },
         { $set: { status: 'delivered' } }
@@ -666,7 +765,6 @@ exports.getInventory = async (req, res) => {
   }
 };
 
-
 exports.updateStock = async (req, res) => {
   try {
     const { variantId } = req.params;
@@ -699,6 +797,146 @@ exports.updateStock = async (req, res) => {
       .redirect('/admin/inventory');
   }
 };
+
+exports.getRevenue = async (req, res) => {
+  try {
+    const { from, to, download } = req.query;
+
+    const dateFilter = {};
+    if (from) dateFilter.$gte = new Date(from);
+    if (to) {
+      const end = new Date(to);
+      end.setHours(23, 59, 59, 999);
+      dateFilter.$lte = end;
+    }
+
+    const query = {};
+    if (Object.keys(dateFilter).length) {
+      query.created_at = dateFilter;
+    }
+
+    const orders = await Order.find(query).lean();
+
+    let totalRevenue = 0;
+    let totalDiscount = 0;
+
+    // VALUE BUCKETS (₹)
+    let paidValue = 0;
+    let pendingValue = 0;
+    let refundedValue = 0;
+    let cancelledValue = 0;
+
+    const dailyRevenue = {};
+
+    orders.forEach(order => {
+      const isPaid = order.paymentStatus === 'paid';
+
+      order.items.forEach(item => {
+        const price = item.price;
+
+        const cancelledQty = item.cancelledQty || 0;
+        const returnedQty = item.returnedQty || 0;
+        const deliveredQty =
+          item.quantity - cancelledQty - returnedQty;
+
+        // ---- VALUE SPLIT ----
+        const deliveredValue = deliveredQty * price;
+        const cancelledValueItem = cancelledQty * price;
+        const returnedValueItem = returnedQty * price;
+
+        if (isPaid) {
+          paidValue += deliveredValue;
+          refundedValue += returnedValueItem;
+        } else {
+          pendingValue += deliveredValue;
+        }
+
+        cancelledValue += cancelledValueItem;
+
+        // ---- REVENUE TREND (ONLY DELIVERED & PAID) ----
+        if (isPaid && deliveredValue > 0) {
+          totalRevenue += deliveredValue;
+          totalDiscount += order.discount || 0;
+
+          const day = new Date(order.created_at).toLocaleDateString();
+          dailyRevenue[day] =
+            (dailyRevenue[day] || 0) + deliveredValue;
+        }
+      });
+    });
+
+    const netRevenue = totalRevenue - totalDiscount;
+
+    const totalPieValue =
+      paidValue + pendingValue + refundedValue + cancelledValue || 1;
+
+    const paymentStats = {
+      paid: ((paidValue / totalPieValue) * 100).toFixed(2),
+      pending: ((pendingValue / totalPieValue) * 100).toFixed(2),
+      refunded: ((refundedValue / totalPieValue) * 100).toFixed(2),
+      cancelled: ((cancelledValue / totalPieValue) * 100).toFixed(2)
+    };
+
+    // ===== EXCEL EXPORT (unchanged) =====
+    if (download === 'excel') {
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet('Revenue Report');
+
+      sheet.columns = [
+        { header: 'Order Number', key: 'orderNumber', width: 15 },
+        { header: 'Date', key: 'date', width: 18 },
+        { header: 'Payment Method', key: 'paymentMethod', width: 15 },
+        { header: 'Payment Status', key: 'paymentStatus', width: 15 },
+        { header: 'Subtotal', key: 'subtotal', width: 12 },
+        { header: 'Discount', key: 'discount', width: 12 },
+        { header: 'Total', key: 'total', width: 12 }
+      ];
+
+      orders.forEach(o => {
+        sheet.addRow({
+          orderNumber: o.orderNumber,
+          date: new Date(o.created_at).toDateString(),
+          paymentMethod: o.paymentMethod,
+          paymentStatus: o.paymentStatus,
+          subtotal: o.subtotal,
+          discount: o.discount,
+          total: o.total
+        });
+      });
+
+      res.setHeader(
+        'Content-Type',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      );
+      res.setHeader(
+        'Content-Disposition',
+        'attachment; filename=revenue-report.xlsx'
+      );
+
+      return workbook.xlsx.write(res);
+    }
+
+    return res.render('admin/revenue', {
+      metrics: {
+        totalRevenue,
+        totalDiscount,
+        netRevenue,
+        totalOrders: orders.length
+      },
+      paymentStats,
+      dailyRevenue,
+      from,
+      to,
+      currentPage: 'revenue'
+    });
+
+  } catch (error) {
+    console.error('GET REVENUE ERROR:', error);
+    return res.status(500).render('admin/500');
+  }
+};
+
+
 
 /* LOGOUT */
 exports.logout = (req, res) => {

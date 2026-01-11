@@ -5,11 +5,16 @@ const Address = require(__basedir +'/db/address');
 const Product = require(__basedir +'/db/productModel');
 const Category = require(__basedir +'/db/categoryModel');
 const Order = require(__basedir +'/db/orderModel');
+const Coupon = require(__basedir +'/db/couponModel')
+const Wallet = require(__basedir +'/db/walletModel');
 const Cart  = require(__basedir +'/db/cartModel')
 const Variant = require(__basedir +'/db/variantModel');
 const { sendOtpMail } = require(__basedir +'/Services/emailService')
 const { generateReferralCode } = require(__basedir +'/Services/referralService');
 const HttpStatus = require(__basedir +'/constants/httpStatus')
+const mongoose = require('mongoose');
+const Wishlist = require(__basedir + '/db/WishlistModel')
+const couponService = require(__basedir + '/services/couponService');
 
 
 // HOME PAGE
@@ -18,25 +23,23 @@ exports.getHome = (req, res) => {
 };
 
 // PROFILE PAGE
-exports.getProfile = async (req, res) => {
+exports.getProfile = async (req, res, next) => {
   try {
-    const user = req.user;
     if (!req.user) {
-  return res.redirect('/user/login');
-}
+      return res.redirect('/user/login');
+    }
+
+    const user = req.user;
 
     const defaultAddressDoc = await Address.findOne({
-      user_id: user._id,  
+      user_id: user._id,
       is_default: true
     }).lean();
 
     let defaultAddress = 'No default address set';
 
     if (defaultAddressDoc) {
-      defaultAddress =
-        `${defaultAddressDoc.building_name}, ` +
-        `${defaultAddressDoc.city}, ` +
-        `${defaultAddressDoc.state}`;
+      defaultAddress = `${defaultAddressDoc.building_name}, ${defaultAddressDoc.city}, ${defaultAddressDoc.state}`;
     }
 
     res.render('user/profile', {
@@ -44,12 +47,15 @@ exports.getProfile = async (req, res) => {
       defaultAddress,
       activePage: 'profile'
     });
+
   } catch (error) {
-  error.statusCode =
-    error.statusCode || HttpStatus.INTERNAL_SERVER_ERROR;
-  next(error);
-}
+    error.statusCode =
+      error.statusCode || HttpStatus.INTERNAL_SERVER_ERROR;
+    next(error);
+  }
 };
+
+
 exports.getEditProfile = async (req, res) => {
   res.render('user/edit-profile', {
     user: req.user,
@@ -567,8 +573,40 @@ exports.postResetPassword = async (req, res) => {
   res.redirect('/user/profile');
 };
 
-//PRODUCTS
+//WALLET
 
+exports.getWallet = async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.redirect('/user/login');
+    }
+
+    const userId = req.user._id; // ✅ FIX
+
+    let wallet = await Wallet.findOne({ user_id: userId }).lean();
+
+    if (!wallet) {
+      wallet = {
+        balance: 0,
+        transactionHistory: []
+      };
+    }
+
+    res.render('user/wallet', {
+      walletBalance: wallet.balance,
+      transactions: wallet.transactionHistory.sort(
+        (a, b) => new Date(b.date) - new Date(a.date)
+      ),
+      activePage: 'wallet'
+    });
+
+  } catch (error) {
+    console.error('GET WALLET ERROR:', error);
+    res.redirect('/user/profile');
+  }
+};
+
+//PRODUCTS
 
 exports.getProducts = async (req, res) => {
   try {
@@ -722,7 +760,7 @@ exports.getProductDetails = async (req, res) => {
 
     return res.render('user/product-details', {
       product,
-      category,
+      category, // <-- already here, used for offer
       colorMap,
       colors,
       defaultColor,
@@ -741,15 +779,13 @@ exports.getCheckout = async (req, res) => {
   try {
     const userId = req.user._id;
 
-    const cartDoc = await Cart.findOne({ user_id: userId }).lean();
-    if (!cartDoc || !cartDoc.items.length) {
-      return res.redirect('/user/cart');
-    }
+    const cart = await Cart.findOne({ user_id: userId }).lean();
+    if (!cart || !cart.items.length) return res.redirect('/user/cart');
 
     let items = [];
     let subtotal = 0;
 
-    for (const item of cartDoc.items) {
+    for (const item of cart.items) {
       const variant = await Variant.findById(item.variant_id).lean();
       if (!variant) continue;
 
@@ -759,7 +795,24 @@ exports.getCheckout = async (req, res) => {
       }).lean();
       if (!product) continue;
 
-      const itemTotal = item.quantity * item.price_snapshot;
+      // 🔹 PRICE LOGIC (ONLY ADDITION)
+      let finalPrice = item.price_snapshot;
+      let priceMessage = null;
+
+      if (
+        product.category_offer_price &&
+        product.category_offer_price < item.price_snapshot
+      ) {
+        finalPrice = product.category_offer_price;
+        priceMessage = 'Special price applied';
+      } else if (
+        product.category_offer_price &&
+        product.category_offer_price >= item.price_snapshot
+      ) {
+        priceMessage = 'You already have the best price';
+      }
+
+      const itemTotal = item.quantity * finalPrice;
       subtotal += itemTotal;
 
       items.push({
@@ -767,27 +820,51 @@ exports.getCheckout = async (req, res) => {
         image: variant.images?.[0] || 'default-product.webp',
         variant: `${variant.size} · ${variant.color}`,
         quantity: item.quantity,
-        price: item.price_snapshot,
-        itemTotal
+        itemTotal,
+        priceMessage // 🔹 passed to EJS
       });
     }
 
-    if (!items.length) {
-      return res.redirect('/user/cart');
-    }
+    if (!items.length) return res.redirect('/user/cart');
 
     const addresses = await Address.find({ user_id: userId }).lean();
-    const defaultAddress =
-      addresses.find(a => a.is_default) || addresses[0] || null;
+    const defaultAddress = addresses.find(a => a.is_default) || addresses[0];
+
+    const appliedCoupon = cart.applied_coupon || null;
+    const discount = appliedCoupon?.discount || 0;
+
+    const coupons = await Coupon.find({ status: true }).lean();
+
+    const couponList = coupons.map(c => {
+      let disabled = false;
+      let reason = '';
+
+      if (c.expiry_date < new Date()) {
+        disabled = true;
+        reason = 'Expired';
+      } else if (c.minimum_purchase > subtotal) {
+        disabled = true;
+        reason = `Min ₹${c.minimum_purchase}`;
+      } else if (c.usage_limit > 0 && c.used_count >= c.usage_limit) {
+        disabled = true;
+        reason = 'Limit reached';
+      }
+
+      return {
+        code: c.coupon_code,
+        description: c.description,
+        disabled,
+        reason
+      };
+    });
+
+    const total = Math.max(subtotal - discount, 0);
 
     res.render('user/checkout', {
       cart: { items },
-      summary: {
-        subtotal,
-        discount: 0,
-        shipping: 0,
-        total: subtotal
-      },
+      summary: { subtotal, discount, shipping: 0, total },
+      appliedCoupon,
+      coupons: couponList,
       addresses,
       defaultAddress,
       user: {
@@ -795,11 +872,62 @@ exports.getCheckout = async (req, res) => {
       }
     });
 
-  } catch (error) {
-    console.error('GET CHECKOUT ERROR:', error);
-    res.status(500).render('user/500');
+  } catch (err) {
+    console.error(err);
+    res.render('user/500');
   }
 };
+
+
+//COUPON
+
+exports.applyCoupon = async (req, res) => {
+  try {
+    const { code } = req.body;
+    const userId = req.user._id;
+
+    const cart = await Cart.findOne({ user_id: userId });
+    if (!cart) throw new Error('Cart not found');
+
+    let subtotal = cart.items.reduce(
+      (sum, i) => sum + i.quantity * i.price_snapshot,
+      0
+    );
+
+    const result = await couponService.applyCoupon({
+      code,
+      userId: userId.toString(),
+      subtotal
+    });
+
+    cart.applied_coupon = {
+      coupon_id: result.couponId,
+      coupon_code: result.couponCode,
+      discount: result.discount
+    };
+
+    await cart.save();
+
+    res.json({
+      success: true,
+      discount: result.discount
+    });
+
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};
+
+exports.removeCoupon = async (req, res) => {
+  const cart = await Cart.findOne({ user_id: req.user._id });
+  if (!cart) return res.json({ success: true });
+
+  cart.applied_coupon = null;
+  await cart.save();
+
+  res.json({ success: true });
+};
+
 
 
 exports.logout = (req, res) => {

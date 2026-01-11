@@ -4,7 +4,9 @@ const userController = require(__basedir +'/controller/user/userController');
 const addressController = require(__basedir +'/controller/user/addressController');
 const cartController = require(__basedir +'/controller/user/cartController')
 const orderController = require(__basedir +'/controller/user/orderController')
+const paymentController = require(__basedir +'/controller/user/paymentController')
 const productStatus = require(__basedir +'/middleware/checkProductActive')
+const wishlistController = require(__basedir +'/controller/user/wishlistController')
 const { verifyUser, noCache, blockIfLoggedIn } = require(__basedir +'/middleware/userMiddleware');
 const passport = require('passport');
 
@@ -60,12 +62,23 @@ router.get('/product/:id',productStatus, userController.getProductDetails)
 router.get('/cart',verifyUser, cartController.getCartPage)
 router.post('/cart/add', verifyUser, cartController.addToCart);
 router.patch('/cart/item/:cartItemId',verifyUser,cartController.updateCartQuantity);
-
 router.delete('/cart/item/:cartItemId',verifyUser,cartController.removeCartItem);
+router.post('/wishlist/add-from-cart',verifyUser,cartController.addToWishlistFromCart)
+
+//Wishlist
+router.get('/wishlist',verifyUser,wishlistController.getWishlistPage)
+router.post('/wishlist/add',verifyUser,wishlistController.addToWishlist)
+router.post('/wishlist/move-to-cart',verifyUser,wishlistController.moveToCart)
+router.delete('/wishlist/remove',verifyUser,wishlistController.removeFromWishlist)
 
 //checkuot
 router.get('/checkout',verifyUser,userController.getCheckout)
-router.post('/checkout/pay', verifyUser, orderController.placeOrderCOD);
+
+router.post('/checkout/pay', verifyUser, paymentController.placeOrderCOD);
+router.post('/checkout/pay-wallet', verifyUser, paymentController.placeOrderWallet);
+router.post('/checkout/stripe/create-session',verifyUser,paymentController.createStripeSession);
+router.get('/checkout/stripe/success',verifyUser,paymentController.stripeSuccess);
+router.get('/checkout/stripe/cancel',verifyUser,paymentController.stripeCancel);
 
 //ORDER
 router.get('/orders/:orderNumber/success', verifyUser, orderController.orderSuccessPage);
@@ -74,8 +87,15 @@ router.get('/orders/:orderNumber/invoice',verifyUser,orderController.downloadInv
 router.get('/orders',verifyUser, orderController.getOrders)
 router.get('/orders/:orderNumber',verifyUser,orderController.getOrderDetails);
 router.get('/orders/:orderNumber/cancel',verifyUser,orderController.getCancelOrder);
-router.post('/orders/:orderNumber/cancel',verifyUser, orderController.postCancelOrder)//
+router.post('/orders/:orderNumber/cancel',verifyUser, orderController.postCancelOrder)
 
+//COUPON
+router.post('/coupon/apply',verifyUser,userController.applyCoupon);
+router.delete('/coupon/remove',verifyUser,userController.removeCoupon);
+
+//WALLET
+
+router.get('/wallet',verifyUser,userController.getWallet)
 
 router.get('/logout',userController.logout)
 
