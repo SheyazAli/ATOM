@@ -69,7 +69,7 @@ router.post('/wishlist/add-from-cart',verifyUser,cartController.addToWishlistFro
 router.get('/wishlist',verifyUser,wishlistController.getWishlistPage)
 router.post('/wishlist/add',verifyUser,wishlistController.addToWishlist)
 router.post('/wishlist/move-to-cart',verifyUser,wishlistController.moveToCart)
-router.delete('//wishlist/remove',verifyUser,wishlistController.removeFromWishlist)
+router.delete('/wishlist/remove',verifyUser,wishlistController.removeFromWishlist)
 
 //checkuot
 router.get('/checkout',verifyUser,userController.getCheckout)

@@ -22,6 +22,29 @@
       object-fit: cover;
       cursor: zoom-in;
     }
+    /* CATEGORY OFFER MARQUEE */
+  .offer-marquee {
+    overflow: hidden;
+    white-space: nowrap;
+    position: relative;
+    background: #f0fff4;
+    padding: 6px 0;
+    margin-bottom: 12px;
+  }
+
+  .offer-text {
+    display: inline-block;
+    padding-left: 100%;
+    animation: marquee 12s linear infinite;
+    font-size: 12px;
+    color: #16a34a;
+    font-weight: 500;
+  }
+
+  @keyframes marquee {
+    from { transform: translateX(0); }
+    to { transform: translateX(-100%); }
+  }
 
     .thumb {
       width: 90px;
@@ -79,6 +102,17 @@
 <%- include('./userPartials/navbar') %>
 
 <div class="container py-4">
+  <% if (category && category.hasOffer && category.offer && category.offer.active) { %>
+  <div class="offer-marquee">
+    <div class="offer-text">
+      GET <%= category.offer.discount_value %>
+      <%= category.offer.discount_type.toUpperCase() %>
+      OFF ON ALL PRODUCTS AT THIS CATEGORY.
+      YOU CAN CLAIM THIS AT CHECKOUT. t&c applied*
+    </div>
+  </div>
+<% } %>
+
 
   <!-- BREADCRUMB -->
   <nav class="breadcrumb mb-4">

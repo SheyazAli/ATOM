@@ -93,10 +93,11 @@
                  class="text-danger text-decoration-none">
                 Remove
               </a>
-              <a 
-              href="/user/product/<%= item.product_id %>" class="text-success text-decoration-none"> 
-                View Product 
-            </a>
+
+              <a href="/user/product/<%= item.product_id %>"
+                 class="text-success text-decoration-none">
+                View Product
+              </a>
             </div>
           </div>
         </div>
@@ -106,41 +107,71 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
 <script>
 function moveToCart(id) {
   fetch('/user/wishlist/move-to-cart', {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({ wishlistItemId:id })
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ wishlistItemId: id })
   })
   .then(res => res.json())
   .then(data => {
     if (data.success) {
       location.href = '/user/cart';
     } else {
-      alert(data.error || 'Failed to move to cart');
+      Swal.fire('Error', data.error || 'Failed to move to cart', 'error');
     }
   })
-  .catch(() => alert('Server error'));
+  .catch(() => Swal.fire('Error', 'Server error', 'error'));
 }
 
 function removeFromWishlist(id) {
-  if (!confirm('Remove this item from wishlist?')) return;
+  Swal.fire({
+    title: 'Remove item?',
+    text: 'This item will be removed from your wishlist',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#dc3545',
+    cancelButtonColor: '#6c757d',
+    confirmButtonText: 'Yes, remove'
+  }).then(async result => {
+    if (!result.isConfirmed) return;
 
-  fetch('/user/wishlist/remove', {
-    method:'DELETE',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({ wishlistItemId:id })
-  })
-  .then(res => res.json())
-  .then(data => {
-    if (data.success) {
-      location.reload();
-    } else {
-      alert(data.error || 'Failed to remove');
+    try {
+      const res = await fetch('/user/wishlist/remove', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ wishlistItemId: id })
+      });
+
+      const data = await res.json();
+
+      if (!data.success) {
+        return Swal.fire(
+          'Failed',
+          data.error || 'Unable to remove item',
+          'error'
+        );
+      }
+
+      Swal.fire({
+        icon: 'success',
+        title: 'Removed',
+        text: 'Item removed from wishlist',
+        timer: 1200,
+        showConfirmButton: false
+      }).then(() => location.reload());
+
+    } catch (error) {
+      Swal.fire('Error', 'Server error', 'error');
     }
   });
 }
 </script>
+
 
 <%- include('./userPartials/footer') %>

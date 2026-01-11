@@ -18,9 +18,7 @@ const path = require('path');
 const { processRefund } = require(__basedir +'/services/refundService');
 
 
-/* SHOW LOGIN */
 exports.getLogin = (req, res) => {
-  // If already logged in → redirect
   if (req.cookies.adminToken) {
     return res.redirect('/admin/user');
   }
@@ -28,7 +26,6 @@ exports.getLogin = (req, res) => {
   res.render('admin/login');
 };
 
-/* HANDLE LOGIN */
 exports.postLogin = async (req, res) => {
   const { email, password } = req.body;
 
@@ -83,6 +80,7 @@ exports.getCategories = async (req, res) => {
     const limit = 8;
     const skip = (page - 1) * limit;
     const search = req.query.search || '';
+
     const query = {
       name: { $regex: search, $options: 'i' }
     };
@@ -97,6 +95,11 @@ exports.getCategories = async (req, res) => {
       category.productCount = await Product.countDocuments({
         category_id: category.category_id
       });
+
+      category.offerActive =
+        category.hasOffer &&
+        category.offer &&
+        category.offer.active === true;
     }
 
     const totalCategories = await Category.countDocuments(query);
@@ -112,58 +115,135 @@ exports.getCategories = async (req, res) => {
 
   } catch (error) {
     console.error('GET CATEGORIES ERROR:', error);
-    return res.redirect('/admin');
+    return res.redirect('/admin/revenue');
   }
 };
+
 exports.getEditCategory = async (req, res) => {
-  const { categoryId } = req.params;
+  try {
+    const { categoryId } = req.params;
 
-  const category = categoryId
-    ? await Category.findOne({ category_id: categoryId }).lean()
-    : null;
-
-  res.render('admin/edit-category', {
-    category,
-    error: null,
-    currentPage: 'categories'
-  });
-};
-exports.saveCategory = async (req, res) => {
-  const { name } = req.body;
-  const { categoryId } = req.params;
-
-  // Normalize name
-  const trimmedName = name.trim();
-
-  // Check duplicate (exclude self in edit)
-  const duplicate = await Category.findOne({
-    name: { $regex: `^${trimmedName}$`, $options: 'i' },
-    ...(categoryId && { category_id: { $ne: categoryId } })
-  });
-
-  if (duplicate) {
     const category = categoryId
       ? await Category.findOne({ category_id: categoryId }).lean()
       : null;
 
     return res.render('admin/edit-category', {
       category,
-      error: 'Category name already exists',
+      error: null,
+      currentPage: 'categories'
+    });
+
+  } catch (error) {
+    console.error('GET EDIT CATEGORY ERROR:', error);
+    return res.redirect('/admin/categories');
+  }
+};
+
+exports.saveCategory = async (req, res) => {
+  try {
+    const { name } = req.body;
+    const { categoryId } = req.params;
+
+    const trimmedName = name.trim();
+
+    // ---------- DUPLICATE CHECK ----------
+    const duplicate = await Category.findOne({
+      name: { $regex: `^${trimmedName}$`, $options: 'i' },
+      ...(categoryId && { category_id: { $ne: categoryId } })
+    });
+
+    if (duplicate) {
+      const category = categoryId
+        ? await Category.findOne({ category_id: categoryId }).lean()
+        : null;
+
+      return res.render('admin/edit-category', {
+        category,
+        error: 'Category name already exists',
+        currentPage: 'categories'
+      });
+    }
+
+    // ---------- OFFER DATA ----------
+    const hasOffer = req.body.hasOffer === 'on';
+    let offerData = null;
+
+    if (hasOffer) {
+      offerData = {
+        discount_type: req.body.discount_type,
+        discount_value: Number(req.body.discount_value) || 0,
+        minimum_purchase: Number(req.body.minimum_purchase) || 0,
+        maximum_discount: Number(req.body.maximum_discount) || 0,
+        expiry_date: req.body.expiry_date
+          ? new Date(req.body.expiry_date)
+          : null,
+        active: req.body.offer_active === 'on'
+      };
+    }
+
+    // ---------- SAVE CATEGORY ----------
+    let category;
+
+    if (categoryId) {
+      category = await Category.findOneAndUpdate(
+        { category_id: categoryId },
+        { name: trimmedName, hasOffer, offer: offerData },
+        { new: true }
+      );
+    } else {
+      category = await Category.create({
+        name: trimmedName,
+        hasOffer,
+        offer: offerData
+      });
+    }
+
+    // ---------- UPDATE PRODUCTS ----------
+    const products = await Product.find({
+      category_id: category.category_id,
+      status: true
+    });
+
+    for (const product of products) {
+      let categoryOfferPrice = 0;
+
+      // 🟢 APPLY / UPDATE CATEGORY OFFER
+      if (hasOffer && offerData?.active) {
+        if (offerData.discount_type === 'percentage') {
+          categoryOfferPrice =
+            product.regular_price -
+            (product.regular_price * offerData.discount_value) / 100;
+        }
+
+        if (offerData.discount_type === 'flat') {
+          categoryOfferPrice =
+            product.regular_price - offerData.discount_value;
+        }
+
+        categoryOfferPrice = Math.max(0, Math.round(categoryOfferPrice));
+      }
+
+      // 🔴 REMOVE OFFER → RESET TO 0
+      product.category_offer_price = categoryOfferPrice;
+
+      // ❗ DO NOT TOUCH sale_price
+      await product.save();
+    }
+
+    return res.redirect('/admin/categories');
+
+  } catch (error) {
+    console.error('SAVE CATEGORY ERROR:', error);
+
+    return res.render('admin/edit-category', {
+      category: req.body,
+      error: 'Something went wrong',
       currentPage: 'categories'
     });
   }
-
-  if (categoryId) {
-    await Category.findOneAndUpdate(
-      { category_id: categoryId },
-      { name: trimmedName }
-    );
-  } else {
-    await Category.create({ name: trimmedName });
-  }
-
-  res.redirect('/admin/categories');
 };
+
+
 exports.deleteCategory = async (req, res) => {
   try {
     const { categoryId } = req.params;
@@ -428,7 +508,6 @@ exports.postUpdateOrderDetails = async (req, res) => {
         .json({ success: false });
     }
 
-    // CONFIRMED / SHIPPED / DELIVERED
     if (['confirmed', 'shipped', 'delivered'].includes(status)) {
       order.status = status;
 
@@ -438,13 +517,13 @@ exports.postUpdateOrderDetails = async (req, res) => {
         }
       });
 
-      // 🔥 IMPORTANT: Mark payment as PAID when delivered (COD case)
+
       if (status === 'delivered') {
         order.paymentStatus = 'paid';
       }
     }
 
-    // CANCELLED
+ 
     if (status === 'cancelled') {
       order.status = 'cancelled';
 
@@ -584,7 +663,6 @@ exports.rejectReturn = async (req, res) => {
       return res.redirect('/admin/returns');
     }
 
-    /* ================= UPDATE ITEM ================= */
     await Order.updateOne(
       { _id: orderId, 'items.variant_id': variantId },
       {
@@ -596,7 +674,6 @@ exports.rejectReturn = async (req, res) => {
       }
     );
 
-    /* ================= RECALCULATE ORDER STATUS ================= */
     const order = await Order.findById(orderId).lean();
     if (!order) return res.redirect('/admin/returns');
 
@@ -605,7 +682,7 @@ exports.rejectReturn = async (req, res) => {
     const anyReturned = statuses.some(s => s === 'returned');
 
     if (!anyReturned) {
-      // ✅ THIS fixes your DB issue
+
       await Order.updateOne(
         { _id: orderId },
         { $set: { status: 'delivered' } }

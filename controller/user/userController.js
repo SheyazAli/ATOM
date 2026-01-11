@@ -760,7 +760,7 @@ exports.getProductDetails = async (req, res) => {
 
     return res.render('user/product-details', {
       product,
-      category,
+      category, // <-- already here, used for offer
       colorMap,
       colors,
       defaultColor,
@@ -773,6 +773,7 @@ exports.getProductDetails = async (req, res) => {
     return res.redirect('/user/products');
   }
 };
+
 
 exports.getCheckout = async (req, res) => {
   try {
@@ -794,7 +795,24 @@ exports.getCheckout = async (req, res) => {
       }).lean();
       if (!product) continue;
 
-      const itemTotal = item.quantity * item.price_snapshot;
+      // 🔹 PRICE LOGIC (ONLY ADDITION)
+      let finalPrice = item.price_snapshot;
+      let priceMessage = null;
+
+      if (
+        product.category_offer_price &&
+        product.category_offer_price < item.price_snapshot
+      ) {
+        finalPrice = product.category_offer_price;
+        priceMessage = 'Special price applied';
+      } else if (
+        product.category_offer_price &&
+        product.category_offer_price >= item.price_snapshot
+      ) {
+        priceMessage = 'You already have the best price';
+      }
+
+      const itemTotal = item.quantity * finalPrice;
       subtotal += itemTotal;
 
       items.push({
@@ -802,7 +820,8 @@ exports.getCheckout = async (req, res) => {
         image: variant.images?.[0] || 'default-product.webp',
         variant: `${variant.size} · ${variant.color}`,
         quantity: item.quantity,
-        itemTotal
+        itemTotal,
+        priceMessage // 🔹 passed to EJS
       });
     }
 
@@ -859,6 +878,7 @@ exports.getCheckout = async (req, res) => {
   }
 };
 
+
 //COUPON
 
 exports.applyCoupon = async (req, res) => {
@@ -907,6 +927,7 @@ exports.removeCoupon = async (req, res) => {
 
   res.json({ success: true });
 };
+
 
 
 exports.logout = (req, res) => {

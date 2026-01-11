@@ -1,6 +1,6 @@
 const Stripe = require('stripe');
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-
+const Product = require(__basedir +'/db/productModel');
 const Address = require(__basedir + '/db/address');
 const Cart = require(__basedir + '/db/cartModel');
 const Coupon = require(__basedir + '/db/couponModel');
@@ -9,9 +9,7 @@ const Variant = require(__basedir + '/db/variantModel');
 const HttpStatus = require(__basedir + '/constants/httpStatus');
 const { generateOrderNumber } = require(__basedir + '/Services/orderNumberService');
 
-/* =======================
-   ORDER CREATION HELPER
-======================= */
+
 async function createOrderWithRetry(orderData, retries = 5) {
   for (let i = 0; i < retries; i++) {
     try {
@@ -25,9 +23,7 @@ async function createOrderWithRetry(orderData, retries = 5) {
   throw new Error('FAILED_TO_GENERATE_ORDER_NUMBER');
 }
 
-/* =======================
-   COD ORDER
-======================= */
+
 exports.placeOrderCOD = async (req, res) => {
   try {
     const userId = req.user._id;
@@ -35,12 +31,16 @@ exports.placeOrderCOD = async (req, res) => {
 
     const cart = await Cart.findOne({ user_id: userId });
     if (!cart || !cart.items.length) {
-      return res.status(HttpStatus.BAD_REQUEST).json({ error: 'CART_EMPTY' });
+      return res
+        .status(HttpStatus.BAD_REQUEST)
+        .json({ error: 'CART_EMPTY' });
     }
 
     const address = await Address.findOne({ user_id: userId, address_id }).lean();
     if (!address) {
-      return res.status(HttpStatus.BAD_REQUEST).json({ error: 'INVALID_ADDRESS' });
+      return res
+        .status(HttpStatus.BAD_REQUEST)
+        .json({ error: 'INVALID_ADDRESS' });
     }
 
     let subtotal = 0;
@@ -49,14 +49,31 @@ exports.placeOrderCOD = async (req, res) => {
     for (const item of cart.items) {
       const variant = await Variant.findById(item.variant_id);
       if (!variant || variant.stock < item.quantity) {
-        return res.status(HttpStatus.BAD_REQUEST).json({ error: 'STOCK_ISSUE' });
+        return res
+          .status(HttpStatus.BAD_REQUEST)
+          .json({ error: 'STOCK_ISSUE' });
       }
 
-      subtotal += item.price_snapshot * item.quantity;
+      const product = await Product.findOne({
+        product_id: variant.product_id,
+        status: true
+      }).lean();
+
+      // ✅ FINAL PRICE DECISION
+      let finalPrice = item.price_snapshot;
+
+      if (
+        product?.category_offer_price > 0 &&
+        product.category_offer_price < item.price_snapshot
+      ) {
+        finalPrice = product.category_offer_price;
+      }
+
+      subtotal += finalPrice * item.quantity;
 
       items.push({
         variant_id: variant._id,
-        price: item.price_snapshot,
+        price: finalPrice,
         quantity: item.quantity,
         status: 'placed'
       });
@@ -83,29 +100,21 @@ exports.placeOrderCOD = async (req, res) => {
       status: 'placed'
     });
 
-    if (cart.applied_coupon?.coupon_id) {
-      await Coupon.updateOne(
-        { _id: cart.applied_coupon.coupon_id },
-        { $addToSet: { user_ids: userId } }
-      );
-    }
-
     cart.items = [];
     cart.applied_coupon = null;
     await cart.save();
 
     res.redirect(`/user/orders/${order.orderNumber}/success`);
+
   } catch (err) {
-  console.error('COD ERROR:', err);
-  res
-    .status(HttpStatus.INTERNAL_SERVER_ERROR)
-    .render('user/500');
-}
+    console.error('COD ERROR:', err);
+    res
+      .status(HttpStatus.INTERNAL_SERVER_ERROR)
+      .render('user/500');
+  }
 };
 
-/* =======================
-   STRIPE SESSION
-======================= */
+
 exports.createStripeSession = async (req, res) => {
   const userId = req.user._id;
   const { address_id } = req.body;
@@ -143,9 +152,7 @@ exports.createStripeSession = async (req, res) => {
   res.json({ url: session.url });
 };
 
-/* =======================
-   STRIPE SUCCESS
-======================= */
+
 exports.stripeSuccess = async (req, res) => {
   try {
     const session = await stripe.checkout.sessions.retrieve(req.query.session_id);
@@ -177,11 +184,26 @@ exports.stripeSuccess = async (req, res) => {
     for (const item of cart.items) {
       const variant = await Variant.findById(item.variant_id);
 
-      subtotal += item.price_snapshot * item.quantity;
+      const product = await Product.findOne({
+        product_id: variant.product_id,
+        status: true
+      }).lean();
+
+      // ✅ FINAL PRICE DECISION
+      let finalPrice = item.price_snapshot;
+
+      if (
+        product?.category_offer_price > 0 &&
+        product.category_offer_price < item.price_snapshot
+      ) {
+        finalPrice = product.category_offer_price;
+      }
+
+      subtotal += finalPrice * item.quantity;
 
       items.push({
         variant_id: variant._id,
-        price: item.price_snapshot,
+        price: finalPrice,
         quantity: item.quantity,
         status: 'placed'
       });
@@ -222,11 +244,11 @@ exports.stripeSuccess = async (req, res) => {
 
     res.redirect(`/user/orders/${order.orderNumber}/success`);
   } catch (err) {
-  console.error('STRIPE SUCCESS ERROR:', err);
-  res
-    .status(HttpStatus.INTERNAL_SERVER_ERROR)
-    .render('user/500');
-}
+    console.error('STRIPE SUCCESS ERROR:', err);
+    res
+      .status(HttpStatus.INTERNAL_SERVER_ERROR)
+      .render('user/500');
+  }
 };
 
 exports.stripeCancel = async (req, res) => {

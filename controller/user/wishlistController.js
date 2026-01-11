@@ -193,32 +193,41 @@ exports.removeFromWishlist = async (req, res) => {
     if (!wishlistItemId) {
       return res
         .status(HttpStatus.BAD_REQUEST)
-        .json({ error: 'Invalid request' });
+        .json({ success: false, error: 'Invalid request' });
     }
 
     const wishlist = await Wishlist.findOne({ user_id: userId });
     if (!wishlist) {
       return res
         .status(HttpStatus.NOT_FOUND)
-        .json({ error: 'Wishlist not found' });
+        .json({ success: false, error: 'Wishlist not found' });
     }
 
-    const item = wishlist.items.id(wishlistItemId);
-    if (!item) {
+    const exists = wishlist.items.some(
+      item => item._id.toString() === wishlistItemId
+    );
+
+    if (!exists) {
       return res
         .status(HttpStatus.NOT_FOUND)
-        .json({ error: 'Item not found' });
+        .json({ success: false, error: 'Item not found' });
     }
 
-    item.remove();
+    wishlist.items = wishlist.items.filter(
+      item => item._id.toString() !== wishlistItemId
+    );
+
     await wishlist.save();
 
-    res.status(HttpStatus.OK).json({ success: true });
+    return res
+      .status(HttpStatus.OK)
+      .json({ success: true });
 
   } catch (error) {
     console.error('REMOVE WISHLIST ERROR:', error);
-    res
+
+    return res
       .status(HttpStatus.INTERNAL_SERVER_ERROR)
-      .json({ error: 'Server error' });
+      .json({ success: false, error: 'Server error' });
   }
 };

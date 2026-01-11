@@ -11,8 +11,6 @@
     font-size:14px;
   }
 
-  .promo-card span { color:#28a745; font-weight:600; }
-
   .account-menu a {
     display:flex;
     justify-content:space-between;
@@ -72,18 +70,9 @@
     top:20px;
   }
 
-  .coupon-box {
-    display:flex;
-    gap:8px;
-    margin-bottom:16px;
-  }
-
-  .coupon-box input {
-    flex:1;
-    font-size:14px;
-    padding:8px 10px;
-    border-radius:6px;
-    border:1px solid #ddd;
+  .related-card img {
+    aspect-ratio:5/7;
+    object-fit:cover;
   }
 </style>
 
@@ -93,9 +82,8 @@
     <!-- SIDEBAR -->
     <div class="col-lg-3 col-md-4">
       <div class="promo-card mb-4">
-        <div>USE CODE</div>
-        <div class="fw-semibold">ATOM10</div>
-        <div class="mt-2">& GET UP TO <span>10% OFF</span></div>
+        <div class="fw-semibold">Fast & Secure Checkout</div>
+        <div class="small mt-2">Apply coupons at checkout</div>
       </div>
 
       <div class="account-menu">
@@ -160,13 +148,6 @@
     <!-- ORDER SUMMARY -->
     <div class="col-lg-3">
       <div class="summary-box">
-
-        <!-- COUPON -->
-        <div class="coupon-box">
-          <input id="couponInput" type="text" placeholder="Enter coupon code">
-          <button class="btn btn-outline-dark" onclick="applyCoupon()">Apply</button>
-        </div>
-
         <h6 class="fw-semibold">Order Summary</h6>
 
         <div class="d-flex justify-content-between mb-2">
@@ -179,11 +160,6 @@
           <span class="text-success">FREE</span>
         </div>
 
-        <div class="d-flex justify-content-between mb-2">
-          <span>Coupon Discount</span>
-          <span id="discount">₹ 0</span>
-        </div>
-
         <hr>
 
         <div class="d-flex justify-content-between mb-3">
@@ -194,53 +170,43 @@
         <a href="/user/checkout" class="btn btn-dark w-100">
           Proceed to Checkout
         </a>
-
       </div>
     </div>
 
   </div>
 
   <!-- RELATED PRODUCTS -->
-  <div class="mt-5">
-    <h4 class="fw-semibold mb-4">You may also like</h4>
-    <div class="row g-4">
-      <% relatedProducts.forEach(p => { %>
-        <div class="col-lg-3 col-md-4 col-sm-6">
-          <a href="/user/product/<%= p.product_id %>" class="text-decoration-none text-dark">
-            <div class="card h-100 shadow-sm related-card">
-              <img src="/uploads/<%= p.thumbnail %>" class="card-img-top">
-              <div class="card-body">
-                <h6><%= p.title %></h6>
-                <span class="fw-semibold text-success">₹ <%= p.sale_price %></span>
-                <div class="text-muted small"><%= p.colorsCount %> colors</div>
+  <% if (relatedProducts && relatedProducts.length) { %>
+    <div class="mt-5">
+      <h4 class="fw-semibold mb-4">You may also like</h4>
+      <div class="row g-4">
+        <% relatedProducts.forEach(p => { %>
+          <div class="col-lg-3 col-md-4 col-sm-6">
+            <a href="/user/product/<%= p.product_id %>"
+               class="text-decoration-none text-dark">
+              <div class="card h-100 shadow-sm related-card">
+                <img src="/uploads/<%= p.thumbnail %>" class="card-img-top">
+                <div class="card-body">
+                  <h6><%= p.title %></h6>
+                  <span class="fw-semibold text-success">
+                    ₹ <%= p.sale_price %>
+                  </span>
+                  <div class="text-muted small">
+                    <%= p.colorsCount %> colors
+                  </div>
+                </div>
               </div>
-            </div>
-          </a>
-        </div>
-      <% }) %>
+            </a>
+          </div>
+        <% }) %>
+      </div>
     </div>
-  </div>
+  <% } %>
 
 </div>
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
 
 <script>
 let cartState = [];
-let couponDiscount = <%= appliedCoupon?.discount || 0 %>;
-let appliedCouponCode = "<%= appliedCoupon?.coupon_code || '' %>";
-
-/* QTY BUTTON HANDLER */
-document.addEventListener('click', e => {
-  const btn = e.target.closest('.qty-btn');
-  if (!btn) return;
-
-  const card = btn.closest('.cart-card');
-  const delta = Number(btn.dataset.delta);
-  if (!card || !delta) return;
-
-  changeQty(card, delta);
-});
 
 /* INIT */
 document.addEventListener('DOMContentLoaded', () => {
@@ -254,24 +220,20 @@ document.addEventListener('DOMContentLoaded', () => {
     syncButtons(card);
   });
 
-
-  if (appliedCouponCode) {
-    document.querySelector('.coupon-box').innerHTML = `
-      <div class="d-flex justify-content-between w-100 align-items-center">
-        <span class="fw-semibold text-success">
-          Coupon Applied: ${appliedCouponCode}
-        </span>
-        <button class="btn btn-sm btn-outline-danger"
-          onclick="removeCouponUI(true)">
-          Remove
-        </button>
-      </div>
-    `;
-  }
-
   renderSummary();
 });
 
+/* QTY HANDLER */
+document.addEventListener('click', e => {
+  const btn = e.target.closest('.qty-btn');
+  if (!btn) return;
+
+  const card = btn.closest('.cart-card');
+  const delta = Number(btn.dataset.delta);
+  if (!card || !delta) return;
+
+  changeQty(card, delta);
+});
 
 async function changeQty(card, delta) {
   const item = cartState.find(i => i.id === card.dataset.cartId);
@@ -281,9 +243,9 @@ async function changeQty(card, delta) {
   if (newQty < 1 || newQty > item.stock) return;
 
   const res = await fetch(`/user/cart/item/${item.id}`, {
-    method:'PATCH',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({ delta })
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ delta })
   });
 
   const data = await res.json();
@@ -292,11 +254,6 @@ async function changeQty(card, delta) {
   item.qty = data.newQty;
   card.querySelector('.qty').innerText = data.newQty;
   syncButtons(card);
-
-  if (appliedCouponCode) {
-    await removeCouponUI(false);
-  }
-
   renderSummary();
 }
 
@@ -306,44 +263,8 @@ function calculateSubtotal() {
 
 function renderSummary() {
   const subtotal = calculateSubtotal();
-  const total = subtotal - couponDiscount;
-
   document.getElementById('subtotal').innerText = `₹ ${subtotal}`;
-  document.getElementById('discount').innerText = `₹ ${couponDiscount}`;
-  document.getElementById('grandTotal').innerText = `₹ ${total}`;
-}
-
-
-async function applyCoupon() {
-  const code = document.getElementById('couponInput').value.trim().toUpperCase();
-  if (!code) {
-    Swal.fire('Coupon required', 'Please enter a coupon code', 'warning');
-    return;
-  }
-
-  const subtotal = calculateSubtotal();
-
-  const res = await fetch('/user/coupon/apply', {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({ code, subtotal })
-  });
-
-  const data = await res.json();
-  if (!data.success) {
-    Swal.fire('Coupon Error', data.error, 'error');
-    return;
-  }
-
-  couponDiscount = data.coupon.discount;
-  appliedCouponCode = data.coupon.couponCode;
-
-  location.reload(); 
-}
-
-async function removeCouponUI(showAlert = true) {
-  await fetch('/user/coupon/remove', { method:'DELETE' });
-  location.reload();
+  document.getElementById('grandTotal').innerText = `₹ ${subtotal}`;
 }
 
 function syncButtons(card) {
@@ -351,7 +272,36 @@ function syncButtons(card) {
   card.querySelector('.minus').disabled = item.qty <= 1;
   card.querySelector('.plus').disabled  = item.qty >= item.stock;
 }
-</script>
 
+/* REMOVE ITEM */
+async function removeItem(cartItemId) {
+  const res = await fetch(`/user/cart/item/${cartItemId}`, {
+    method: 'DELETE'
+  });
+
+  const data = await res.json();
+  if (!data.success) {
+    return alert(data.error || 'Failed to remove item');
+  }
+
+  location.reload();
+}
+
+/* MOVE TO WISHLIST */
+async function addToWishlistFromCart(cartItemId) {
+  const res = await fetch('/user/wishlist/add-from-cart', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ cartItemId })
+  });
+
+  const data = await res.json();
+  if (!data.success) {
+    return alert(data.error || 'Failed to move to wishlist');
+  }
+
+  location.reload();
+}
+</script>
 
 <%- include('./userPartials/footer') %>
