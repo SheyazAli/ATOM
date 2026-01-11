@@ -14,7 +14,7 @@ const walletTransactionSchema = new mongoose.Schema(
 
     payment_method: {
       type: String,
-      enum: ['cod', 'stripe', 'wallet', 'refund', 'admin'],
+      enum: ['cod', 'stripe', 'wallet', 'refund', 'admin', 'referral', 'purchase'],
       required: true
     },
 
@@ -38,7 +38,7 @@ const walletSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true,
-      unique: true // 🔒 One-to-One with user
+      unique: true 
     },
 
     balance: {

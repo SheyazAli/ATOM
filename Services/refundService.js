@@ -2,10 +2,10 @@ const Wallet = require(__basedir +'/db/walletModel');
 /**
  * Refund for cancelled / returned items
  * @param {Object} params
- * @param {Object} params.order - Order document
- * @param {Object} params.item - Order item
- * @param {Number} params.refundQty - Quantity being refunded
- * @param {String} params.reason - refund | cancel
+ * @param {Object} params.order 
+ * @param {Object} params.item 
+ * @param {Number} params.refundQty 
+ * @param {String} params.reason 
  */
 exports.processRefund = async ({
   order,
@@ -13,10 +13,8 @@ exports.processRefund = async ({
   refundQty,
   reason = 'refund'
 }) => {
-  // Base refund
-  let refundAmount = refundQty * item.price;
 
-  // Coupon / discount adjustment
+  let refundAmount = refundQty * item.price;
   if (order.discount && order.discount > 0) {
     const totalQty = order.items.reduce(
       (sum, i) => sum + i.quantity,
@@ -32,7 +30,6 @@ exports.processRefund = async ({
 
   refundAmount = Math.max(0, Number(refundAmount.toFixed(2)));
 
-  // Only refund if already paid
   if (order.paymentStatus !== 'paid' || refundAmount <= 0) {
     return 0;
   }

@@ -536,6 +536,10 @@ exports.postCancelOrder = async (req, res) => {
 
     const isReturn = order.status === 'delivered';
 
+    const allowDirectRefund =
+      order.paymentStatus === 'paid' &&
+      ['placed', 'confirmed', 'shipped'].includes(order.status);
+
     for (const variantId of items) {
       const qty = Number(req.body[`qty_${variantId}`]);
       const message = req.body[`message_${variantId}`];
@@ -545,12 +549,12 @@ exports.postCancelOrder = async (req, res) => {
       );
 
       if (!item || qty <= 0) continue;
-
       if (isReturn) {
         item.returnedQty += qty;
         item.status = 'returned';
         item.returnStatus = 'pending';
-      } else {
+      }
+      else {
         item.cancelledQty += qty;
         item.status = 'cancelled';
 
@@ -558,12 +562,14 @@ exports.postCancelOrder = async (req, res) => {
           variantId,
           { $inc: { stock: qty } }
         );
-        await processRefund({
-          order,
-          item,
-          refundQty: qty,
-          reason: 'refund'
-        });
+        if (allowDirectRefund) {
+          await processRefund({
+            order,
+            item,
+            refundQty: qty,
+            reason: 'refund'
+          });
+        }
       }
 
       item.message = message || null;

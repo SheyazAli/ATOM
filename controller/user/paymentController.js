@@ -1,13 +1,16 @@
 const Stripe = require('stripe');
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const Product = require(__basedir +'/db/productModel');
+const User = require(__basedir +'/db/user');
 const Address = require(__basedir + '/db/address');
+const Wallet = require(__basedir + '/db/walletModel');
 const Cart = require(__basedir + '/db/cartModel');
 const Coupon = require(__basedir + '/db/couponModel');
 const Order = require(__basedir + '/db/orderModel');
 const Variant = require(__basedir + '/db/variantModel');
 const HttpStatus = require(__basedir + '/constants/httpStatus');
 const { generateOrderNumber } = require(__basedir + '/Services/orderNumberService');
+
 
 
 async function createOrderWithRetry(orderData, retries = 5) {
@@ -114,6 +117,102 @@ exports.placeOrderCOD = async (req, res) => {
   }
 };
 
+exports.placeOrderWallet = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { address_id } = req.body;
+
+    const cart = await Cart.findOne({ user_id: userId });
+    if (!cart || !cart.items.length) {
+      return res.json({ success: false });
+    }
+
+    const address = await Address.findOne({ user_id: userId, address_id }).lean();
+
+    const wallet = await Wallet.findOne({ user_id: userId });
+    if (!wallet) {
+      return res.json({ success: false });
+    }
+
+    let subtotal = 0;
+    const items = [];
+
+    for (const item of cart.items) {
+      const variant = await Variant.findById(item.variant_id);
+      if (!variant || variant.stock < item.quantity) {
+        return res.json({ success: false });
+      }
+
+      const product = await Product.findOne({
+        product_id: variant.product_id,
+        status: true
+      }).lean();
+
+      let finalPrice = item.price_snapshot;
+
+      if (
+        product?.category_offer_price > 0 &&
+        product.category_offer_price < item.price_snapshot
+      ) {
+        finalPrice = product.category_offer_price;
+      }
+
+      subtotal += finalPrice * item.quantity;
+
+      items.push({
+        variant_id: variant._id,
+        price: finalPrice,
+        quantity: item.quantity,
+        status: 'placed'
+      });
+
+      await Variant.findByIdAndUpdate(
+        variant._id,
+        { $inc: { stock: -item.quantity } }
+      );
+    }
+    if (wallet.balance < subtotal) {
+      return res.json({ success: false });
+    }
+    const order = await createOrderWithRetry({
+      user_id: userId,
+      paymentMethod: 'wallet',
+      paymentStatus: 'paid',
+      address,
+      items,
+      subtotal,
+      discount: 0,
+      coupon: null,
+      shipping: 0,
+      total: subtotal,
+      status: 'placed'
+    });
+
+    wallet.balance -= subtotal;
+
+    wallet.transactionHistory.push({
+      amount: subtotal,
+      transaction_id: order.orderNumber, 
+      payment_method: 'purchase',
+      type: 'debit'
+    });
+
+    await wallet.save();
+
+    cart.items = [];
+    cart.applied_coupon = null;
+    await cart.save();
+
+    return res.json({
+      success: true,
+      redirect: `/user/orders/${order.orderNumber}/success`
+    });
+
+  } catch (err) {
+    console.error('WALLET ORDER ERROR:', err);
+    return res.json({ success: false });
+  }
+};
 
 exports.createStripeSession = async (req, res) => {
   const userId = req.user._id;
@@ -151,7 +250,6 @@ exports.createStripeSession = async (req, res) => {
 
   res.json({ url: session.url });
 };
-
 
 exports.stripeSuccess = async (req, res) => {
   try {

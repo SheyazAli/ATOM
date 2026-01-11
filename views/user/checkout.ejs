@@ -104,6 +104,12 @@
           <input type="radio" name="paymentMethodRadio" value="stripe">
           Card
         </label>
+
+        <!-- ✅ WALLET -->
+        <label class="payment-option">
+          <input type="radio" name="paymentMethodRadio" value="wallet">
+          Wallet
+        </label>
       </div>
 
       <!-- COUPONS -->
@@ -224,6 +230,7 @@
       return;
     }
 
+    // COD
     if (paymentMethod === 'cod') {
       const form = document.createElement('form');
       form.method = 'POST';
@@ -240,6 +247,25 @@
       return;
     }
 
+    // WALLET
+    if (paymentMethod === 'wallet') {
+      const res = await fetch('/user/checkout/pay-wallet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ address_id: addressId })
+      });
+
+      const data = await res.json();
+
+      if (data.success && data.redirect) {
+        window.location.href = data.redirect;
+      } else {
+        window.location.href = '/user/payment-failed';
+      }
+      return;
+    }
+
+    // STRIPE
     const res = await fetch('/user/checkout/stripe/create-session', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

@@ -653,8 +653,6 @@ exports.approveReturn = async (req, res) => {
   }
 };
 
-
-
 exports.rejectReturn = async (req, res) => {
   try {
     const { orderId, variantId, message } = req.body;
