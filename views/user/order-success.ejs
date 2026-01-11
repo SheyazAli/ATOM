@@ -161,6 +161,17 @@
           <span>Subtotal</span>
           <span>₹ <%= order.subtotal %></span>
         </div>
+        <% if (order.discount > 0) { %>
+          
+        <div class="row-line">
+          <span>
+            Discount (<%= order.coupon?.coupon_code %>)
+          </span>
+          <span class="text-success">
+            - ₹ <%= order.discount %>
+          </span>
+        </div>
+      <% } %>
 
         <div class="row-line">
           <span>Shipping</span>

@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title><%= coupon ? 'Edit Coupon' : 'Add Coupon' %></title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <style>
+    body { background:#f2e5e2; font-family:Inter,sans-serif; }
+    .content { margin-left:250px; padding:40px; }
+
+    .form-card {
+      background:#fff;
+      border-radius:18px;
+      padding:30px;
+      max-width:600px;
+      margin:auto;
+      box-shadow:0 4px 15px rgba(0,0,0,.08);
+    }
+  </style>
+</head>
+
+<body>
+
+<%- include('./adminPartials/adminSidebar') %>
+
+<div class="content">
+  <div class="form-card">
+    <h4 class="fw-bold mb-4">
+      <%= coupon ? 'Edit Coupon' : 'Add New Coupon' %>
+    </h4>
+
+    <form
+        method="POST"
+        action="<%= coupon
+            ? '/admin/coupons/' + coupon._id + '?_method=PUT'
+            : '/admin/coupons' %>">
+
+      <div class="mb-3">
+        <label class="form-label">Coupon Code *</label>
+        <input
+          type="text"
+          name="coupon_code"
+          class="form-control"
+          required
+          value="<%= coupon?.coupon_code || '' %>"
+        >
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Description</label>
+        <textarea
+          name="description"
+          class="form-control"
+          rows="2"
+        ><%= coupon?.description || '' %></textarea>
+      </div>
+
+      <div class="row">
+        <div class="col-md-6 mb-3">
+          <label class="form-label">Discount Type *</label>
+          <select name="discount_type" class="form-select" required>
+            <option value="percentage" <%= coupon?.discount_type==='percentage'?'selected':'' %>>Percentage</option>
+            <option value="flat" <%= coupon?.discount_type==='flat'?'selected':'' %>>Flat</option>
+            <option value="bogo" <%= coupon?.discount_type==='bogo'?'selected':'' %>>Buy One Get One</option>
+          </select>
+        </div>
+
+        <div class="col-md-6 mb-3">
+          <label class="form-label">Discount Value *</label>
+          <input
+            type="number"
+            name="discount_value"
+            class="form-control"
+            required
+            value="<%= coupon?.discount_value || 0 %>"
+          >
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-md-6 mb-3">
+          <label class="form-label">Minimum Purchase</label>
+          <input
+            type="number"
+            name="minimum_purchase"
+            class="form-control"
+            value="<%= coupon?.minimum_purchase || 0 %>"
+          >
+        </div>
+
+        <div class="col-md-6 mb-3">
+          <label class="form-label">Maximum Discount</label>
+          <input
+            type="number"
+            name="maximum_discount"
+            class="form-control"
+            value="<%= coupon?.maximum_discount || 0 %>"
+          >
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Expiry Date *</label>
+        <input
+          type="date"
+          name="expiry_date"
+          class="form-control"
+          required
+          value="<%= coupon ? coupon.expiry_date.toISOString().split('T')[0] : '' %>"
+        >
+      </div>
+
+      <div class="form-check form-switch mb-4">
+        <input
+          class="form-check-input"
+          type="checkbox"
+          name="status"
+          <%= coupon?.status !== false ? 'checked' : '' %>
+        >
+        <label class="form-check-label">Active</label>
+      </div>
+
+      <div class="d-flex justify-content-end gap-2">
+        <a href="/admin/coupons" class="btn btn-outline-secondary">Cancel</a>
+        <button class="btn btn-danger px-4">Save</button>
+      </div>
+
+    </form>
+  </div>
+</div>
+
+</body>
+</html>

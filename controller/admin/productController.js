@@ -169,7 +169,6 @@ exports.getEditProduct = async (req, res) => {
   try {
     const { productId } = req.params;
 
-    /*  FETCH PRODUCT */
     const product = await Product.findOne({
       product_id: productId
     }).lean();
@@ -178,15 +177,12 @@ exports.getEditProduct = async (req, res) => {
       return res.redirect('/admin/products');
     }
 
-    /*  FETCH VARIANTS (SIZE LEVEL) */
     const variants = await Variant.find({
       product_id: productId
     }).lean();
 
-    /* FETCH CATEGORIES */
     const categories = await Category.find({ status: true }).lean();
 
-    /* GROUP VARIANTS BY COLOR*/
     const colorVariants = {};
 
     variants.forEach(v => {

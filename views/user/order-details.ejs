@@ -42,6 +42,7 @@
                   <%= order.status.replace('_', ' ') %> 
                 </div> 
               </div> 
+              
             </div> 
             <!-- ITEMS --> 
              <% items.forEach(item => { %> 
@@ -76,31 +77,39 @@
                                 </div> 
                               </div> <% }) %> 
                               <!-- SHIPPING --> 
-                               <div class="card-box"> 
-                                <h6 class="mb-2">Shipping Address</h6>
-                                 <p class="mb-1 fw-semibold"><%= order.address.building_name %></p>
-                                  <p class="mb-1"><%= order.address.address_line_1 %></p> 
-                                  <p class="mb-1"> <%= order.address.city %><%= order.address.state %> - <%= order.address.postal_code %> </p>
-                                  <p class="mb-0">Phone: <%= order.address.phone_number %></p> 
-                                </div>
-                                 <!-- PRICE -->
-                                   <div class="card-box"> 
-                                    <h6 class="mb-2">Price Breakdown</h6> 
-                                    <div class="d-flex justify-content-between"> <span>Item Total</span> 
-                                      <span>₹<%= price.itemTotal %></span> 
-                                    </div> 
-                                    <div class="d-flex justify-content-between"> <span>Shipping</span> 
-                                      <span><%= price.shipping === 0 ? 'Free' : '₹' + price.shipping %></span> 
-                                    </div> 
-                                    <hr> 
-                                    <div class="d-flex justify-content-between fw-semibold"> 
-                                      <span>Total</span> 
-                                      <span>₹<%= price.finalAmount %></span> 
-                                    </div> 
-                                  </div> 
-                                </div> 
-                              </div> 
-                            </div> 
-                            <%- include('./userPartials/footer') %> 
-                          </body> 
-                          </html>
+                               
+                               <div class="d-flex justify-content-between">
+                      <span>Item Total</span>
+                      <span>₹<%= price.itemTotal %></span>
+                    </div>
+
+                    <div class="d-flex justify-content-between">
+                      <span>Shipping</span>
+                      <span><%= price.shipping === 0 ? 'Free' : '₹' + price.shipping %></span>
+                    </div>
+
+                    <% if (price.discount > 0 && price.couponCode) { %>
+                      <div class="d-flex justify-content-between text-success">
+                        <span>Coupon (<%= price.couponCode %>)</span>
+                        <span>- ₹<%= price.discount %></span>
+                      </div>
+                    <% } %>
+
+                    <hr>
+
+                    <div class="d-flex justify-content-between fw-semibold">
+                      <span>Total</span>
+                      <span>₹<%= price.finalAmount %></span>
+                    </div>
+                    <div class="mt-4 d-grid gap-2">
+          <a href="/user/orders/<%= order.orderNumber %>/invoice"
+             class="btn btn-outline-dark">
+            Download Invoice (PDF)
+          </a>
+              </div> 
+           </div> 
+        </div> 
+     </div> 
+  <%- include('./userPartials/footer') %> 
+   </body> 
+</html>

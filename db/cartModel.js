@@ -1,6 +1,5 @@
 const mongoose = require('mongoose');
 
-
 const cartItemSchema = new mongoose.Schema(
   {
     product_id: {
@@ -21,7 +20,24 @@ const cartItemSchema = new mongoose.Schema(
       required: true
     }
   },
-  { _id: true } 
+  { _id: true }
+);
+
+const appliedCouponSchema = new mongoose.Schema(
+  {
+    coupon_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Coupon'
+    },
+    coupon_code: {
+      type: String
+    },
+    discount: {
+      type: Number,
+      default: 0
+    }
+  },
+  { _id: false }
 );
 
 const cartSchema = new mongoose.Schema(
@@ -33,12 +49,19 @@ const cartSchema = new mongoose.Schema(
     },
 
     user_id: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true,
-    unique: true
-  },
-    items: [cartItemSchema]
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+      unique: true
+    },
+
+    items: [cartItemSchema],
+
+    // ✅ NEW
+    applied_coupon: {
+      type: appliedCouponSchema,
+      default: null
+    }
   },
   {
     timestamps: {

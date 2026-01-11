@@ -1,0 +1,177 @@
+<%- include('./userPartials/navbar') %>
+
+<style>
+  body { background:#fafafa; }
+
+  .account-menu a {
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:14px 16px;
+    border-radius:10px;
+    text-decoration:none;
+    color:#111;
+    margin-bottom:6px;
+    font-size:15px;
+    background:#fff;
+    border:1px solid #eaeaea;
+  }
+
+  .account-menu a.active {
+    background:#f1faf4;
+    color:#198754;
+    font-weight:600;
+  }
+
+  .cart-card {
+    background:#fff;
+    border-radius:12px;
+    padding:16px;
+    margin-bottom:16px;
+    display:flex;
+    gap:16px;
+    border:1px solid #eee;
+  }
+
+  .cart-card img {
+    width:90px;
+    aspect-ratio:5/7;
+    object-fit:cover;
+    border-radius:6px;
+  }
+</style>
+
+<div class="container py-4">
+  <div class="row">
+
+    <!-- SIDEBAR -->
+    <div class="col-lg-3 col-md-4 mb-3">
+      <div class="account-menu">
+        <a href="/user/cart">
+          <span><i class="bi bi-cart me-2"></i>Cart</span>
+          <i class="bi bi-chevron-right"></i>
+        </a>
+        <a href="/user/wishlist" class="active">
+          <span><i class="bi bi-heart me-2"></i>Wishlist</span>
+          <i class="bi bi-chevron-right"></i>
+        </a>
+      </div>
+    </div>
+
+    <!-- CONTENT -->
+    <div class="col-lg-6 col-md-8">
+      <h5 class="fw-semibold mb-3">Wishlist</h5>
+
+      <% if (!wishlistItems || !wishlistItems.length) { %>
+        <p class="text-muted">Your wishlist is empty</p>
+      <% } %>
+
+      <% wishlistItems.forEach(item => { %>
+        <div class="cart-card">
+          <img src="/uploads/<%= item.image %>" alt="<%= item.title %>">
+
+          <div class="flex-grow-1">
+            <h6 class="mb-1"><%= item.title %></h6>
+
+            <div class="small text-muted mb-2">
+              Size: <%= item.size %> · Color: <%= item.color %>
+            </div>
+
+            <div class="fw-semibold mb-2">
+              ₹ <%= item.price %>
+            </div>
+
+            <div class="small">
+              <a href="javascript:void(0)"
+                 onclick="moveToCart('<%= item.wishlistItemId %>')"
+                 class="me-3 text-decoration-none">
+                <i class="bi bi-cart"></i> Move to Cart
+              </a>
+
+              <a href="javascript:void(0)"
+                 onclick="removeFromWishlist('<%= item.wishlistItemId %>')"
+                 class="text-danger text-decoration-none">
+                Remove
+              </a>
+
+              <a href="/user/product/<%= item.product_id %>"
+                 class="text-success text-decoration-none">
+                View Product
+              </a>
+            </div>
+          </div>
+        </div>
+      <% }) %>
+    </div>
+
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<script>
+function moveToCart(id) {
+  fetch('/user/wishlist/move-to-cart', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ wishlistItemId: id })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.success) {
+      location.href = '/user/cart';
+    } else {
+      Swal.fire('Error', data.error || 'Failed to move to cart', 'error');
+    }
+  })
+  .catch(() => Swal.fire('Error', 'Server error', 'error'));
+}
+
+function removeFromWishlist(id) {
+  Swal.fire({
+    title: 'Remove item?',
+    text: 'This item will be removed from your wishlist',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#dc3545',
+    cancelButtonColor: '#6c757d',
+    confirmButtonText: 'Yes, remove'
+  }).then(async result => {
+    if (!result.isConfirmed) return;
+
+    try {
+      const res = await fetch('/user/wishlist/remove', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ wishlistItemId: id })
+      });
+
+      const data = await res.json();
+
+      if (!data.success) {
+        return Swal.fire(
+          'Failed',
+          data.error || 'Unable to remove item',
+          'error'
+        );
+      }
+
+      Swal.fire({
+        icon: 'success',
+        title: 'Removed',
+        text: 'Item removed from wishlist',
+        timer: 1200,
+        showConfirmButton: false
+      }).then(() => location.reload());
+
+    } catch (error) {
+      Swal.fire('Error', 'Server error', 'error');
+    }
+  });
+}
+</script>
+
+
+<%- include('./userPartials/footer') %>

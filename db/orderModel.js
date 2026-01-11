@@ -7,18 +7,15 @@ const orderItemSchema = new mongoose.Schema(
       ref: 'Variant',
       required: true
     },
-
     price: {
       type: Number,
       required: true
     },
-
     quantity: {
       type: Number,
       required: true,
       min: 1
     },
-
     status: {
       type: String,
       enum: [
@@ -31,23 +28,13 @@ const orderItemSchema = new mongoose.Schema(
       ],
       default: 'placed'
     },
-
-    cancelledQty: {
-      type: Number,
-      default: 0
-    },
-
-    returnedQty: {
-      type: Number,
-      default: 0
-    },
-
+    cancelledQty: { type: Number, default: 0 },
+    returnedQty: { type: Number, default: 0 },
     returnStatus: {
       type: String,
       enum: ['none', 'pending', 'approved', 'rejected'],
       default: 'none'
     },
-
     message: {
       type: String,
       default: null
@@ -56,15 +43,18 @@ const orderItemSchema = new mongoose.Schema(
   { _id: false }
 );
 
-
-
-
 const orderSchema = new mongoose.Schema(
   {
     orderNumber: {
       type: String,
       unique: true,
       index: true
+    },
+
+    stripeSessionId: {
+      type: String,
+      unique: true,
+      sparse: true
     },
 
     user_id: {
@@ -90,7 +80,7 @@ const orderSchema = new mongoose.Schema(
 
     paymentMethod: {
       type: String,
-      enum: ['cod', 'razorpay', 'wallet'],
+      enum: ['cod', 'card', 'wallet'],
       required: true
     },
 
@@ -100,9 +90,37 @@ const orderSchema = new mongoose.Schema(
       default: 'pending'
     },
 
-    subtotal: Number,
-    shipping: Number,
-    total: Number,
+    subtotal: {
+      type: Number,
+      required: true
+    },
+
+    discount: {
+      type: Number,
+      default: 0
+    },
+
+    coupon: {
+      coupon_id: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Coupon',
+        default: null
+      },
+      coupon_code: {
+        type: String,
+        default: null
+      }
+    },
+
+    shipping: {
+      type: Number,
+      default: 0
+    },
+
+    total: {
+      type: Number,
+      required: true
+    },
 
     status: {
       type: String,

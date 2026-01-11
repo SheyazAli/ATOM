@@ -32,7 +32,11 @@ const productSchema = new mongoose.Schema(
     sale_price: {
       type: Number
     },
-
+    category_offer_price: {
+    type: Number,
+    default: null
+    },
+    
     discount_percentage: {
       type: Number,
       default: 0

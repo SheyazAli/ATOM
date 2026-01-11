@@ -5,19 +5,79 @@ const Address = require(__basedir +'/db/address');
 const Product = require(__basedir +'/db/productModel');
 const Category = require(__basedir +'/db/categoryModel');
 const Cart  = require(__basedir +'/db/cartModel')
+const Coupon = require(__basedir +'/db/couponModel')
 const Variant = require(__basedir +'/db/variantModel');
 const HttpStatus = require(__basedir +'/constants/httpStatus')
+const Wishlist = require(__basedir + '/db/WishlistModel')
+
+
+// exports.getCartPage = async (req, res) => {
+//   try {
+//     const userId = req.user._id;
+
+//     const cartDoc = await Cart.findOne({ user_id: userId }).lean();
+
+//     let cartItems = [];
+//     let subtotal = 0;
+
+//     if (cartDoc && cartDoc.items.length) {
+//       for (const item of cartDoc.items) {
+//         const product = await Product.findOne({
+//           product_id: item.product_id,
+//           status: true
+//         }).lean();
+
+//         const variant = await Variant.findById(item.variant_id).lean();
+//         if (!product || !variant) continue;
+
+//         const itemTotal = item.quantity * item.price_snapshot;
+//         subtotal += itemTotal;
+
+//         cartItems.push({
+//           cartItemId: item._id,
+//           title: product.title,
+//           image: variant.images?.[0] || 'default-product.webp',
+//           size: variant.size,
+//           color: variant.color,
+//           stock: variant.stock,
+//           quantity: item.quantity,
+//           price_snapshot: item.price_snapshot,
+//           itemTotal
+//         });
+//       }
+//     }
+
+//     const relatedProducts = await Product.find({ status: true })
+//       .limit(4)
+//       .lean();
+
+//     // ✅ FIX: read from session
+//     const appliedCoupon = req.session.appliedCoupon || null;
+
+//     res.render('user/cart', {
+//       cartItems,
+//       subtotal,
+//       appliedCoupon,
+//       relatedProducts
+//     });
+
+//   } catch (error) {
+//     console.error('GET CART PAGE ERROR:', error);
+//     return res
+//       .status(HttpStatus.INTERNAL_SERVER_ERROR)
+//       .render('user/500');
+//   }
+// };
 
 exports.getCartPage = async (req, res) => {
   try {
     const userId = req.user._id;
-
     const cartDoc = await Cart.findOne({ user_id: userId }).lean();
 
     let cartItems = [];
     let subtotal = 0;
 
-    if (cartDoc && cartDoc.items.length) {
+    if (cartDoc?.items?.length) {
       for (const item of cartDoc.items) {
         const product = await Product.findOne({
           product_id: item.product_id,
@@ -25,11 +85,9 @@ exports.getCartPage = async (req, res) => {
         }).lean();
 
         const variant = await Variant.findById(item.variant_id).lean();
-
         if (!product || !variant) continue;
 
-        const itemTotal = item.quantity * item.price_snapshot;
-        subtotal += itemTotal;
+        subtotal += item.quantity * item.price_snapshot;
 
         cartItems.push({
           cartItemId: item._id,
@@ -39,30 +97,25 @@ exports.getCartPage = async (req, res) => {
           color: variant.color,
           stock: variant.stock,
           quantity: item.quantity,
-          itemTotal
+          price_snapshot: item.price_snapshot
         });
       }
     }
 
-    const relatedProducts = await Product.find({ status: true })
-      .limit(4)
-      .lean();
+    const relatedProducts = await Product.find({ status: true }).limit(4).lean();
 
     res.render('user/cart', {
       cartItems,
       subtotal,
+      appliedCoupon: cartDoc?.applied_coupon || null,
       relatedProducts
     });
 
   } catch (error) {
     console.error('GET CART PAGE ERROR:', error);
-    return res
-    .status(HttpStatus.INTERNAL_SERVER_ERROR)
-      .render('user/500');
+    res.status(HttpStatus.INTERNAL_SERVER_ERROR).render('user/500');
   }
 };
-
-
 exports.addToCart = async (req, res) => {
   try {
     const userId = req.user._id;
@@ -164,7 +217,6 @@ exports.updateCartQuantity = async (req, res) => {
   }
 };
 
-
 exports.removeCartItem = async (req, res) => {
   try {
     const userId = req.user._id;
@@ -185,5 +237,81 @@ exports.removeCartItem = async (req, res) => {
   } catch (error) {
     console.error('REMOVE CART ITEM ERROR:', error);
     res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ error: 'Server error' });
+  }
+};
+
+exports.addToWishlistFromCart = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { cartItemId } = req.body;
+
+    if (!cartItemId) {
+      return res
+        .status(HttpStatus.BAD_REQUEST)
+        .json({ error: 'Invalid request' });
+    }
+
+    const cart = await Cart.findOne({ user_id: userId });
+    if (!cart) {
+      return res
+        .status(HttpStatus.NOT_FOUND)
+        .json({ error: 'Cart not found' });
+    }
+
+    const cartItem = cart.items.id(cartItemId);
+    if (!cartItem) {
+      return res
+        .status(HttpStatus.NOT_FOUND)
+        .json({ error: 'Cart item not found' });
+    }
+
+    const variant = await Variant.findById(cartItem.variant_id);
+    if (!variant) {
+      return res
+        .status(HttpStatus.BAD_REQUEST)
+        .json({ error: 'Variant not found' });
+    }
+
+    const product = await Product.findOne({
+      product_id: cartItem.product_id,
+      status: true
+    }).lean();
+
+    if (!product) {
+      return res
+        .status(HttpStatus.BAD_REQUEST)
+        .json({ error: 'Product not available' });
+    }
+
+    let wishlist = await Wishlist.findOne({ user_id: userId });
+    if (!wishlist) {
+      wishlist = new Wishlist({ user_id: userId, items: [] });
+    }
+
+    const exists = wishlist.items.find(
+      i => i.variant_id.toString() === variant._id.toString()
+    );
+
+    if (exists) {
+      return res
+        .status(HttpStatus.BAD_REQUEST)
+        .json({ error: 'Already in wishlist' });
+    }
+
+    wishlist.items.push({
+      product_id: product.product_id,
+      variant_id: variant._id,
+      price_snapshot: cartItem.price_snapshot
+    });
+
+    await wishlist.save();
+
+    res.status(HttpStatus.OK).json({ success: true });
+
+  } catch (error) {
+    console.error('ADD TO WISHLIST FROM CART ERROR:', error);
+    res
+      .status(HttpStatus.INTERNAL_SERVER_ERROR)
+      .json({ error: 'Server error' });
   }
 };
