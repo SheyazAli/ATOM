@@ -245,60 +245,79 @@ exports.postSignup = async (req, res) => {
   try {
     const { firstName, lastName, email, password, referralCode } = req.body;
 
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.render('user/signup', { error: 'Email already exists' });
+    if (!firstName || !lastName || !email || !password) {
+      return res.render('user/signup', {
+        error: 'All fields except referral code are required'
+      });
     }
 
+    if (!firstName.trim()) {
+      return res.render('user/signup', { error: 'First name is required' });
+    }
+
+    if (!lastName.trim()) {
+      return res.render('user/signup', { error: 'Last name is required' });
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.render('user/signup', {
+        error: 'Please enter a valid email address'
+      });
+    }
+
+    if (password.length < 6) {
+      return res.render('user/signup', {
+        error: 'Password must be at least 6 characters long'
+      });
+    }
+
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.render('user/signup', {
+        error: 'Email already exists'
+      });
+    }
+
+    if (referralCode) {
+      const referrer = await User.findOne({ referralCode });
+      if (!referrer) {
+        return res.render('user/signup', {
+          error: 'Incorrect referral code'
+        });
+      }
+    }
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const generatedReferralCode = await generateReferralCode();
-
-    const newUser = new User({
-      first_name: firstName,
-      last_name: lastName,
+    req.session.signupData = {
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
       email,
-      password: hashedPassword,
-      referralCode: generatedReferralCode,
-      referredBy: referralCode || null
-    });
-
-    await newUser.save();
+      hashedPassword,
+      referralCode: referralCode || null
+    };
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-
+    console.log(otp)
     req.session.otp = otp;
-    req.session.userId = newUser._id;
-    req.session.otpExpires = Date.now() + 2 * 60 * 1000; // 2 minutes
+    req.session.otpExpires = Date.now() + 2 * 60 * 1000;
     req.session.otpAttempts = 0;
 
     await sendOtpMail(email, otp);
-
-    const token = jwt.sign(
-      { userId: newUser._id, email: newUser.email },
-      process.env.JWT_USER_SECRET,
-      { expiresIn: '1d' }
-    );
-
-    res.cookie('userToken', token, {
-      httpOnly: true,
-      secure: false,
-      maxAge: 24 * 60 * 60 * 1000
-    });
 
     res.redirect('/user/verify-otp');
 
   } catch (err) {
     console.error('POST SIGNUP ERROR:', err);
     res.render('user/signup', {
-      error: 'Failed to send OTP. Please try again.'
+      error: 'Signup failed. Please try again.'
     });
   }
 };
+
 exports.getOtpPage = (req, res) => {
   try {
-    // If OTP session not found → invalid access
-    if (!req.session.otp || !req.session.userId) {
+    if (!req.session.otp || !req.session.signupData) {
       return res.redirect('/user/signup');
     }
 
@@ -309,11 +328,12 @@ exports.getOtpPage = (req, res) => {
     res.redirect('/user/signup');
   }
 };
+
  exports.postOtpPage = async (req, res) => {
   try {
     const { otp } = req.body;
 
-    if (!req.session.otp || !req.session.userId) {
+    if (!req.session.otp || !req.session.signupData) {
       return res.redirect('/user/signup');
     }
 
@@ -345,12 +365,66 @@ exports.getOtpPage = (req, res) => {
       });
     }
 
-    await User.findByIdAndUpdate(req.session.userId, {
+    const {
+      firstName,
+      lastName,
+      email,
+      hashedPassword,
+      referralCode
+    } = req.session.signupData;
+
+    const generatedReferralCode = await generateReferralCode();
+
+    const newUser = await User.create({
+      first_name: firstName,
+      last_name: lastName,
+      email,
+      password: hashedPassword,
+      referralCode: generatedReferralCode,
+      referredBy: referralCode,
       isVerified: true
     });
 
-    req.session.destroy();
+    if (referralCode) {
+      const referrer = await User.findOne({ referralCode });
 
+      if (referrer) {
+        let wallet = await Wallet.findOne({ user_id: referrer._id });
+
+        if (!wallet) {
+          wallet = await Wallet.create({
+            user_id: referrer._id,
+            balance: 0,
+            transactionHistory: []
+          });
+        }
+
+        wallet.balance += 200;
+
+        wallet.transactionHistory.push({
+          amount: 200,
+          transaction_id: `RFL-${newUser._id}`,
+          payment_method: 'referral', 
+          type: 'credit'
+        });
+
+        await wallet.save();
+      }
+    }
+
+    const token = jwt.sign(
+      { userId: newUser._id },
+      process.env.JWT_USER_SECRET,
+      { expiresIn: '1d' }
+    );
+
+    res.cookie('userToken', token, {
+      httpOnly: true,
+      secure: false,
+      maxAge: 24 * 60 * 60 * 1000
+    });
+
+    req.session.destroy();
     res.redirect('/user/profile');
 
   } catch (error) {
@@ -360,6 +434,7 @@ exports.getOtpPage = (req, res) => {
     });
   }
 };
+
 exports.resendOtp = async (req, res) => {
   try {
 
@@ -774,7 +849,6 @@ exports.getProductDetails = async (req, res) => {
   }
 };
 
-
 exports.getCheckout = async (req, res) => {
   try {
     const userId = req.user._id;
@@ -878,7 +952,6 @@ exports.getCheckout = async (req, res) => {
   }
 };
 
-
 //COUPON
 
 exports.applyCoupon = async (req, res) => {
@@ -927,8 +1000,6 @@ exports.removeCoupon = async (req, res) => {
 
   res.json({ success: true });
 };
-
-
 
 exports.logout = (req, res) => {
   res.clearCookie('userToken', {

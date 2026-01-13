@@ -1,3 +1,4 @@
+const { render } = require('ejs');
 const Stripe = require('stripe');
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const Product = require(__basedir +'/db/productModel');
@@ -10,8 +11,7 @@ const Order = require(__basedir + '/db/orderModel');
 const Variant = require(__basedir + '/db/variantModel');
 const HttpStatus = require(__basedir + '/constants/httpStatus');
 const { generateOrderNumber } = require(__basedir + '/Services/orderNumberService');
-
-
+const {  PAYMENT_STATUS, PAYMENT_FAILURE_REASONS} = require(__basedir + '/constants/paymentStatus')
 
 async function createOrderWithRetry(orderData, retries = 5) {
   for (let i = 0; i < retries; i++) {
@@ -62,7 +62,6 @@ exports.placeOrderCOD = async (req, res) => {
         status: true
       }).lean();
 
-      // ✅ FINAL PRICE DECISION
       let finalPrice = item.price_snapshot;
 
       if (
@@ -140,7 +139,10 @@ exports.placeOrderWallet = async (req, res) => {
     for (const item of cart.items) {
       const variant = await Variant.findById(item.variant_id);
       if (!variant || variant.stock < item.quantity) {
-        return res.json({ success: false });
+        return res.json({ success: false,
+    reason: PAYMENT_FAILURE_REASONS.STOCK_ISSUE,
+    redirect: `/user/payment-failed?reason=${PAYMENT_FAILURE_REASONS.STOCK_ISSUE}`
+      });
       }
 
       const product = await Product.findOne({
@@ -172,7 +174,9 @@ exports.placeOrderWallet = async (req, res) => {
       );
     }
     if (wallet.balance < subtotal) {
-      return res.json({ success: false });
+      return res.json({ success: false,
+    reason: PAYMENT_FAILURE_REASONS.INSUFFICIENT_WALLET_BALANCE,
+    redirect: `/user/payment-failed?reason=${PAYMENT_FAILURE_REASONS.INSUFFICIENT_WALLET_BALANCE}` });
     }
     const order = await createOrderWithRetry({
       user_id: userId,
@@ -287,7 +291,6 @@ exports.stripeSuccess = async (req, res) => {
         status: true
       }).lean();
 
-      // ✅ FINAL PRICE DECISION
       let finalPrice = item.price_snapshot;
 
       if (
@@ -391,6 +394,63 @@ exports.stripeCancel = async (req, res) => {
     return res
       .status(HttpStatus.INTERNAL_SERVER_ERROR)
       .render('user/500');
+  }
+};
+
+exports.getPaymentFailed = async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.redirect('/user/login');
+    }
+
+    const userId = req.user._id;
+
+    const reason =
+      req.query.reason ||
+      req.session.paymentFailReason ||
+      null;
+
+    const cart = await Cart.findOne({ user_id: userId }).lean();
+
+    const addressId = req.session.checkoutAddressId || null;
+
+    let address = null;
+    if (addressId) {
+      address = await Address.findOne({
+        user_id: userId,
+        address_id: addressId
+      }).lean();
+    }
+
+    let summary = null;
+
+    if (cart && cart.items && cart.items.length) {
+      let subtotal = 0;
+      cart.items.forEach(item => {
+        subtotal += item.price_snapshot * item.quantity;
+      });
+
+      const discount = cart.applied_coupon?.discount || 0;
+
+      summary = {
+        subtotal,
+        discount,
+        total: Math.max(subtotal - discount, 0)
+      };
+    }
+
+    delete req.session.paymentFailReason;
+
+    res.render('user/payment-failed', {
+      cart: cart || null,
+      address,
+      summary,
+      reason
+    });
+
+  } catch (error) {
+    console.error('GET PAYMENT FAILED ERROR:', error);
+    res.redirect('/user/checkout');
   }
 };
 

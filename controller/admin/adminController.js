@@ -20,7 +20,7 @@ const { processRefund } = require(__basedir +'/services/refundService');
 
 exports.getLogin = (req, res) => {
   if (req.cookies.adminToken) {
-    return res.redirect('/admin/user');
+    return res.redirect('/admin/revenue');
   }
 
   res.render('admin/login');

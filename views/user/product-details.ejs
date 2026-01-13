@@ -22,15 +22,29 @@
       object-fit: cover;
       cursor: zoom-in;
     }
-    /* CATEGORY OFFER MARQUEE */
-  .offer-marquee {
-    overflow: hidden;
-    white-space: nowrap;
-    position: relative;
-    background: #f0fff4;
-    padding: 6px 0;
-    margin-bottom: 12px;
+    
+    .offer-marquee {
+      overflow: hidden;
+      white-space: nowrap;
+      position: relative;
+      background: #f0fff4;
+      padding: 6px 0;
+      margin-bottom: 12px;
+    }
+    .zoom-nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(255,255,255,0.85);
+    border: none;
+    padding: 10px 14px;
+    font-size: 22px;
+    cursor: pointer;
+    z-index: 10;
   }
+
+  .zoom-prev { left: 20px; }
+  .zoom-next { right: 20px; }
 
   .offer-text {
     display: inline-block;
@@ -146,13 +160,20 @@
       </div>
 
       <div class="mb-3">
-        <span class="text-decoration-line-through text-muted">
-          ₹ <%= product.regular_price %>
-        </span>
-        <span class="fs-4 fw-bold ms-2">
-          ₹ <%= product.sale_price %>
-        </span>
-      </div>
+          <% if (!product.sale_price || product.sale_price === product.regular_price) { %>
+            <span class="fs-4 fw-bold">
+              ₹ <%= product.regular_price %>
+            </span>
+          <% } else { %>
+            <span class="text-decoration-line-through text-muted">
+              ₹ <%= product.regular_price %>
+            </span>
+            <span class="fs-4 fw-bold ms-2">
+              ₹ <%= product.sale_price %>
+            </span>
+          <% } %>
+        </div>
+
 
       <h6>Color</h6>
       <div class="d-flex mb-3">
@@ -211,6 +232,10 @@
       <button class="btn btn-light zoom-close"
               data-bs-dismiss="modal">✕</button>
 
+      <!-- ✅ MOVE BUTTONS HERE -->
+      <button class="zoom-nav zoom-prev" onclick="changeZoom(-1)">‹</button>
+      <button class="zoom-nav zoom-next" onclick="changeZoom(1)">›</button>
+
       <div class="zoom-container" id="zoomContainer">
         <img id="zoomImg" class="zoom-img">
       </div>
@@ -219,22 +244,32 @@
   </div>
 </div>
 
+
 <script>
   const colorMap = <%- JSON.stringify(colorMap) %>;
   let currentColor = "<%= defaultColor %>";
   let images = [];
   let selectedVariant = null;
   let scale = 1;
+  let currentIndex = 0;
 
   function renderImages(color) {
     images = colorMap[color].images || [];
     if (!images.length) return;
 
+    currentIndex = 0;
     mainImage.src = '/uploads/' + images[0];
     thumbs.innerHTML = images.map((img,i)=>
       `<img src="/uploads/${img}" class="thumb"
             onclick="mainImage.src='/uploads/${img}'">`
     ).join('');
+  }
+
+    function changeZoom(dir) {
+    if (!images.length) return;
+
+    currentIndex = (currentIndex + dir + images.length) % images.length;
+    zoomImg.src = '/uploads/' + images[currentIndex];
   }
 
   function renderSizes(color) {

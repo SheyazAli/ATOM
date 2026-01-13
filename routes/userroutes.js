@@ -15,9 +15,9 @@ router.get('/home',userController.getHome);
 router.get('/login',noCache, blockIfLoggedIn, userController.getLogin)
 router.post('/login',userController.postLogin)
 
-router.get('/forgot-password',userController.getForgotPassword);
+router.get('/forgot-password',blockIfLoggedIn,userController.getForgotPassword);
 router.post('/forgot-password', userController.postForgotPassword);
-router.get('/reset-password', userController.getResetPassword);
+router.get('/reset-password',blockIfLoggedIn, userController.getResetPassword);
 router.post('/reset-password', userController.postResetPassword); //
 //router.put('/reset-password', userController.resetPassword);
 
@@ -29,7 +29,7 @@ router.post('/signup',userController.postSignup)
 router.get('/google',passport.authenticate('google', {scope: ['profile', 'email']}));
 router.get('/google/callback',passport.authenticate('google', { session: false }),userController.googleAuthSuccess);
 
-router.get('/verify-otp',userController.getOtpPage)
+router.get('/verify-otp',blockIfLoggedIn,userController.getOtpPage)
 router.post('/verify-otp',userController.postOtpPage)
 router.post('/resend-otp', userController.resendOtp);
 
@@ -79,6 +79,7 @@ router.post('/checkout/pay-wallet', verifyUser, paymentController.placeOrderWall
 router.post('/checkout/stripe/create-session',verifyUser,paymentController.createStripeSession);
 router.get('/checkout/stripe/success',verifyUser,paymentController.stripeSuccess);
 router.get('/checkout/stripe/cancel',verifyUser,paymentController.stripeCancel);
+router.get('/payment-failed',verifyUser,paymentController.getPaymentFailed);
 
 //ORDER
 router.get('/orders/:orderNumber/success', verifyUser, orderController.orderSuccessPage);
