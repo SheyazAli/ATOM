@@ -1,4 +1,5 @@
 <%- include('./userPartials/navbar') %>
+
 <%
   const reasonMessages = {
     INSUFFICIENT_WALLET_BALANCE: 'Your wallet balance is insufficient',
@@ -8,9 +9,6 @@
   };
 %>
 
-<p class="text-muted">
-  <%= reasonMessages[reason] || 'Payment failed. Please try again.' %>
-</p>
 
 <style>
   body { background:#fafafa; }
@@ -72,8 +70,8 @@
 
     <p class="text-muted">
       Your payment was not completed.
-     <% if (reason) { %>
-        (<%= readableReason %>)
+      <% if (reason) { %>
+        (<%= reasonMessages[reason] || 'Payment failed. Please try again.' %>)
       <% } %>
     </p>
   </div>

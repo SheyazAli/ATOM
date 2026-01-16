@@ -718,7 +718,7 @@ exports.getProducts = async (req, res) => {
     }
 
     const productQuery = {
-      status: true,
+      // status: true,
       title: { $regex: search, $options: 'i' }
     };
 
@@ -835,7 +835,7 @@ exports.getProductDetails = async (req, res) => {
 
     return res.render('user/product-details', {
       product,
-      category, // <-- already here, used for offer
+      category,
       colorMap,
       colors,
       defaultColor,

@@ -56,7 +56,7 @@ router.delete('/address/:id', verifyUser, addressController.deleteAddress);
 
 //PRODUCTS
 router.get('/products', userController.getProducts);
-router.get('/product/:id',productStatus, userController.getProductDetails)
+router.get('/product/:id',productStatus, userController.getProductDetails) 
 
 //CART
 router.get('/cart',verifyUser, cartController.getCartPage)

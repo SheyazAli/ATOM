@@ -34,16 +34,18 @@ exports.placeOrderCOD = async (req, res) => {
 
     const cart = await Cart.findOne({ user_id: userId });
     if (!cart || !cart.items.length) {
-      return res
-        .status(HttpStatus.BAD_REQUEST)
-        .json({ error: 'CART_EMPTY' });
+      return res.json({ success: false,
+    reason: PAYMENT_FAILURE_REASONS.STOCK_ISSUE,
+    redirect: `/user/payment-failed?reason=${PAYMENT_FAILURE_REASONS.CART_EMPTY}`
+      });
     }
 
     const address = await Address.findOne({ user_id: userId, address_id }).lean();
     if (!address) {
-      return res
-        .status(HttpStatus.BAD_REQUEST)
-        .json({ error: 'INVALID_ADDRESS' });
+      return res.json({ success: false,
+    reason: PAYMENT_FAILURE_REASONS.STOCK_ISSUE,
+    redirect: `/user/payment-failed?reason=${PAYMENT_FAILURE_REASONS.INVALID_ADDRESS}`
+      });
     }
 
     let subtotal = 0;
@@ -52,15 +54,22 @@ exports.placeOrderCOD = async (req, res) => {
     for (const item of cart.items) {
       const variant = await Variant.findById(item.variant_id);
       if (!variant || variant.stock < item.quantity) {
-        return res
-          .status(HttpStatus.BAD_REQUEST)
-          .json({ error: 'STOCK_ISSUE' });
+        return res.json({ success: false,
+    reason: PAYMENT_FAILURE_REASONS.STOCK_ISSUE,
+    redirect: `/user/payment-failed?reason=${PAYMENT_FAILURE_REASONS.STOCK_ISSUE}`
+      });
       }
-
       const product = await Product.findOne({
         product_id: variant.product_id,
         status: true
       }).lean();
+      if (!product || product.status === false) {
+        return res.json({
+          success: false,
+          reason: PAYMENT_FAILURE_REASONS.PRODUCT_UNAVAILABLE,
+          redirect: `/user/payment-failed?reason=${PAYMENT_FAILURE_REASONS.PRODUCT_UNAVAILABLE}`
+        });
+      }
 
       let finalPrice = item.price_snapshot;
 
@@ -259,7 +268,9 @@ exports.stripeSuccess = async (req, res) => {
   try {
     const session = await stripe.checkout.sessions.retrieve(req.query.session_id);
     if (session.payment_status !== 'paid') {
-      return res.redirect('/user/checkout');
+      return res.redirect(
+        `/user/payment-failed?reason=${PAYMENT_FAILURE_REASONS.PAYMENT_FAILED}`
+      );
     }
 
     const existingOrder = await Order.findOne({
@@ -290,6 +301,13 @@ exports.stripeSuccess = async (req, res) => {
         product_id: variant.product_id,
         status: true
       }).lean();
+      if (!product || product.status === false) {
+        return res.json({
+          success: false,
+          reason: PAYMENT_FAILURE_REASONS.PRODUCT_UNAVAILABLE,
+          redirect: `/user/payment-failed?reason=${PAYMENT_FAILURE_REASONS.PRODUCT_UNAVAILABLE}`
+        });
+      }
 
       let finalPrice = item.price_snapshot;
 
@@ -420,6 +438,22 @@ exports.getPaymentFailed = async (req, res) => {
         user_id: userId,
         address_id: addressId
       }).lean();
+    }
+    await Cart.findOne({ user_id: userId }).lean();
+
+/* ✅ ADD THIS BLOCK */
+    if (cart?.items?.length) {
+      for (const item of cart.items) {
+        const variant = await Variant.findById(item.variant_id).lean();
+        if (!variant) continue;
+
+        const product = await Product.findOne({
+          product_id: variant.product_id
+        }).lean();
+        if (!product) continue;
+
+        item.name = product.title; 
+      }
     }
 
     let summary = null;
