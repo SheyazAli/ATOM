@@ -58,6 +58,7 @@ router.post('/coupons',verifyAdmin,couponController.createCoupon);
 router.get('/coupons/:id/edit',verifyAdmin,couponController.getEditCoupon);
 router.put('/coupons/:id',verifyAdmin,couponController.updateCoupon);
 
+//REVENUE
 router.get('/revenue',verifyAdmin,adminController.getRevenue)
 
 router.get('/logout', adminController.logout);
