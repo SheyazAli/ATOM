@@ -121,9 +121,9 @@
           <% coupons.forEach(c => { %>
             <option
               value="<%= c.code %>"
-              <%= appliedCoupon && appliedCoupon.coupon_code === c.code ? 'selected' : '' %>
               <%= c.disabled ? 'disabled' : '' %>>
               <%= c.code %> - <%= c.description %>
+              <%= c.disabled && c.reason ? `(${c.reason})` : '' %>
             </option>
           <% }) %>
         </select>

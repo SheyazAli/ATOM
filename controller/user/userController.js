@@ -883,7 +883,7 @@ exports.getCheckout = async (req, res) => {
         product.category_offer_price &&
         product.category_offer_price >= item.price_snapshot
       ) {
-        priceMessage = 'You already have the best price';
+        priceMessage = 'Special category offer is not applied. You already have the best price';
       }
 
       const itemTotal = item.quantity * finalPrice;
@@ -895,7 +895,7 @@ exports.getCheckout = async (req, res) => {
         variant: `${variant.size} · ${variant.color}`,
         quantity: item.quantity,
         itemTotal,
-        priceMessage // 🔹 passed to EJS
+        priceMessage 
       });
     }
 
@@ -910,27 +910,35 @@ exports.getCheckout = async (req, res) => {
     const coupons = await Coupon.find({ status: true }).lean();
 
     const couponList = coupons.map(c => {
-      let disabled = false;
-      let reason = '';
+    let disabled = false;
+    let reason = '';
 
-      if (c.expiry_date < new Date()) {
-        disabled = true;
-        reason = 'Expired';
-      } else if (c.minimum_purchase > subtotal) {
-        disabled = true;
-        reason = `Min ₹${c.minimum_purchase}`;
-      } else if (c.usage_limit > 0 && c.used_count >= c.usage_limit) {
-        disabled = true;
-        reason = 'Limit reached';
-      }
+    if (c.expiry_date < new Date()) {
+      disabled = true;
+      reason = 'Expired';
+    }
+    else if (
+      c.user_ids?.some(id => id.toString() === userId.toString())
+    ) {
+      disabled = true;
+      reason = 'Already used';
+    }
+    else if (c.minimum_purchase > subtotal) {
+      disabled = true;
+      reason = `Min ₹${c.minimum_purchase}`;
+    }
+    else if (c.usage_limit > 0 && c.used_count >= c.usage_limit) {
+      disabled = true;
+      reason = 'Limit reached';
+    }
 
-      return {
-        code: c.coupon_code,
-        description: c.description,
-        disabled,
-        reason
-      };
-    });
+    return {
+      code: c.coupon_code,
+      description: c.description,
+      disabled,
+      reason
+    };
+  });
 
     const total = Math.max(subtotal - discount, 0);
 
