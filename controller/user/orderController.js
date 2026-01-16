@@ -14,6 +14,7 @@ const HttpStatus = require(__basedir +'/constants/httpStatus')
 const PDFDocument = require('pdfkit');
 const { processRefund } = require(__basedir +'/services/refundService');
 const { generateOrderNumber } = require(__basedir +'/Services/orderNumberService')
+const { validatePartialCancellation } = require(__basedir +'/Services/couponValidationService');
 
 
 exports.placeOrderCOD = async (req, res) => {
@@ -475,6 +476,7 @@ exports.getCancelOrder = async (req, res) => {
     }).populate('items.variant_id');
 
     if (!order) {
+      
       return res.redirect('/user/orders');
     }
 
@@ -524,15 +526,39 @@ exports.getCancelOrder = async (req, res) => {
 exports.postCancelOrder = async (req, res) => {
   try {
     const { orderNumber } = req.params;
-    const userId = req.user._id;
-    const { items = [] } = req.body;
+    const userId = req.user?._id;
+
+    if (!userId) {
+      return res.json({
+        success: false,
+        message: 'Unauthorized'
+      });
+    }
+
+    const selectedItems = Array.isArray(req.body.items)
+      ? req.body.items
+      : req.body.items
+      ? [req.body.items]
+      : [];
+
+    if (!selectedItems.length) {
+      return res.json({
+        success: false,
+        message: 'Please select at least one item'
+      });
+    }
 
     const order = await Order.findOne({
-      orderNumber,
+      orderNumber: String(orderNumber),
       user_id: userId
     });
 
-    if (!order) return res.redirect('/user/orders');
+    if (!order || !Array.isArray(order.items)) {
+      return res.json({
+        success: false,
+        message: 'Order not found'
+      });
+    }
 
     const isReturn = order.status === 'delivered';
 
@@ -540,28 +566,71 @@ exports.postCancelOrder = async (req, res) => {
       order.paymentStatus === 'paid' &&
       ['placed', 'confirmed', 'shipped'].includes(order.status);
 
-    for (const variantId of items) {
+    const isFullCancel = selectedItems.length === order.items.length;
+
+    if (!isFullCancel && order.coupon?.coupon_id) {
+      const couponCheck = await validatePartialCancellation({
+        order,
+        cancellingItems: selectedItems
+      });
+
+      if (!couponCheck.allowed) {
+        return res.json({
+          success: false,
+          message: couponCheck.message
+        });
+      }
+    }
+
+    for (const variantId of selectedItems) {
       const qty = Number(req.body[`qty_${variantId}`]);
-      const message = req.body[`message_${variantId}`];
+      const message = req.body[`message_${variantId}`]?.trim();
+
+      if (!message) {
+        return res.json({
+          success: false,
+          message: 'Please provide a reason for all selected items'
+        });
+      }
 
       const item = order.items.find(
         i => i.variant_id.toString() === variantId
       );
 
       if (!item || qty <= 0) continue;
+
+      const remainingQty =
+        item.quantity -
+        (item.cancelledQty || 0) -
+        (item.returnedQty || 0);
+
+      if (qty > remainingQty) {
+        return res.json({
+          success: false,
+          message: 'Invalid quantity selected'
+        });
+      }
+
       if (isReturn) {
         item.returnedQty += qty;
-        item.status = 'returned';
+        item.status =
+          item.returnedQty === item.quantity
+            ? 'returned'
+            : 'partially_returned';
+
         item.returnStatus = 'pending';
-      }
-      else {
+      } else {
         item.cancelledQty += qty;
-        item.status = 'cancelled';
+        item.status =
+          item.cancelledQty === item.quantity
+            ? 'cancelled'
+            : 'partially_cancelled';
 
         await Variant.findByIdAndUpdate(
           variantId,
           { $inc: { stock: qty } }
         );
+
         if (allowDirectRefund) {
           await processRefund({
             order,
@@ -572,28 +641,30 @@ exports.postCancelOrder = async (req, res) => {
         }
       }
 
-      item.message = message || null;
+      item.message = message;
     }
 
     const statuses = order.items.map(i => i.status);
 
     if (statuses.every(s => s === 'cancelled')) {
       order.status = 'cancelled';
+    } else if (statuses.every(s => s === 'returned')) {
+      order.status = 'returned';
     } else if (statuses.some(s => s === 'cancelled')) {
       order.status = 'partially_cancelled';
-    }
-
-    if (statuses.every(s => s === 'returned')) {
-      order.status = 'returned';
     } else if (statuses.some(s => s === 'returned')) {
       order.status = 'partially_returned';
     }
 
     await order.save();
-    res.redirect('/user/orders');
+
+    return res.json({ success: true });
 
   } catch (error) {
     console.error('POST CANCEL/RETURN ORDER ERROR:', error);
-    res.redirect('/user/orders');
+    return res.json({
+      success: false,
+      message: 'Something went wrong. Please try again.'
+    });
   }
 };
