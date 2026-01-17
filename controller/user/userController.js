@@ -4,6 +4,8 @@ const bcrypt = require('bcryptjs');
 const Address = require(__basedir +'/db/address');
 const Product = require(__basedir +'/db/productModel');
 const Category = require(__basedir +'/db/categoryModel');
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const crypto = require('crypto');
 const Order = require(__basedir +'/db/orderModel');
 const Coupon = require(__basedir +'/db/couponModel')
 const Wallet = require(__basedir +'/db/walletModel');
@@ -648,38 +650,6 @@ exports.postResetPassword = async (req, res) => {
   res.redirect('/user/profile');
 };
 
-//WALLET
-
-exports.getWallet = async (req, res) => {
-  try {
-    if (!req.user) {
-      return res.redirect('/user/login');
-    }
-
-    const userId = req.user._id; // ✅ FIX
-
-    let wallet = await Wallet.findOne({ user_id: userId }).lean();
-
-    if (!wallet) {
-      wallet = {
-        balance: 0,
-        transactionHistory: []
-      };
-    }
-
-    res.render('user/wallet', {
-      walletBalance: wallet.balance,
-      transactions: wallet.transactionHistory.sort(
-        (a, b) => new Date(b.date) - new Date(a.date)
-      ),
-      activePage: 'wallet'
-    });
-
-  } catch (error) {
-    console.error('GET WALLET ERROR:', error);
-    res.redirect('/user/profile');
-  }
-};
 
 //PRODUCTS
 

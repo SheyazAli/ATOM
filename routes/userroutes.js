@@ -4,6 +4,7 @@ const userController = require(__basedir +'/controller/user/userController');
 const addressController = require(__basedir +'/controller/user/addressController');
 const cartController = require(__basedir +'/controller/user/cartController')
 const orderController = require(__basedir +'/controller/user/orderController')
+const walletController = require(__basedir +'/controller/user/walletController');
 const paymentController = require(__basedir +'/controller/user/paymentController')
 const productStatus = require(__basedir +'/middleware/checkProductActive')
 const wishlistController = require(__basedir +'/controller/user/wishlistController')
@@ -95,8 +96,12 @@ router.post('/coupon/apply',verifyUser,userController.applyCoupon);
 router.delete('/coupon/remove',verifyUser,userController.removeCoupon);
 
 //WALLET
+router.get('/wallet',verifyUser,walletController.getWallet)
+router.get('/wallet/add-money',verifyUser,walletController.getAddMoneyPage)
+router.post('/wallet/add-money',verifyUser,walletController.createWalletStripeSession);
+router.get('/wallet/stripe-success',walletController.walletStripeSuccess);
+router.get('/wallet/stripe-cancel',walletController.walletStripeCancel);
 
-router.get('/wallet',verifyUser,userController.getWallet)
 
 router.get('/logout',userController.logout)
 

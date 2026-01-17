@@ -37,26 +37,37 @@
   </div>
 
   <!-- DATE FILTER -->
- <form class="row g-3 mb-4">
-  <div class="col-md-2">
-    <select name="range" class="form-select">
-      <option value="">Custom</option>
-      <option value="week" <%= range==='week'?'selected':'' %>>This Week</option>
-      <option value="month" <%= range==='month'?'selected':'' %>>This Month</option>
-      <option value="year" <%= range==='year'?'selected':'' %>>This Year</option>
-    </select>
-  </div>
-  <div class="col-md-3">
-    <input type="date" name="from" class="form-control" value="<%= from || '' %>">
-  </div>
-  <div class="col-md-3">
-    <input type="date" name="to" class="form-control" value="<%= to || '' %>">
-  </div>
-  <div class="col-md-2">
-    <button class="btn btn-primary w-100">Apply</button>
-  </div>
-</form>
+    <form class="row g-3 mb-4">
+      <div class="col-md-2">
+        <select name="range" class="form-select">
+          <option value="">Custom</option>
+          <option value="week" <%= range==='week'?'selected':'' %>>This Week</option>
+          <option value="month" <%= range==='month'?'selected':'' %>>This Month</option>
+          <option value="year" <%= range==='year'?'selected':'' %>>This Year</option>
+        </select>
+      </div>
 
+      <div class="col-md-3">
+        <input type="date" name="from" class="form-control" value="<%= from || '' %>">
+      </div>
+
+      <div class="col-md-3">
+        <input type="date" name="to" class="form-control" value="<%= to || '' %>">
+      </div>
+
+      <div class="col-md-2">
+        <button class="btn btn-primary w-100">Apply</button>
+      </div>
+
+      <div class="col-md-2">
+        <button
+          type="button"
+          class="btn btn-secondary w-100"
+          onclick="window.location.href=window.location.pathname">
+          Reset
+        </button>
+      </div>
+    </form>
 
   <!-- METRICS -->
   <div class="row g-4 mb-4">
