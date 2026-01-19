@@ -232,15 +232,24 @@ exports.saveCategory = async (req, res) => {
   }
 };
 
-
 exports.deleteCategory = async (req, res) => {
   try {
     const { categoryId } = req.params;
 
     if (!categoryId) {
-      return res
-        .status(HttpStatus.BAD_REQUEST)
-        .json({ error: 'Category ID required' });
+      return res.status(HttpStatus.BAD_REQUEST).json({
+        error: 'Category ID required'
+      });
+    }
+
+    const haveProducts = await Product.find({
+      category_id: categoryId
+    });
+
+    if (haveProducts.length > 0) {
+      return res.status(HttpStatus.BAD_REQUEST).json({
+        error: 'This category have products'
+      });
     }
 
     const deleted = await Category.findOneAndDelete({
@@ -248,21 +257,21 @@ exports.deleteCategory = async (req, res) => {
     });
 
     if (!deleted) {
-      return res
-        .status(HttpStatus.NOT_FOUND)
-        .json({ error: 'Category not found' });
+      return res.status(HttpStatus.NOT_FOUND).json({
+        error: 'Category not found'
+      });
     }
 
-    return res
-      .status(HttpStatus.OK)
-      .json({ success: true });
+    return res.status(HttpStatus.OK).json({
+      success: true
+    });
 
   } catch (error) {
     console.error('DELETE CATEGORY ERROR:', error);
 
-    return res
-      .status(HttpStatus.INTERNAL_SERVER_ERROR)
-      .json({ error: 'Server error' });
+    return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+      error: 'Server error'
+    });
   }
 };
 

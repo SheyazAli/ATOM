@@ -1,46 +1,58 @@
 exports.validatePartialCancellation = async ({
   order,
-  cancellingItems
+  cancellingItems,
+  cancellingQtyMap   // 🔥 NEW
 }) => {
-  // 🔒 HARD GUARD — THIS WAS MISSING
-  if (!order || !Array.isArray(order.items)) {
+
+  if (!order?.items?.length) return { allowed: true };
+
+  // ===============================
+  // STEP 1: Calculate remaining qty AFTER this action
+  // ===============================
+  let remainingQtyAfter = 0;
+  let remainingAmountAfter = 0;
+
+  for (const item of order.items) {
+    const alreadyRemoved =
+      (item.cancelledQty || 0) +
+      (item.returnedQty || 0);
+
+    const cancellingNow =
+      cancellingQtyMap[item.variant_id.toString()] || 0;
+
+    const remainingQty =
+      item.quantity - alreadyRemoved - cancellingNow;
+
+    if (remainingQty > 0) {
+      remainingQtyAfter += remainingQty;
+      remainingAmountAfter += item.price * remainingQty;
+    }
+  }
+
+  // ===============================
+  // STEP 2: FULL EXIT → ALWAYS ALLOW
+  // ===============================
+  if (remainingQtyAfter === 0) {
     return { allowed: true };
   }
 
-  if (!order.coupon || !order.coupon.coupon_id) {
-    return { allowed: true };
-  }
+  // ===============================
+  // STEP 3: Coupon validation
+  // ===============================
+  if (!order.coupon?.coupon_id) return { allowed: true };
 
-  const Coupon = require(__basedir +'/db/couponModel');
-
+  const Coupon = require(__basedir + '/db/couponModel');
   const coupon = await Coupon.findById(order.coupon.coupon_id);
 
-  if (!coupon || !coupon.status) {
-    return { allowed: true };
-  }
+  if (!coupon?.status) return { allowed: true };
 
   const minimumPurchase = coupon.minimum_purchase || 0;
 
-  const remainingAmount = order.items.reduce((sum, item) => {
-    const isCancelling = cancellingItems.includes(
-      item.variant_id.toString()
-    );
-
-    if (isCancelling) return sum;
-
-    const remainingQty =
-      item.quantity -
-      (item.cancelledQty || 0) -
-      (item.returnedQty || 0);
-
-    return sum + item.price * remainingQty;
-  }, 0);
-
-  if (remainingAmount < minimumPurchase) {
+  if (remainingAmountAfter < minimumPurchase) {
     return {
       allowed: false,
       message:
-        `A coupon is applied to this order. Partial cancellation not allowed. Order value will drop below ₹${minimumPurchase}.`
+        `A coupon is applied to this order. Partial cancellation or return is not allowed because the order value would fall below ₹${minimumPurchase}.`
     };
   }
 

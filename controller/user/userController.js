@@ -466,7 +466,7 @@ exports.getOtpPage = (req, res) => {
     });
 
     req.session.destroy();
-    res.redirect('/user/profile');
+    res.redirect('user/home');
 
   } catch (error) {
     console.error('POST OTP ERROR:', error);
@@ -607,7 +607,7 @@ exports.postLogin = async (req, res) => {
       maxAge: 24 * 60 * 60 * 1000
     });
 
-    res.redirect('/user/profile');
+    res.redirect('/user/home');
 
   } catch (err) {
     console.error('POST LOGIN ERROR:', err);

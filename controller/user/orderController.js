@@ -403,10 +403,11 @@ exports.postCancelOrder = async (req, res) => {
     if (!userId) {
       return res.json({ success: false, message: 'Unauthorized' });
     }
-
     const selectedItems = Array.isArray(req.body.items)
       ? req.body.items
-      : req.body.items ? [req.body.items] : [];
+      : req.body.items
+      ? [req.body.items]
+      : [];
 
     if (!selectedItems.length) {
       return res.json({
@@ -414,7 +415,6 @@ exports.postCancelOrder = async (req, res) => {
         message: 'Please select at least one item'
       });
     }
-
     const order = await Order.findOne({
       orderNumber,
       user_id: userId
@@ -433,12 +433,25 @@ exports.postCancelOrder = async (req, res) => {
       order.paymentStatus === 'paid' &&
       ['placed', 'confirmed', 'shipped', 'delivered'].includes(order.status);
 
-    const isFullCancel = selectedItems.length === order.items.length;
+    const cancellingQtyMap = {};
 
-    if (!isFullCancel && order.coupon?.coupon_id) {
+    for (const variantId of selectedItems) {
+      const qty = Number(req.body[`qty_${variantId}`]);
+
+      if (!qty || qty <= 0) {
+        return res.json({
+          success: false,
+          message: 'Invalid quantity selected'
+        });
+      }
+
+      cancellingQtyMap[variantId] = qty;
+    }
+    if (order.coupon?.coupon_id) {
       const couponCheck = await validatePartialCancellation({
         order,
-        cancellingItems: selectedItems
+        cancellingItems: selectedItems,
+        cancellingQtyMap
       });
 
       if (!couponCheck.allowed) {
@@ -450,7 +463,7 @@ exports.postCancelOrder = async (req, res) => {
     }
 
     for (const variantId of selectedItems) {
-      const qty = Number(req.body[`qty_${variantId}`]);
+      const qty = cancellingQtyMap[variantId];
       const message = req.body[`message_${variantId}`]?.trim();
 
       if (!message) {
@@ -464,7 +477,7 @@ exports.postCancelOrder = async (req, res) => {
         i => i.variant_id.toString() === variantId
       );
 
-      if (!item || qty <= 0) continue;
+      if (!item) continue;
 
       const remainingQty =
         item.quantity -
@@ -477,26 +490,32 @@ exports.postCancelOrder = async (req, res) => {
           message: 'Invalid quantity selected'
         });
       }
+
+      //  RETURN FLOW
       if (isReturn) {
-        item.returnedQty += qty;
+        item.returnedQty = (item.returnedQty || 0) + qty;
+
         if (item.returnedQty === item.quantity) {
           item.status = 'returned';
         }
 
         item.returnStatus = 'pending';
       }
+      //  CANCEL FLOW
       else {
-        item.cancelledQty += qty;
+        item.cancelledQty = (item.cancelledQty || 0) + qty;
 
         if (item.cancelledQty === item.quantity) {
           item.status = 'cancelled';
         }
 
+        // Restock
         await Variant.findByIdAndUpdate(
           variantId,
           { $inc: { stock: qty } }
         );
 
+        // Refund
         if (allowDirectRefund) {
           await processRefund({
             order,
@@ -530,6 +549,7 @@ exports.postCancelOrder = async (req, res) => {
 
   } catch (error) {
     console.error('POST CANCEL/RETURN ORDER ERROR:', error);
+
     return res.json({
       success: false,
       message: 'Something went wrong. Please try again.'
