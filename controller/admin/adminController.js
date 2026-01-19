@@ -15,12 +15,13 @@ const ExcelJS = require('exceljs');
 const fs = require('fs');
 const mongoose = require('mongoose');
 const path = require('path');
+const { exportRevenueExcel } = require(__basedir +'/services/revenueExportService');
 const { processRefund } = require(__basedir +'/services/refundService');
 
 
 exports.getLogin = (req, res) => {
   if (req.cookies.adminToken) {
-    return res.redirect('/admin/user');
+    return res.redirect('/admin/revenue');
   }
 
   res.render('admin/login');
@@ -145,8 +146,6 @@ exports.saveCategory = async (req, res) => {
     const { categoryId } = req.params;
 
     const trimmedName = name.trim();
-
-    // ---------- DUPLICATE CHECK ----------
     const duplicate = await Category.findOne({
       name: { $regex: `^${trimmedName}$`, $options: 'i' },
       ...(categoryId && { category_id: { $ne: categoryId } })
@@ -163,8 +162,6 @@ exports.saveCategory = async (req, res) => {
         currentPage: 'categories'
       });
     }
-
-    // ---------- OFFER DATA ----------
     const hasOffer = req.body.hasOffer === 'on';
     let offerData = null;
 
@@ -181,7 +178,6 @@ exports.saveCategory = async (req, res) => {
       };
     }
 
-    // ---------- SAVE CATEGORY ----------
     let category;
 
     if (categoryId) {
@@ -198,7 +194,6 @@ exports.saveCategory = async (req, res) => {
       });
     }
 
-    // ---------- UPDATE PRODUCTS ----------
     const products = await Product.find({
       category_id: category.category_id,
       status: true
@@ -206,8 +201,6 @@ exports.saveCategory = async (req, res) => {
 
     for (const product of products) {
       let categoryOfferPrice = 0;
-
-      // 🟢 APPLY / UPDATE CATEGORY OFFER
       if (hasOffer && offerData?.active) {
         if (offerData.discount_type === 'percentage') {
           categoryOfferPrice =
@@ -222,11 +215,7 @@ exports.saveCategory = async (req, res) => {
 
         categoryOfferPrice = Math.max(0, Math.round(categoryOfferPrice));
       }
-
-      // 🔴 REMOVE OFFER → RESET TO 0
       product.category_offer_price = categoryOfferPrice;
-
-      // ❗ DO NOT TOUCH sale_price
       await product.save();
     }
 
@@ -243,15 +232,24 @@ exports.saveCategory = async (req, res) => {
   }
 };
 
-
 exports.deleteCategory = async (req, res) => {
   try {
     const { categoryId } = req.params;
 
     if (!categoryId) {
-      return res
-        .status(HttpStatus.BAD_REQUEST)
-        .json({ error: 'Category ID required' });
+      return res.status(HttpStatus.BAD_REQUEST).json({
+        error: 'Category ID required'
+      });
+    }
+
+    const haveProducts = await Product.find({
+      category_id: categoryId
+    });
+
+    if (haveProducts.length > 0) {
+      return res.status(HttpStatus.BAD_REQUEST).json({
+        error: 'This category have products'
+      });
     }
 
     const deleted = await Category.findOneAndDelete({
@@ -259,21 +257,21 @@ exports.deleteCategory = async (req, res) => {
     });
 
     if (!deleted) {
-      return res
-        .status(HttpStatus.NOT_FOUND)
-        .json({ error: 'Category not found' });
+      return res.status(HttpStatus.NOT_FOUND).json({
+        error: 'Category not found'
+      });
     }
 
-    return res
-      .status(HttpStatus.OK)
-      .json({ success: true });
+    return res.status(HttpStatus.OK).json({
+      success: true
+    });
 
   } catch (error) {
     console.error('DELETE CATEGORY ERROR:', error);
 
-    return res
-      .status(HttpStatus.INTERNAL_SERVER_ERROR)
-      .json({ error: 'Server error' });
+    return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+      error: 'Server error'
+    });
   }
 };
 
@@ -798,11 +796,28 @@ exports.updateStock = async (req, res) => {
   }
 };
 
+// 
 exports.getRevenue = async (req, res) => {
   try {
-    const { from, to, download } = req.query;
+    const { from, to, range, page = 1 } = req.query;
+    const LIMIT = 10;
+    const currentPage = Number(page);
 
     const dateFilter = {};
+    const now = new Date();
+
+    if (range === 'week') {
+      const start = new Date();
+      start.setDate(now.getDate() - 7);
+      dateFilter.$gte = start;
+    }
+    else if (range === 'month') {
+      dateFilter.$gte = new Date(now.getFullYear(), now.getMonth(), 1);
+    }
+    else if (range === 'year') {
+      dateFilter.$gte = new Date(now.getFullYear(), 0, 1);
+    }
+
     if (from) dateFilter.$gte = new Date(from);
     if (to) {
       const end = new Date(to);
@@ -815,105 +830,100 @@ exports.getRevenue = async (req, res) => {
       query.created_at = dateFilter;
     }
 
-    const orders = await Order.find(query).lean();
-
+    const orders = await Order.find(query)
+      .sort({ created_at: -1 })
+      .lean();
     let totalRevenue = 0;
     let totalDiscount = 0;
-
-    // VALUE BUCKETS (₹)
     let paidValue = 0;
     let pendingValue = 0;
     let refundedValue = 0;
     let cancelledValue = 0;
 
-    const dailyRevenue = {};
+    const dailyRevenue = {};  
+    const tableData = [];
 
     orders.forEach(order => {
-      const isPaid = order.paymentStatus === 'paid';
+      let orderQty = 0;
+      let cancelledQty = 0;
+      let returnedQty = 0;
+      let refundedAmount = 0;
+      let cancelledRefundAmount = 0;
 
       order.items.forEach(item => {
-        const price = item.price;
+        orderQty += item.quantity;
+        cancelledQty += item.cancelledQty || 0;
+        returnedQty += item.returnedQty || 0;
 
-        const cancelledQty = item.cancelledQty || 0;
-        const returnedQty = item.returnedQty || 0;
-        const deliveredQty =
-          item.quantity - cancelledQty - returnedQty;
+        refundedAmount += (item.returnedQty || 0) * item.price;
 
-        // ---- VALUE SPLIT ----
-        const deliveredValue = deliveredQty * price;
-        const cancelledValueItem = cancelledQty * price;
-        const returnedValueItem = returnedQty * price;
-
-        if (isPaid) {
-          paidValue += deliveredValue;
-          refundedValue += returnedValueItem;
-        } else {
-          pendingValue += deliveredValue;
-        }
-
-        cancelledValue += cancelledValueItem;
-
-        // ---- REVENUE TREND (ONLY DELIVERED & PAID) ----
-        if (isPaid && deliveredValue > 0) {
-          totalRevenue += deliveredValue;
-          totalDiscount += order.discount || 0;
-
-          const day = new Date(order.created_at).toLocaleDateString();
-          dailyRevenue[day] =
-            (dailyRevenue[day] || 0) + deliveredValue;
+        if (order.paymentStatus === 'paid') {
+          cancelledRefundAmount += (item.cancelledQty || 0) * item.price;
         }
       });
+
+      const totalRefund = refundedAmount + cancelledRefundAmount;
+
+      const netTotal = Math.max(
+        order.total - totalRefund,
+        0
+      );
+
+      if (order.paymentStatus === 'paid') {
+        totalRevenue += netTotal;
+        totalDiscount += order.discount || 0;
+        paidValue += netTotal;
+        refundedValue += totalRefund;
+      } else {
+        pendingValue += order.total;
+      }
+
+      cancelledValue += cancelledQty;
+
+      const day = new Date(order.created_at).toLocaleDateString();
+      dailyRevenue[day] = (dailyRevenue[day] || 0) + netTotal;
+      tableData.push({
+        orderNumber: order.orderNumber,
+        quantity: orderQty,
+        cancelledQty,
+        returnedQty,
+        refundAmount: totalRefund,
+        date: new Date(order.created_at).toLocaleDateString(),
+        paymentMethod: order.paymentMethod,
+        paymentStatus: order.paymentStatus,
+        subtotal: order.subtotal,
+        discount: order.discount,
+        total: netTotal
+      });
     });
+    if (req.query.download === 'excel') {
+      return exportRevenueExcel(res, tableData);
+    }
+
+    const totalPages = Math.ceil(tableData.length / LIMIT);
+    const paginatedTable = tableData.slice(
+      (currentPage - 1) * LIMIT,
+      currentPage * LIMIT
+    );
 
     const netRevenue = totalRevenue - totalDiscount;
 
-    const totalPieValue =
+    const totalPie =
       paidValue + pendingValue + refundedValue + cancelledValue || 1;
 
     const paymentStats = {
-      paid: ((paidValue / totalPieValue) * 100).toFixed(2),
-      pending: ((pendingValue / totalPieValue) * 100).toFixed(2),
-      refunded: ((refundedValue / totalPieValue) * 100).toFixed(2),
-      cancelled: ((cancelledValue / totalPieValue) * 100).toFixed(2)
+      paid: ((paidValue / totalPie) * 100).toFixed(2),
+      pending: ((pendingValue / totalPie) * 100).toFixed(2),
+      refunded: ((refundedValue / totalPie) * 100).toFixed(2),
+      cancelled: ((cancelledValue / totalPie) * 100).toFixed(2)
     };
 
-    // ===== EXCEL EXPORT (unchanged) =====
-    if (download === 'excel') {
-      const workbook = new ExcelJS.Workbook();
-      const sheet = workbook.addWorksheet('Revenue Report');
-
-      sheet.columns = [
-        { header: 'Order Number', key: 'orderNumber', width: 15 },
-        { header: 'Date', key: 'date', width: 18 },
-        { header: 'Payment Method', key: 'paymentMethod', width: 15 },
-        { header: 'Payment Status', key: 'paymentStatus', width: 15 },
-        { header: 'Subtotal', key: 'subtotal', width: 12 },
-        { header: 'Discount', key: 'discount', width: 12 },
-        { header: 'Total', key: 'total', width: 12 }
-      ];
-
-      orders.forEach(o => {
-        sheet.addRow({
-          orderNumber: o.orderNumber,
-          date: new Date(o.created_at).toDateString(),
-          paymentMethod: o.paymentMethod,
-          paymentStatus: o.paymentStatus,
-          subtotal: o.subtotal,
-          discount: o.discount,
-          total: o.total
-        });
+    if (req.xhr || req.headers.accept?.includes('application/json')) {
+      return res.json({
+        tableData: paginatedTable,
+        currentPage,
+        totalPages
       });
-
-      res.setHeader(
-        'Content-Type',
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-      );
-      res.setHeader(
-        'Content-Disposition',
-        'attachment; filename=revenue-report.xlsx'
-      );
-
-      return workbook.xlsx.write(res);
     }
 
     return res.render('admin/revenue', {
@@ -925,14 +935,20 @@ exports.getRevenue = async (req, res) => {
       },
       paymentStats,
       dailyRevenue,
+      tableData: paginatedTable,
+      currentPage,
+      totalPages,
       from,
       to,
+      range,
       currentPage: 'revenue'
     });
 
   } catch (error) {
     console.error('GET REVENUE ERROR:', error);
-    return res.status(500).render('admin/500');
+    return res
+      .status(HttpStatus.INTERNAL_SERVER_ERROR)
+      .render('admin/500');
   }
 };
 

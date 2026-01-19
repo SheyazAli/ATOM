@@ -9,17 +9,15 @@ module.exports = async (req, res, next) => {
       return res.redirect('/user/products');
     }
 
-    const product = await Product.findOne({
+      const product = await Product.findOne({
       $or: [
         { product_id: id },
         { _id: id }
-      ],
-      status: true
+      ]
     }).lean();
-
-    if (!product) {
-      return res.redirect('/user/products');
-    }
+    // if (!product) {
+    //   return res.redirect('/user/products');
+    // }
 
     req.product = product;
     next();

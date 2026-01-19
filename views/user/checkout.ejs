@@ -121,9 +121,9 @@
           <% coupons.forEach(c => { %>
             <option
               value="<%= c.code %>"
-              <%= appliedCoupon && appliedCoupon.coupon_code === c.code ? 'selected' : '' %>
               <%= c.disabled ? 'disabled' : '' %>>
               <%= c.code %> - <%= c.description %>
+              <%= c.disabled && c.reason ? `(${c.reason})` : '' %>
             </option>
           <% }) %>
         </select>
@@ -202,6 +202,135 @@
   </div>
 </div>
 
+<!-- <script>
+  const addressSelect = document.getElementById('addressSelect');
+  const payBtn = document.getElementById('payNowBtn');
+
+  function getSelectedPayment() {
+    const checked = document.querySelector('input[name="paymentMethodRadio"]:checked');
+    return checked ? checked.value : 'cod';
+  }
+
+  function getAddressId() {
+    return addressSelect.value;
+  }
+
+  addressSelect.addEventListener('change', () => {
+    if (addressSelect.value === 'add_new') {
+      window.location.href = '/user/address/add';
+    }
+  });
+
+  payBtn.addEventListener('click', async () => {
+    const paymentMethod = getSelectedPayment();
+    const addressId = getAddressId();
+
+    if (!addressId || addressId === 'add_new') {
+      alert('Please select a valid address');
+      return;
+    }
+
+    // // COD
+    // if (paymentMethod === 'cod') {
+    //   const form = document.createElement('form');
+    //   form.method = 'POST';
+    //   form.action = '/user/checkout/pay';
+
+    //   const addr = document.createElement('input');
+    //   addr.type = 'hidden';
+    //   addr.name = 'address_id';
+    //   addr.value = addressId;
+
+    //   form.appendChild(addr);
+    //   document.body.appendChild(form);
+    //   form.submit();
+    //   return;
+    // }
+    // COD
+    if (paymentMethod === 'cod') {
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = '/user/checkout/pay';
+
+      const addr = document.createElement('input');
+      addr.type = 'hidden';
+      addr.name = 'address_id';
+      addr.value = addressId;
+
+      form.appendChild(addr);
+      document.body.appendChild(form);
+      form.submit();
+      return;
+    }
+
+
+    // WALLET
+    // if (paymentMethod === 'wallet') {
+    //   const res = await fetch('/user/checkout/pay-wallet', {
+    //     method: 'POST',
+    //     headers: { 'Content-Type': 'application/json' },
+    //     body: JSON.stringify({ address_id: addressId })
+    //   });
+
+    //   const data = await res.json();
+
+    //   if (data.success && data.redirect) {
+    //     window.location.href = data.redirect;
+    //   } else {
+    //     window.location.href = '/user/payment-failed';
+    //   }
+    //   return;
+    // }
+
+      if (paymentMethod === 'wallet') {
+    const res = await fetch('/user/checkout/pay-wallet', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ address_id: addressId })
+    });
+
+    const data = await res.json();
+
+    if (data.redirect) {
+      window.location.href = data.redirect;
+    } else {
+      window.location.href = '/user/payment-failed?reason=PAYMENT_FAILED';
+    }
+    return;
+  }
+
+    // STRIPE
+  //   const res = await fetch('/user/checkout/stripe/create-session', {
+  //     method: 'POST',
+  //     headers: { 'Content-Type': 'application/json' },
+  //     body: JSON.stringify({ address_id: addressId })
+  //   });
+
+  //   const data = await res.json();
+  //   if (data.url) {
+  //     window.location.href = data.url;
+  //   } else {
+  //     alert(data.error || 'Payment failed');
+  //   }
+  // });
+
+const res = await fetch('/user/checkout/stripe/create-session', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ address_id: addressId })
+});
+
+const data = await res.json();
+
+if (data.url) {
+  window.location.href = data.url;
+} 
+else {
+  window.location.href = '/user/payment-failed?reason=PAYMENT_FAILED';
+}
+
+</script> -->
+
 <script>
   const addressSelect = document.getElementById('addressSelect');
   const payBtn = document.getElementById('payNowBtn');
@@ -230,25 +359,27 @@
       return;
     }
 
-    // COD
+    /* ================= COD ================= */
     if (paymentMethod === 'cod') {
-      const form = document.createElement('form');
-      form.method = 'POST';
-      form.action = '/user/checkout/pay';
+      const res = await fetch('/user/checkout/pay', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ address_id: addressId })
+      });
 
-      const addr = document.createElement('input');
-      addr.type = 'hidden';
-      addr.name = 'address_id';
-      addr.value = addressId;
+      if (res.redirected) {
+        window.location.href = res.url;
+        return;
+      }
 
-      form.appendChild(addr);
-      document.body.appendChild(form);
-      form.submit();
+      const data = await res.json().catch(() => null);
+      window.location.href =
+        `/user/payment-failed?reason=${data?.error || 'PAYMENT_FAILED'}`;
       return;
     }
 
-    // WALLET
-    if (paymentMethod === 'wallet') {
+    /* ================= WALLET ================= */
+    else if (paymentMethod === 'wallet') {
       const res = await fetch('/user/checkout/pay-wallet', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -257,26 +388,30 @@
 
       const data = await res.json();
 
-      if (data.success && data.redirect) {
+      if (data.redirect) {
         window.location.href = data.redirect;
       } else {
-        window.location.href = '/user/payment-failed';
+        window.location.href = '/user/payment-failed?reason=PAYMENT_FAILED';
       }
       return;
     }
 
-    // STRIPE
-    const res = await fetch('/user/checkout/stripe/create-session', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ address_id: addressId })
-    });
+    /* ================= STRIPE ================= */
+    else if (paymentMethod === 'stripe') {
+      const res = await fetch('/user/checkout/stripe/create-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ address_id: addressId })
+      });
 
-    const data = await res.json();
-    if (data.url) {
-      window.location.href = data.url;
-    } else {
-      alert(data.error || 'Payment failed');
+      const data = await res.json();
+
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        window.location.href = '/user/payment-failed?reason=PAYMENT_FAILED';
+      }
+      return;
     }
   });
 </script>

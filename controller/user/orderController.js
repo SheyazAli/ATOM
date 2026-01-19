@@ -13,7 +13,9 @@ const Variant = require(__basedir +'/db/variantModel');
 const HttpStatus = require(__basedir +'/constants/httpStatus')
 const PDFDocument = require('pdfkit');
 const { processRefund } = require(__basedir +'/services/refundService');
+const { generateInvoicePDF } = require(__basedir +'/services/invoiceService');
 const { generateOrderNumber } = require(__basedir +'/Services/orderNumberService')
+const { validatePartialCancellation } = require(__basedir +'/Services/couponValidationService');
 
 
 exports.placeOrderCOD = async (req, res) => {
@@ -159,17 +161,20 @@ exports.downloadInvoice = async (req, res) => {
     const userId = req.user._id;
 
     const order = await Order.findOne({ orderNumber, user_id: userId }).lean();
-    if (!order) return res.status(404).render('user/404');
+    if (!order) {
+      return res.status(404).render('user/404');
+    }
 
     for (const item of order.items) {
       const variant = await Variant.findById(item.variant_id).lean();
-      const product = await Product.findOne({ product_id: variant.product_id }).lean();
+      const product = await Product.findOne({
+        product_id: variant.product_id
+      }).lean();
+
       item.name = product.title;
       item.variant = `${variant.size} · ${variant.color}`;
       item.total = item.price * item.quantity;
     }
-
-    const doc = new PDFDocument({ size: 'A4', margin: 40 });
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader(
@@ -177,149 +182,17 @@ exports.downloadInvoice = async (req, res) => {
       `attachment; filename=Invoice-${order.orderNumber}.pdf`
     );
 
-    doc.pipe(res);
-
-    const logoPath = path.join(
-      __basedir,
-      'uploads',
-      'Atom logo white bg with name.png'
-    );
-
-    if (fs.existsSync(logoPath)) {
-      doc.image(logoPath, 40, 35, { width: 100 });
-    }
-
-    doc
-      .fontSize(22)
-      .text('INVOICE', 0, 45, { align: 'right' });
-
-    doc
-      .fontSize(10)
-      .text(`Order ID: ${order.orderNumber}`, { align: 'right' })
-      .text(`Date: ${new Date(order.created_at).toDateString()}`, { align: 'right' })
-      .text(`Payment: ${order.paymentMethod.toUpperCase()}`, { align: 'right' });
-
-    doc.moveDown(2);
-    doc.moveTo(40, doc.y).lineTo(555, doc.y).stroke();
-
-    doc.moveDown(1);
-
-const LEFT_X = 40;
-let billToY = doc.y + 10;
-
-doc
-  .fontSize(11)
-  .text('BILL TO', LEFT_X, billToY, { underline: true });
-
-billToY += 16;
-
-doc
-  .fontSize(11)
-  .font('Helvetica-Bold')
-  .text(
-    `${order.address.first_name || ''} ${order.address.last_name || ''}`.trim(),
-    LEFT_X,
-    billToY
-  );
-
-billToY += 14;
-
-doc
-  .font('Helvetica')
-  .fontSize(10)
-  .text(order.address.building_name, LEFT_X, billToY);
-
-billToY += 13;
-
-doc.text(order.address.address_line_1, LEFT_X, billToY);
-billToY += 13;
-
-doc.text(
-  `${order.address.city}, ${order.address.state} ${order.address.postal_code}`,
-  LEFT_X,
-  billToY
-);
-billToY += 13;
-
-doc.text(order.address.country, LEFT_X, billToY);
-billToY += 13;
-
-doc.text(`Phone: ${order.address.phone_number}`, LEFT_X, billToY);
-
-doc.y = billToY + 20;
-
-    doc.moveDown(1.5);
-
-
-    const tableTop = doc.y;
-
-    doc.fontSize(10).text('Product', 40, tableTop);
-    doc.text('Qty', 330, tableTop);
-    doc.text('Price', 390, tableTop);
-    doc.text('Total', 470, tableTop);
-
-    doc.moveTo(40, tableTop + 12).lineTo(555, tableTop + 12).stroke();
-
-    let y = tableTop + 20;
-
-    order.items.forEach(item => {
-      doc
-        .fontSize(10)
-        .text(`${item.name}\n${item.variant}`, 40, y, { width: 270 })
-        .text(item.quantity, 330, y)
-        .text(`₹${item.price}`, 390, y)
-        .text(`₹${item.total}`, 470, y);
-
-      y += 38;
+    generateInvoicePDF({
+      order,
+      stream: res,
+      baseDir: __basedir
     });
-
-    doc.moveDown(2);
-
-    const boxX = 360;
-    const boxY = doc.y;
-
-    doc.rect(boxX - 10, boxY - 10, 205, 120).stroke();
-
-    doc
-      .fontSize(10)
-      .text(`Subtotal: ₹${order.subtotal}`, boxX, boxY)
-      .moveDown(0.4);
-
-    doc.text(`Shipping: ₹${order.shipping || 0}`, boxX).moveDown(0.4);
-
-    if (order.discount > 0 && order.coupon?.coupon_code) {
-      doc
-        .fillColor('#0a7d34')
-        .text(`Coupon: ${order.coupon.coupon_code}`, boxX)
-        .text(`Discount: - ₹${order.discount}`, boxX)
-        .fillColor('black')
-        .moveDown(0.4);
-    }
-
-    doc
-      .fontSize(12)
-      .text(`Grand Total: ₹${order.total}`, boxX, doc.y, {
-        underline: true
-      });
-
-    doc
-      .fontSize(9)
-      .fillColor('gray')
-      .text(
-        'This is a system generated invoice. No signature required.',
-        40,
-        780,
-        { align: 'center' }
-      )
-      .fillColor('black');
-
-    doc.end();
 
   } catch (err) {
     console.error('INVOICE ERROR:', err);
     return res
-  .status(HttpStatus.INTERNAL_SERVER_ERROR)
-  .render('user/500');
+      .status(HttpStatus.INTERNAL_SERVER_ERROR)
+      .render('user/500');
   }
 };
 
@@ -475,6 +348,7 @@ exports.getCancelOrder = async (req, res) => {
     }).populate('items.variant_id');
 
     if (!order) {
+      
       return res.redirect('/user/orders');
     }
 
@@ -524,44 +398,124 @@ exports.getCancelOrder = async (req, res) => {
 exports.postCancelOrder = async (req, res) => {
   try {
     const { orderNumber } = req.params;
-    const userId = req.user._id;
-    const { items = [] } = req.body;
+    const userId = req.user?._id;
 
+    if (!userId) {
+      return res.json({ success: false, message: 'Unauthorized' });
+    }
+    const selectedItems = Array.isArray(req.body.items)
+      ? req.body.items
+      : req.body.items
+      ? [req.body.items]
+      : [];
+
+    if (!selectedItems.length) {
+      return res.json({
+        success: false,
+        message: 'Please select at least one item'
+      });
+    }
     const order = await Order.findOne({
       orderNumber,
       user_id: userId
     });
 
-    if (!order) return res.redirect('/user/orders');
+    if (!order || !Array.isArray(order.items)) {
+      return res.json({
+        success: false,
+        message: 'Order not found'
+      });
+    }
 
     const isReturn = order.status === 'delivered';
 
     const allowDirectRefund =
       order.paymentStatus === 'paid' &&
-      ['placed', 'confirmed', 'shipped'].includes(order.status);
+      ['placed', 'confirmed', 'shipped', 'delivered'].includes(order.status);
 
-    for (const variantId of items) {
+    const cancellingQtyMap = {};
+
+    for (const variantId of selectedItems) {
       const qty = Number(req.body[`qty_${variantId}`]);
-      const message = req.body[`message_${variantId}`];
+
+      if (!qty || qty <= 0) {
+        return res.json({
+          success: false,
+          message: 'Invalid quantity selected'
+        });
+      }
+
+      cancellingQtyMap[variantId] = qty;
+    }
+    if (order.coupon?.coupon_id) {
+      const couponCheck = await validatePartialCancellation({
+        order,
+        cancellingItems: selectedItems,
+        cancellingQtyMap
+      });
+
+      if (!couponCheck.allowed) {
+        return res.json({
+          success: false,
+          message: couponCheck.message
+        });
+      }
+    }
+
+    for (const variantId of selectedItems) {
+      const qty = cancellingQtyMap[variantId];
+      const message = req.body[`message_${variantId}`]?.trim();
+
+      if (!message) {
+        return res.json({
+          success: false,
+          message: 'Please provide a reason for all selected items'
+        });
+      }
 
       const item = order.items.find(
         i => i.variant_id.toString() === variantId
       );
 
-      if (!item || qty <= 0) continue;
+      if (!item) continue;
+
+      const remainingQty =
+        item.quantity -
+        (item.cancelledQty || 0) -
+        (item.returnedQty || 0);
+
+      if (qty > remainingQty) {
+        return res.json({
+          success: false,
+          message: 'Invalid quantity selected'
+        });
+      }
+
+      //  RETURN FLOW
       if (isReturn) {
-        item.returnedQty += qty;
-        item.status = 'returned';
+        item.returnedQty = (item.returnedQty || 0) + qty;
+
+        if (item.returnedQty === item.quantity) {
+          item.status = 'returned';
+        }
+
         item.returnStatus = 'pending';
       }
+      //  CANCEL FLOW
       else {
-        item.cancelledQty += qty;
-        item.status = 'cancelled';
+        item.cancelledQty = (item.cancelledQty || 0) + qty;
 
+        if (item.cancelledQty === item.quantity) {
+          item.status = 'cancelled';
+        }
+
+        // Restock
         await Variant.findByIdAndUpdate(
           variantId,
           { $inc: { stock: qty } }
         );
+
+        // Refund
         if (allowDirectRefund) {
           await processRefund({
             order,
@@ -572,28 +526,33 @@ exports.postCancelOrder = async (req, res) => {
         }
       }
 
-      item.message = message || null;
+      item.message = message;
     }
-
     const statuses = order.items.map(i => i.status);
 
     if (statuses.every(s => s === 'cancelled')) {
       order.status = 'cancelled';
-    } else if (statuses.some(s => s === 'cancelled')) {
+    }
+    else if (statuses.every(s => s === 'returned')) {
+      order.status = 'returned';
+    }
+    else if (statuses.some(s => s === 'cancelled')) {
       order.status = 'partially_cancelled';
     }
-
-    if (statuses.every(s => s === 'returned')) {
-      order.status = 'returned';
-    } else if (statuses.some(s => s === 'returned')) {
+    else if (statuses.some(s => s === 'returned')) {
       order.status = 'partially_returned';
     }
 
     await order.save();
-    res.redirect('/user/orders');
+
+    return res.json({ success: true });
 
   } catch (error) {
     console.error('POST CANCEL/RETURN ORDER ERROR:', error);
-    res.redirect('/user/orders');
+
+    return res.json({
+      success: false,
+      message: 'Something went wrong. Please try again.'
+    });
   }
 };

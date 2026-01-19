@@ -10,65 +10,6 @@ const Variant = require(__basedir +'/db/variantModel');
 const HttpStatus = require(__basedir +'/constants/httpStatus')
 const Wishlist = require(__basedir + '/db/WishlistModel')
 
-
-// exports.getCartPage = async (req, res) => {
-//   try {
-//     const userId = req.user._id;
-
-//     const cartDoc = await Cart.findOne({ user_id: userId }).lean();
-
-//     let cartItems = [];
-//     let subtotal = 0;
-
-//     if (cartDoc && cartDoc.items.length) {
-//       for (const item of cartDoc.items) {
-//         const product = await Product.findOne({
-//           product_id: item.product_id,
-//           status: true
-//         }).lean();
-
-//         const variant = await Variant.findById(item.variant_id).lean();
-//         if (!product || !variant) continue;
-
-//         const itemTotal = item.quantity * item.price_snapshot;
-//         subtotal += itemTotal;
-
-//         cartItems.push({
-//           cartItemId: item._id,
-//           title: product.title,
-//           image: variant.images?.[0] || 'default-product.webp',
-//           size: variant.size,
-//           color: variant.color,
-//           stock: variant.stock,
-//           quantity: item.quantity,
-//           price_snapshot: item.price_snapshot,
-//           itemTotal
-//         });
-//       }
-//     }
-
-//     const relatedProducts = await Product.find({ status: true })
-//       .limit(4)
-//       .lean();
-
-//     // ✅ FIX: read from session
-//     const appliedCoupon = req.session.appliedCoupon || null;
-
-//     res.render('user/cart', {
-//       cartItems,
-//       subtotal,
-//       appliedCoupon,
-//       relatedProducts
-//     });
-
-//   } catch (error) {
-//     console.error('GET CART PAGE ERROR:', error);
-//     return res
-//       .status(HttpStatus.INTERNAL_SERVER_ERROR)
-//       .render('user/500');
-//   }
-// };
-
 exports.getCartPage = async (req, res) => {
   try {
     const userId = req.user._id;
@@ -80,17 +21,23 @@ exports.getCartPage = async (req, res) => {
     if (cartDoc?.items?.length) {
       for (const item of cartDoc.items) {
         const product = await Product.findOne({
-          product_id: item.product_id,
-          status: true
+          product_id: item.product_id
         }).lean();
 
         const variant = await Variant.findById(item.variant_id).lean();
+
         if (!product || !variant) continue;
 
-        subtotal += item.quantity * item.price_snapshot;
+        const isActive = product.status === true;
+
+        if (isActive) {
+          subtotal += item.quantity * item.price_snapshot;
+        }
 
         cartItems.push({
           cartItemId: item._id,
+          product_id: item.product_id,
+          productStatus: isActive,
           title: product.title,
           image: variant.images?.[0] || 'default-product.webp',
           size: variant.size,
@@ -102,7 +49,9 @@ exports.getCartPage = async (req, res) => {
       }
     }
 
-    const relatedProducts = await Product.find({ status: true }).limit(4).lean();
+    const relatedProducts = await Product.find({ status: true })
+      .limit(4)
+      .lean();
 
     res.render('user/cart', {
       cartItems,
@@ -116,6 +65,8 @@ exports.getCartPage = async (req, res) => {
     res.status(HttpStatus.INTERNAL_SERVER_ERROR).render('user/500');
   }
 };
+
+
 exports.addToCart = async (req, res) => {
   try {
     const userId = req.user._id;
