@@ -37,17 +37,37 @@
   </div>
 
   <!-- DATE FILTER -->
-  <form class="row g-3 mb-4">
-    <div class="col-md-3">
-      <input type="date" name="from" class="form-control" value="<%= from || '' %>">
-    </div>
-    <div class="col-md-3">
-      <input type="date" name="to" class="form-control" value="<%= to || '' %>">
-    </div>
-    <div class="col-md-2">
-      <button class="btn btn-primary w-100">Apply</button>
-    </div>
-  </form>
+    <form class="row g-3 mb-4">
+      <div class="col-md-2">
+        <select name="range" class="form-select">
+          <option value="">Custom</option>
+          <option value="week" <%= range==='week'?'selected':'' %>>This Week</option>
+          <option value="month" <%= range==='month'?'selected':'' %>>This Month</option>
+          <option value="year" <%= range==='year'?'selected':'' %>>This Year</option>
+        </select>
+      </div>
+
+      <div class="col-md-3">
+        <input type="date" name="from" class="form-control" value="<%= from || '' %>">
+      </div>
+
+      <div class="col-md-3">
+        <input type="date" name="to" class="form-control" value="<%= to || '' %>">
+      </div>
+
+      <div class="col-md-2">
+        <button class="btn btn-primary w-100">Apply</button>
+      </div>
+
+      <div class="col-md-2">
+        <button
+          type="button"
+          class="btn btn-secondary w-100"
+          onclick="window.location.href=window.location.pathname">
+          Reset
+        </button>
+      </div>
+    </form>
 
   <!-- METRICS -->
   <div class="row g-4 mb-4">
@@ -92,9 +112,68 @@
         <canvas id="paymentChart"></canvas>
       </div>
     </div>
+    <div class="card-box mt-4">
+  <h6 class="fw-semibold mb-3">Order Details</h6>
+<div id="ordersTableWrapper">
+<div class="table-responsive">
+    <table class="table table-bordered table-sm align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>Order #</th>
+          <th>Qty</th>
+          <th>Cancelled</th>
+          <th>Returned</th>
+          <th>Date</th>
+          <th>Payment</th>
+          <th>Status</th>
+          <th>Refund</th>
+          <th>Subtotal</th>
+          <th>Discount</th>
+          <th>Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% tableData.forEach(o => { %>
+          <tr style="cursor:pointer"
+              onclick="window.location.href='/admin/orders/<%= o.orderNumber %>'">
+            <td><%= o.orderNumber %></td>
+            <td><%= o.quantity %></td>
+            <td><%= o.cancelledQty %></td>
+            <td><%= o.returnedQty %></td>
+            <td><%= o.date %></td>
+            <td><%= o.paymentMethod %></td>
+            <td><%= o.paymentStatus %></td>
+            <td class="text-danger">₹ <%= o.refundAmount %></td>
+            <td>₹ <%= o.subtotal %></td>
+            <td class="text-success">₹ <%= o.discount %></td>
+            <td class="fw-semibold">₹ <%= o.total %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  <nav class="mt-3">
+  <ul class="pagination justify-content-end">
+    <% for (let i = 1; i <= totalPages; i++) { %>
+      <li class="page-item <%= i === currentPage ? 'active' : '' %>">
+        <button
+          class="page-link"
+          onclick="loadPage(<%= i %>)">
+          <%= i %>
+        </button>
+      </li>
+    <% } %>
+  </ul>
+</nav>
+</div>
+</nav>
+
+  </div>
+</div>
+
   </div>
 
 </div>
+
 
 <script>
   const revenueData = <%- JSON.stringify(dailyRevenue) %>;
@@ -137,6 +216,49 @@
       }
     }
   });
+</script>
+<script>
+  async function loadPage(page) {
+    const params = new URLSearchParams(window.location.search);
+    params.set('page', page);
+
+    const res = await fetch(
+      `${window.location.pathname}?${params.toString()}`,
+      { headers: { Accept: 'application/json' } }
+    );
+
+    const data = await res.json();
+
+    const tbody = document.querySelector('#ordersTableWrapper tbody');
+    tbody.innerHTML = '';
+
+    data.tableData.forEach(o => {
+      tbody.innerHTML += `
+        <tr style="cursor:pointer"
+            onclick="window.location.href='/admin/orders/${o.orderNumber}'">
+          <td>${o.orderNumber}</td>
+          <td>${o.quantity}</td>
+          <td>${o.cancelledQty}</td>
+          <td>${o.returnedQty}</td>
+          <td>${o.date}</td>
+          <td>${o.paymentMethod}</td>
+          <td>${o.paymentStatus}</td>
+          <td class="text-danger">₹ ${o.refundAmount}</td>
+          <td>₹ ${o.subtotal}</td>
+          <td class="text-success">₹ ${o.discount}</td>
+          <td class="fw-semibold">₹ ${o.total}</td>
+        </tr>
+      `;
+    });
+
+    // Update active page
+    document.querySelectorAll('.pagination .page-item')
+      .forEach((li, idx) => {
+        li.classList.toggle('active', idx + 1 === data.currentPage);
+      });
+
+    window.history.pushState({}, '', `?${params.toString()}`);
+  }
 </script>
 
 </body>

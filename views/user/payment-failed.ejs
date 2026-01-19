@@ -1,5 +1,15 @@
 <%- include('./userPartials/navbar') %>
 
+<%
+  const reasonMessages = {
+    INSUFFICIENT_WALLET_BALANCE: 'Your wallet balance is insufficient',
+    STOCK_ISSUE: 'One or more items are out of stock',
+    CART_EMPTY: 'Your cart is empty',
+    PAYMENT_FAILED: 'Payment could not be completed'
+  };
+%>
+
+
 <style>
   body { background:#fafafa; }
 
@@ -44,7 +54,8 @@
   }
 
   .btn-dark,
-  .btn-outline-dark {
+  .btn-outline-dark,
+  .btn-outline-secondary {
     border-radius:10px;
     padding:12px 16px;
   }
@@ -56,8 +67,12 @@
   <div class="text-center mb-4">
     <div class="failed-icon">✕</div>
     <h4 class="fw-semibold">Payment Failed</h4>
+
     <p class="text-muted">
-      Your payment was not completed. No amount has been deducted.
+      Your payment was not completed.
+      <% if (reason) { %>
+        (<%= reasonMessages[reason] || 'Payment failed. Please try again.' %>)
+      <% } %>
     </p>
   </div>
 
@@ -72,22 +87,25 @@
         <ul class="text-muted small mb-0">
           <li>Payment was cancelled or declined</li>
           <li>No order was placed</li>
-          <li>Your cart items are still محفوظ</li>
+          <li>Retry with other payment option</li>
+          <li>Contact suppor for more info</li>
         </ul>
       </div>
 
-      <div class="checkout-card">
-        <h6 class="fw-semibold mb-3">Shipping Address</h6>
+      <% if (address) { %>
+        <div class="checkout-card">
+          <h6 class="fw-semibold mb-3">Shipping Address</h6>
 
-        <p class="mb-1"><strong><%= address.building_name %></strong></p>
-        <p class="mb-1"><%= address.address_line_1 %></p>
-        <p class="mb-1">
-          <%= address.city %>, <%= address.state %>
-          <%= address.postal_code %>
-        </p>
-        <p class="mb-1"><%= address.country %></p>
-        <p class="mb-0">Phone: <%= address.phone_number %></p>
-      </div>
+          <p class="mb-1"><strong><%= address.building_name %></strong></p>
+          <p class="mb-1"><%= address.address_line_1 %></p>
+          <p class="mb-1">
+            <%= address.city %>, <%= address.state %>
+            <%= address.postal_code %>
+          </p>
+          <p class="mb-1"><%= address.country %></p>
+          <p class="mb-0">Phone: <%= address.phone_number %></p>
+        </div>
+      <% } %>
 
     </div>
 
@@ -97,47 +115,57 @@
 
         <h6 class="fw-semibold mb-3">Order Summary</h6>
 
-        <% cart.items.forEach(item => { %>
+        <% if (cart && cart.items && cart.items.length && summary) { %>
+          <% cart.items.forEach(item => { %>
+            <div class="row-line">
+              <span>
+                <%= item.name %> × <%= item.quantity %>
+              </span>
+              <span>₹ <%= item.price_snapshot * item.quantity %></span>
+            </div>
+          <% }) %>
+
+          <hr>
+
           <div class="row-line">
-            <span>
-              <%= item.name %> × <%= item.quantity %>
-            </span>
-            <span>₹ <%= item.price_snapshot * item.quantity %></span>
+            <span>Subtotal</span>
+            <span>₹ <%= summary.subtotal %></span>
           </div>
-        <% }) %>
 
-        <hr>
+          <% if (summary.discount > 0) { %>
+            <div class="row-line">
+              <span>Discount</span>
+              <span class="text-success">- ₹ <%= summary.discount %></span>
+            </div>
+          <% } %>
 
-        <div class="row-line">
-          <span>Subtotal</span>
-          <span>₹ <%= summary.subtotal %></span>
-        </div>
-
-        <% if (summary.discount > 0) { %>
-          <div class="row-line">
-            <span>Discount</span>
-            <span class="text-success">- ₹ <%= summary.discount %></span>
+          <div class="row-line total">
+            <span>Total</span>
+            <span>₹ <%= summary.total %></span>
           </div>
+        <% } else { %>
+          <p class="text-muted small">No items to show</p>
         <% } %>
-
-        <div class="row-line total">
-          <span>Total</span>
-          <span>₹ <%= summary.total %></span>
-        </div>
 
         <div class="mt-4 d-grid gap-2">
 
           <!-- PLACE ORDER WITH COD -->
-          <form method="POST" action="/user/checkout/pay">
-            <input type="hidden" name="paymentMethod" value="cod">
-            <input type="hidden" name="address_id" value="<%= address.address_id %>">
-            <button class="btn btn-dark w-100">
-              Place Order with Cash on Delivery
-            </button>
-          </form>
+          <% if (address) { %>
+            <form method="POST" action="/user/checkout/pay">
+              <input type="hidden" name="paymentMethod" value="cod">
+              <input type="hidden" name="address_id" value="<%= address.address_id %>">
+              <button class="btn btn-dark w-100">
+                Place Order with Cash on Delivery
+              </button>
+            </form>
+          <% } %>
 
           <a href="/user/checkout" class="btn btn-outline-dark">
             Retry Payment
+          </a>
+
+          <a href="/user/home" class="btn btn-outline-secondary">
+            Go to Home
           </a>
 
         </div>

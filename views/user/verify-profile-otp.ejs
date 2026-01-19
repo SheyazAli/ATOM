@@ -153,9 +153,18 @@
 
         <!-- RESEND -->
         <form action="/user/profile/resend-otp" method="POST" class="mt-3">
-          <button type="submit" class="btn-resend-otp">
+          <button
+            type="submit"
+            class="btn-resend-otp"
+            id="resendBtn"
+            disabled
+          >
             Resend OTP
           </button>
+
+          <p class="mt-2 text-muted" style="font-size: 13px;">
+            <span id="timerText">Resend available in 01:30</span>
+          </p>
         </form>
 
       </div>
@@ -183,6 +192,42 @@
     });
   });
 </script>
+<script>
+  const RESEND_DELAY = 90; // seconds
+  const otpSentAt = <%= otpSentAt || Date.now() %>;
+
+  const resendBtn = document.getElementById('resendBtn');
+  const timerText = document.getElementById('timerText');
+
+  function startTimer() {
+    const elapsed = Math.floor((Date.now() - otpSentAt) / 1000);
+    let remaining = RESEND_DELAY - elapsed;
+
+    if (remaining <= 0) {
+      resendBtn.disabled = false;
+      timerText.textContent = 'You can resend OTP now';
+      return;
+    }
+
+    const interval = setInterval(() => {
+      remaining--;
+
+      const min = String(Math.floor(remaining / 60)).padStart(2, '0');
+      const sec = String(remaining % 60).padStart(2, '0');
+
+      timerText.textContent = `Resend available in ${min}:${sec}`;
+
+      if (remaining <= 0) {
+        clearInterval(interval);
+        resendBtn.disabled = false;
+        timerText.textContent = 'You can resend OTP now';
+      }
+    }, 1000);
+  }
+
+  startTimer();
+</script>
+
 
 </body>
 </html>

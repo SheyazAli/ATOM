@@ -104,6 +104,9 @@
     font-size: 12px;
     color: #555;
   }
+  .input-group-text:hover {
+    background-color: #f1f1f1;
+  }
 
   .links a {
     font-size: 12px;
@@ -137,22 +140,41 @@
 
       <div class="mb-3 text-start">
         <label class="form-label">First name <span class="text-danger">*</span></label>
-        <input type="text" name="firstName" class="form-control">
+        <input type="text" name="firstName" class="form-control" required>
       </div>
 
       <div class="mb-3 text-start">
         <label class="form-label">Last name <span class="text-danger">*</span></label>
-        <input type="text" name="lastName" class="form-control" >
+        <input type="text" name="lastName" class="form-control" required>
       </div>
 
       <div class="mb-3 text-start">
         <label class="form-label">Enter your email id <span class="text-danger">*</span></label>
-        <input type="email" name="email" class="form-control" >
+        <input type="email" name="email" class="form-control" required>
       </div>
 
       <div class="mb-3 text-start">
-        <label class="form-label">Enter your password <span class="text-danger">*</span></label>
-        <input type="password" name="password" class="form-control" >
+        <label class="form-label">
+          Enter your password <span class="text-danger">*</span>
+        </label>
+        <div class="input-group">
+          <input type="password" name="password" id="password" class="form-control" required >
+          <span class="input-group-text" id="togglePassword" role="button">
+            <i class="bi bi-eye"></i>
+          </span>
+        </div>
+      </div>
+
+    <div class="mb-3 text-start">
+        <label class="form-label">
+          Confirm your password <span class="text-danger">*</span>
+        </label>
+        <div class="input-group">
+          <input type="password"name="confirmPassword"id="confirmPassword"class="form-control"required>
+          <span class="input-group-text" id="toggleConfirm" role="button">
+            <i class="bi bi-eye"></i>
+          </span>
+        </div>
       </div>
 
       <div class="mb-3 text-start">
@@ -192,5 +214,24 @@
 <%- include('./userPartials/footer') %>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  function togglePassword(inputId, toggleId) {
+    const input = document.getElementById(inputId);
+    const toggle = document.getElementById(toggleId);
+    const icon = toggle.querySelector('i');
+
+    toggle.addEventListener('click', () => {
+      const isPassword = input.type === 'password';
+      input.type = isPassword ? 'text' : 'password';
+
+      icon.classList.toggle('bi-eye');
+      icon.classList.toggle('bi-eye-slash');
+    });
+  }
+
+  togglePassword('password', 'togglePassword');
+  togglePassword('confirmPassword', 'toggleConfirm');
+</script>
+
 </body>
 </html>

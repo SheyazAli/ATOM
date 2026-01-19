@@ -4,6 +4,8 @@ const bcrypt = require('bcryptjs');
 const Address = require(__basedir +'/db/address');
 const Product = require(__basedir +'/db/productModel');
 const Category = require(__basedir +'/db/categoryModel');
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const crypto = require('crypto');
 const Order = require(__basedir +'/db/orderModel');
 const Coupon = require(__basedir +'/db/couponModel')
 const Wallet = require(__basedir +'/db/walletModel');
@@ -59,9 +61,11 @@ exports.getProfile = async (req, res, next) => {
 exports.getEditProfile = async (req, res) => {
   res.render('user/edit-profile', {
     user: req.user,
-    error: null
+    error: null,
+    activePage: 'profile'
   });
 };
+
 exports.postEditProfile = async (req, res) => {
   const { first_name, last_name, email, phone_number } = req.body;
   const user = req.user;
@@ -78,16 +82,14 @@ exports.postEditProfile = async (req, res) => {
   };
 
   if (emailChanged || phoneChanged) {
-
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    console.log(otp)
-
+    console.log("Profile update OTP: ",otp)
     req.session.otp = otp;
     req.session.otpExpires = Date.now() + 2 * 60 * 1000;
     req.session.otpAttempts = 0;
+    req.session.otpSentAt = Date.now();
 
     await sendOtpMail(email, otp);
-
     return res.redirect('/user/profile/verify-otp');
   }
 
@@ -101,6 +103,7 @@ exports.postEditProfile = async (req, res) => {
   res.redirect('/user/profile');
 };
 
+//CHANGE PASSWORD
 exports.putUpdatePassword = async (req, res) => {
   try {
     const { currentPassword, newPassword, confirmPassword } = req.body;
@@ -150,10 +153,11 @@ exports.putUpdatePassword = async (req, res) => {
     };
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-
+      console.log("Update password OTP: ",otp)
     req.session.otp = otp;
     req.session.otpExpires = Date.now() + 2 * 60 * 1000;
     req.session.otpAttempts = 0;
+    req.session.otpSentAt = Date.now(); 
 
     await sendOtpMail(user.email, otp);
 
@@ -169,15 +173,20 @@ exports.putUpdatePassword = async (req, res) => {
 };
 
 exports.getUpdatePassword = (req, res) => {
-  res.render('user/update-password', { error: null });
+  res.render('user/update-password',{ error: null,activePage: 'profile' });
 };
+
 exports.getProfileOtpPage = (req, res) => {
   if (!req.session.otp || !req.session.profileUpdate) {
     return res.redirect('/user/profile');
   }
 
-  res.render('user/verify-profile-otp');
+  res.render('user/verify-profile-otp', {
+    activePage: 'profile',
+    otpSentAt: req.session.otpSentAt
+  });
 };
+
 exports.postProfileOtp = async (req, res) => {
   const { otp } = req.body;
 
@@ -185,18 +194,24 @@ exports.postProfileOtp = async (req, res) => {
     return res.redirect('/user/profile');
   }
 
-  if (req.session.otpExpires < Date.now()) {
-    req.session.destroy();
+  if (Date.now() > req.session.otpExpires) {
+    req.session.otp = null;
+    req.session.profileUpdate = null;
     return res.redirect('/user/profile');
   }
 
   if (req.session.otp !== otp) {
-    req.session.otpAttempts += 1;
+    req.session.otpAttempts = (req.session.otpAttempts || 0) + 1;
+
     return res.render('user/verify-profile-otp', {
-      error: 'Invalid OTP'
+      activePage: 'profile',
+      error: 'Invalid OTP',
+      otpSentAt: req.session.otpSentAt
     });
+
   }
 
+  // ✅ OTP VALID → UPDATE PROFILE
   await User.findByIdAndUpdate(req.user._id, req.session.profileUpdate);
 
   req.session.otp = null;
@@ -204,18 +219,31 @@ exports.postProfileOtp = async (req, res) => {
 
   res.redirect('/user/profile');
 };
+
 exports.resendProfileOtp = async (req, res) => {
   try {
-
     if (!req.session.profileUpdate) {
       return res.redirect('/user/profile');
     }
 
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const RESEND_DELAY = 90 * 1000;
 
+    if (
+      req.session.otpSentAt &&
+      Date.now() - req.session.otpSentAt < RESEND_DELAY
+    ) {
+      return res.render('user/verify-profile-otp', {
+        error: 'Please wait before requesting another OTP',
+        otpSentAt: req.session.otpSentAt
+      });
+    }
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    console.log("Profile resend OTP",otp)
     req.session.otp = otp;
-    req.session.otpExpires = Date.now() + 2 * 60 * 1000; 
+    req.session.otpExpires = Date.now() + 2 * 60 * 1000;
     req.session.otpAttempts = 0;
+    req.session.otpSentAt = Date.now();
 
     const targetEmail =
       req.session.profileUpdate.email || req.user.email;
@@ -223,114 +251,147 @@ exports.resendProfileOtp = async (req, res) => {
     await sendOtpMail(targetEmail, otp);
 
     res.render('user/verify-profile-otp', {
+      activePage: 'profile',
       success: 'A new OTP has been sent.',
-      error: null
+      otpSentAt: req.session.otpSentAt
     });
-
   } catch (error) {
     console.error('RESEND PROFILE OTP ERROR:', error);
-
     res.render('user/verify-profile-otp', {
+      activePage: 'profile',
       error: 'Failed to resend OTP. Please try again.',
-      success: null
+      otpSentAt: req.session.otpSentAt
     });
   }
 };
 
-// AUTH
+
+// SIGNUP
 exports.getSignup = (req, res) => {
   res.render('user/signup'); 
 };
+
 exports.postSignup = async (req, res) => {
   try {
-    const { firstName, lastName, email, password, referralCode } = req.body;
+    const { firstName, lastName, email, password, confirmPassword ,referralCode } = req.body;
+
+    if (!firstName || !lastName || !email || !password || !confirmPassword) {
+      return res.render('user/signup', {
+        error: 'All fields except referral code are required'
+      });
+    }
+
+    if (!firstName.trim()) {
+      return res.render('user/signup', { error: 'First name is required' });
+    }
+
+    if (!lastName.trim()) {
+      return res.render('user/signup', { error: 'Last name is required' });
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.render('user/signup', {
+        error: 'Please enter a valid email address'
+      });
+    }
+
+    if (password.length < 6) {
+      return res.render('user/signup', {
+        error: 'Password must be at least 6 characters long'
+      });
+    }
+
+    if (password !== confirmPassword){
+      return res.render('user/signup', {
+        error: 'Password not matching'
+      });
+    }
 
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      return res.render('user/signup', { error: 'Email already exists' });
+      return res.render('user/signup', {
+        error: 'Email already exists'
+      });
     }
 
+    if (referralCode) {
+      const referrer = await User.findOne({ referralCode });
+      if (!referrer) {
+        return res.render('user/signup', {
+          error: 'Incorrect referral code'
+        });
+      }
+    }
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const generatedReferralCode = await generateReferralCode();
-
-    const newUser = new User({
-      first_name: firstName,
-      last_name: lastName,
+    req.session.signupData = {
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
       email,
-      password: hashedPassword,
-      referralCode: generatedReferralCode,
-      referredBy: referralCode || null
-    });
-
-    await newUser.save();
+      hashedPassword,
+      referralCode: referralCode || null
+    };
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-
+    console.log(otp)
     req.session.otp = otp;
-    req.session.userId = newUser._id;
-    req.session.otpExpires = Date.now() + 2 * 60 * 1000; // 2 minutes
+    req.session.otpExpires = Date.now() + 2 * 60 * 1000;
+    req.session.otpSentAt = Date.now();
     req.session.otpAttempts = 0;
 
     await sendOtpMail(email, otp);
-
-    const token = jwt.sign(
-      { userId: newUser._id, email: newUser.email },
-      process.env.JWT_USER_SECRET,
-      { expiresIn: '1d' }
-    );
-
-    res.cookie('userToken', token, {
-      httpOnly: true,
-      secure: false,
-      maxAge: 24 * 60 * 60 * 1000
-    });
 
     res.redirect('/user/verify-otp');
 
   } catch (err) {
     console.error('POST SIGNUP ERROR:', err);
     res.render('user/signup', {
-      error: 'Failed to send OTP. Please try again.'
+      error: 'Signup failed. Please try again.'
     });
   }
 };
+//SIGNUPOTP
 exports.getOtpPage = (req, res) => {
   try {
-    // If OTP session not found → invalid access
-    if (!req.session.otp || !req.session.userId) {
+    if (!req.session.otp || !req.session.signupData) {
       return res.redirect('/user/signup');
     }
 
-    res.render('user/verify-otp');
+    res.render('user/verify-otp', {
+      otpSentAt: req.session.otpSentAt
+    });
 
   } catch (error) {
     console.error('GET OTP PAGE ERROR:', error);
     res.redirect('/user/signup');
   }
 };
+
  exports.postOtpPage = async (req, res) => {
   try {
     const { otp } = req.body;
 
-    if (!req.session.otp || !req.session.userId) {
+    if (!req.session.otp || !req.session.signupData) {
       return res.redirect('/user/signup');
     }
 
     if (!otp) {
       return res.render('user/verify-otp', {
-        error: 'OTP is required'
+        error: 'OTP is required',
+        otpSentAt: req.session.otpSentAt
       });
     }
 
-    if (req.session.otpExpires < Date.now()) {
+    if (Date.now() > req.session.otpExpires) {
       req.session.destroy();
       return res.render('user/signup', {
         error: 'OTP expired. Please signup again.'
       });
     }
 
-    req.session.otpAttempts += 1;
+    // safe increment
+    req.session.otpAttempts = (req.session.otpAttempts || 0) + 1;
 
     if (req.session.otpAttempts > 3) {
       req.session.destroy();
@@ -341,58 +402,124 @@ exports.getOtpPage = (req, res) => {
 
     if (req.session.otp !== otp) {
       return res.render('user/verify-otp', {
-        error: `Invalid OTP. Attempts left: ${3 - req.session.otpAttempts}`
+        error: `Invalid OTP. Attempts left: ${3 - req.session.otpAttempts}`,
+        otpSentAt: req.session.otpSentAt
       });
     }
 
-    await User.findByIdAndUpdate(req.session.userId, {
+    // ✅ OTP VALID — CREATE USER
+    const {
+      firstName,
+      lastName,
+      email,
+      hashedPassword,
+      referralCode
+    } = req.session.signupData;
+
+    const generatedReferralCode = await generateReferralCode();
+
+    const newUser = await User.create({
+      first_name: firstName,
+      last_name: lastName,
+      email,
+      password: hashedPassword,
+      referralCode: generatedReferralCode,
+      referredBy: referralCode,
       isVerified: true
     });
 
-    req.session.destroy();
+    // referral reward
+    if (referralCode) {
+      const referrer = await User.findOne({ referralCode });
+      if (referrer) {
+        let wallet = await Wallet.findOne({ user_id: referrer._id });
+        if (!wallet) {
+          wallet = await Wallet.create({
+            user_id: referrer._id,
+            balance: 0,
+            transactionHistory: []
+          });
+        }
 
-    res.redirect('/user/profile');
+        wallet.balance += 200;
+        wallet.transactionHistory.push({
+          amount: 200,
+          transaction_id: `RFL-${newUser._id}`,
+          payment_method: 'referral',
+          type: 'credit'
+        });
+
+        await wallet.save();
+      }
+    }
+
+    const token = jwt.sign(
+      { userId: newUser._id },
+      process.env.JWT_USER_SECRET,
+      { expiresIn: '1d' }
+    );
+
+    res.cookie('userToken', token, {
+      httpOnly: true,
+      secure: false,
+      maxAge: 24 * 60 * 60 * 1000
+    });
+
+    req.session.destroy();
+    res.redirect('user/home');
 
   } catch (error) {
     console.error('POST OTP ERROR:', error);
     res.render('user/verify-otp', {
-      error: 'Something went wrong. Try again.'
+      error: 'Something went wrong. Try again.',
+      otpSentAt: req.session.otpSentAt
     });
   }
 };
+
 exports.resendOtp = async (req, res) => {
   try {
-
-    if (!req.session.userId) {
+    if (!req.session.signupData?.email) {
       return res.redirect('/user/signup');
+    }
+
+    const RESEND_DELAY = 90 * 1000;
+
+    if (
+      req.session.otpSentAt &&
+      Date.now() - req.session.otpSentAt < RESEND_DELAY
+    ) {
+      return res.render('user/verify-otp', {
+        error: 'Please wait before requesting another OTP',
+        otpSentAt: req.session.otpSentAt
+      });
     }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-
+    console.log(otp)
     req.session.otp = otp;
-    req.session.otpExpires = Date.now() + 5 * 60 * 1000;
-    req.session.otpAttempts = 0; 
+    req.session.otpExpires = Date.now() + 2 * 60 * 1000;
+    req.session.otpAttempts = 0;
+    req.session.otpSentAt = Date.now();
 
-    const user = await User.findById(req.session.userId);
-    if (!user) {
-      req.session.destroy();
-      return res.redirect('/user/signup');
-    }
-
-
-    await sendOtpMail(user.email, otp);
+    await sendOtpMail(req.session.signupData.email, otp);
 
     res.render('user/verify-otp', {
-      success: 'A new OTP has been sent to your email'
+      success: 'A new OTP has been sent to your email',
+      otpSentAt: req.session.otpSentAt
     });
 
   } catch (error) {
-    console.error('RESEND OTP ERROR:', error);
+    console.error('SIGNUP RESEND OTP ERROR:', error);
     res.render('user/verify-otp', {
-      error: 'Unable to resend OTP. Try again.'
+      error: 'Unable to resend OTP. Try again.',
+      otpSentAt: req.session.otpSentAt
     });
   }
 };
+
+
+//GOOGLE SIGNUP
 exports.googleAuthSuccess = async (req, res) => {
   try {
     const user = req.user;
@@ -423,6 +550,7 @@ exports.googleAuthSuccess = async (req, res) => {
     res.redirect('/user/login');
   }
 };
+//LOGIN
 exports.getLogin = (req, res) => {
   res.render('user/login'); // renders views/user/login.ejs
 };
@@ -479,7 +607,7 @@ exports.postLogin = async (req, res) => {
       maxAge: 24 * 60 * 60 * 1000
     });
 
-    res.redirect('/user/profile');
+    res.redirect('/user/home');
 
   } catch (err) {
     console.error('POST LOGIN ERROR:', err);
@@ -492,12 +620,12 @@ exports.postLogin = async (req, res) => {
 // FORGOT PASSWORD
 exports.getForgotPassword = async (req, res) => {
   res.render('user/forgot-password', { error: null });
-}
+};
+
 exports.postForgotPassword = async (req, res) => {
   const { email } = req.body;
 
   const user = await User.findOne({ email });
-
   if (!user) {
     return res.render('user/forgot-password', {
       error: 'User not found. Please sign up.'
@@ -505,6 +633,7 @@ exports.postForgotPassword = async (req, res) => {
   }
 
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  console.log('RESET OTP:', otp);
 
   req.session.resetPassword = {
     userId: user._id
@@ -512,52 +641,104 @@ exports.postForgotPassword = async (req, res) => {
 
   req.session.otp = otp;
   req.session.otpExpires = Date.now() + 5 * 60 * 1000;
+  req.session.otpAttempts = 0;
+  req.session.otpSentAt = Date.now(); // ⏱️ REQUIRED
 
-  await sendOtpMail(email, otp);
+  await sendOtpMail(user.email, otp);
 
   res.redirect('/user/reset-password');
 };
+
 exports.getResetPassword = async (req, res) => {
-  res.render('user/reset-password', { error: null });
-}
+  if (!req.session.resetPassword) {
+    return res.redirect('/user/forgot-password');
+  }
+
+  res.render('user/reset-password', {
+    error: null,
+    success: null,
+    otpSentAt: req.session.otpSentAt
+  });
+};
+
 exports.passwordResendOtp = async (req, res) => {
   try {
+    if (req.session.signupData) {
+      return res.redirect('/user/verify-otp');
+    }
+
+    if (!req.session.resetPassword?.userId) {
+      return res.redirect('/user/forgot-password');
+    }
+
+    const RESEND_DELAY = 90 * 1000;
+
+    if (
+      req.session.otpSentAt &&
+      Date.now() - req.session.otpSentAt < RESEND_DELAY
+    ) {
+      return res.render('user/reset-password', {
+        error: 'Please wait before requesting another OTP',
+        success: null,
+        otpSentAt: req.session.otpSentAt
+      });
+    }
+
+    const user = await User.findById(req.session.resetPassword.userId);
+    if (!user) {
+      return res.redirect('/user/forgot-password');
+    }
+
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    console.log(otp)
 
     req.session.otp = otp;
     req.session.otpExpires = Date.now() + 5 * 60 * 1000;
+    req.session.otpAttempts = 0;
+    req.session.otpSentAt = Date.now();
 
-    await sendOtpMail(req.user.email, otp);
+    await sendOtpMail(user.email, otp);
 
-    res.render('user/verify-otp', {
-      success: 'OTP resent successfully'
+    res.render('user/reset-password', {
+      success: 'OTP resent successfully',
+      error: null,
+      otpSentAt: req.session.otpSentAt
     });
 
   } catch (error) {
-    console.error('RESEND OTP ERROR:', error);
-    res.render('user/verify-otp', {
-      error: 'Failed to resend OTP'
+    console.error('PASSWORD RESEND OTP ERROR:', error);
+    res.render('user/reset-password', {
+      error: 'Failed to resend OTP',
+      success: null,
+      otpSentAt: req.session.otpSentAt
     });
   }
 };
+
 exports.postResetPassword = async (req, res) => {
   const { otp, newPassword, confirmPassword } = req.body;
 
   if (!otp || !newPassword || !confirmPassword) {
     return res.render('user/reset-password', {
-      error: 'All fields are required'
+      error: 'All fields are required',
+      success: null,
+      otpSentAt: req.session.otpSentAt
     });
   }
 
   if (newPassword !== confirmPassword) {
     return res.render('user/reset-password', {
-      error: 'Passwords do not match'
+      error: 'Passwords do not match',
+      success: null,
+      otpSentAt: req.session.otpSentAt
     });
   }
 
-  if (req.session.otp !== otp || Date.now() > req.session.otpExpires) {
+  if (!req.session.otp || Date.now() > req.session.otpExpires || req.session.otp !== otp) {
     return res.render('user/reset-password', {
-      error: 'Invalid or expired OTP'
+      error: 'Invalid or expired OTP',
+      success: null,
+      otpSentAt: req.session.otpSentAt
     });
   }
 
@@ -573,38 +754,6 @@ exports.postResetPassword = async (req, res) => {
   res.redirect('/user/profile');
 };
 
-//WALLET
-
-exports.getWallet = async (req, res) => {
-  try {
-    if (!req.user) {
-      return res.redirect('/user/login');
-    }
-
-    const userId = req.user._id; // ✅ FIX
-
-    let wallet = await Wallet.findOne({ user_id: userId }).lean();
-
-    if (!wallet) {
-      wallet = {
-        balance: 0,
-        transactionHistory: []
-      };
-    }
-
-    res.render('user/wallet', {
-      walletBalance: wallet.balance,
-      transactions: wallet.transactionHistory.sort(
-        (a, b) => new Date(b.date) - new Date(a.date)
-      ),
-      activePage: 'wallet'
-    });
-
-  } catch (error) {
-    console.error('GET WALLET ERROR:', error);
-    res.redirect('/user/profile');
-  }
-};
 
 //PRODUCTS
 
@@ -643,7 +792,7 @@ exports.getProducts = async (req, res) => {
     }
 
     const productQuery = {
-      status: true,
+      // status: true,
       title: { $regex: search, $options: 'i' }
     };
 
@@ -760,7 +909,7 @@ exports.getProductDetails = async (req, res) => {
 
     return res.render('user/product-details', {
       product,
-      category, // <-- already here, used for offer
+      category,
       colorMap,
       colors,
       defaultColor,
@@ -773,7 +922,6 @@ exports.getProductDetails = async (req, res) => {
     return res.redirect('/user/products');
   }
 };
-
 
 exports.getCheckout = async (req, res) => {
   try {
@@ -809,7 +957,7 @@ exports.getCheckout = async (req, res) => {
         product.category_offer_price &&
         product.category_offer_price >= item.price_snapshot
       ) {
-        priceMessage = 'You already have the best price';
+        priceMessage = 'Special category offer is not applied. You already have the best price';
       }
 
       const itemTotal = item.quantity * finalPrice;
@@ -821,7 +969,7 @@ exports.getCheckout = async (req, res) => {
         variant: `${variant.size} · ${variant.color}`,
         quantity: item.quantity,
         itemTotal,
-        priceMessage // 🔹 passed to EJS
+        priceMessage 
       });
     }
 
@@ -836,27 +984,35 @@ exports.getCheckout = async (req, res) => {
     const coupons = await Coupon.find({ status: true }).lean();
 
     const couponList = coupons.map(c => {
-      let disabled = false;
-      let reason = '';
+    let disabled = false;
+    let reason = '';
 
-      if (c.expiry_date < new Date()) {
-        disabled = true;
-        reason = 'Expired';
-      } else if (c.minimum_purchase > subtotal) {
-        disabled = true;
-        reason = `Min ₹${c.minimum_purchase}`;
-      } else if (c.usage_limit > 0 && c.used_count >= c.usage_limit) {
-        disabled = true;
-        reason = 'Limit reached';
-      }
+    if (c.expiry_date < new Date()) {
+      disabled = true;
+      reason = 'Expired';
+    }
+    else if (
+      c.user_ids?.some(id => id.toString() === userId.toString())
+    ) {
+      disabled = true;
+      reason = 'Already used';
+    }
+    else if (c.minimum_purchase > subtotal) {
+      disabled = true;
+      reason = `Min ₹${c.minimum_purchase}`;
+    }
+    else if (c.usage_limit > 0 && c.used_count >= c.usage_limit) {
+      disabled = true;
+      reason = 'Limit reached';
+    }
 
-      return {
-        code: c.coupon_code,
-        description: c.description,
-        disabled,
-        reason
-      };
-    });
+    return {
+      code: c.coupon_code,
+      description: c.description,
+      disabled,
+      reason
+    };
+  });
 
     const total = Math.max(subtotal - discount, 0);
 
@@ -877,7 +1033,6 @@ exports.getCheckout = async (req, res) => {
     res.render('user/500');
   }
 };
-
 
 //COUPON
 
@@ -928,8 +1083,6 @@ exports.removeCoupon = async (req, res) => {
   res.json({ success: true });
 };
 
-
-
 exports.logout = (req, res) => {
   res.clearCookie('userToken', {
     httpOnly: true,
@@ -940,3 +1093,4 @@ exports.logout = (req, res) => {
 
   res.redirect('/user/home');
 };
+

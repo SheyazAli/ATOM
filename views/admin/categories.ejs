@@ -195,14 +195,40 @@ function deleteCategory(id) {
     text: 'This will remove the category permanently',
     icon: 'warning',
     showCancelButton: true,
-    confirmButtonColor: '#d33'
+    confirmButtonColor: '#d33',
+    confirmButtonText: 'Yes, delete it'
   }).then(result => {
-    if (result.isConfirmed) {
-      fetch(`/admin/categories/${id}`, { method: 'DELETE' })
-        .then(() => location.reload());
-    }
+    if (!result.isConfirmed) return;
+
+    fetch(`/admin/categories/${id}`, { method: 'DELETE' })
+      .then(res => res.json())
+      .then(data => {
+        if (data.error) {
+          Swal.fire({
+            icon: 'error',
+            title: 'Cannot delete category',
+            text: data.error
+          });
+        } else {
+          Swal.fire({
+            icon: 'success',
+            title: 'Deleted',
+            text: 'Category deleted successfully'
+          }).then(() => {
+            location.reload();
+          });
+        }
+      })
+      .catch(() => {
+        Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: 'Something went wrong'
+        });
+      });
   });
 }
+
 </script>
 
 </body>

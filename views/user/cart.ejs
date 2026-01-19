@@ -31,6 +31,27 @@
     font-weight:600;
   }
 
+  .cart-disabled {
+  opacity: .55;
+}
+
+  .cart-disabled .disable-interaction {
+    pointer-events: none;
+  }
+
+
+  .cart-badge {
+    position:absolute;
+    top:10px;
+    left:10px;
+    background:#dc3545;
+    color:#fff;
+    font-size:12px;
+    padding:4px 8px;
+    border-radius:6px;
+    font-weight:600;
+  }
+
   .cart-card {
     background:#fff;
     border-radius:12px;
@@ -70,6 +91,11 @@
     top:20px;
   }
 
+  .summary-item {
+    font-size:14px;
+    margin-bottom:8px;
+  }
+
   .related-card img {
     aspect-ratio:5/7;
     object-fit:cover;
@@ -98,76 +124,105 @@
       </div>
     </div>
 
-    <!-- CART ITEMS -->
+    <!-- CART -->
     <div class="col-lg-6 col-md-8">
-      <h5 class="fw-semibold mb-3">Cart</h5>
+  <h5 class="fw-semibold mb-3">Cart</h5>
 
-      <% if (!cartItems.length) { %>
-        <p class="text-muted">Your cart is empty</p>
+  <%
+    const hasDisabledProduct = cartItems.some(i => !i.productStatus);
+  %>
+
+  <% if (hasDisabledProduct) { %>
+    <div class="alert alert-danger text-center fw-semibold">
+      One or more products in your cart are currently unavailable.
+      Please remove them to proceed to checkout.
+    </div>
+  <% } %>
+
+  <% if (!cartItems.length) { %>
+    <p class="text-muted">Your cart is empty</p>
+  <% } %>
+
+  <% cartItems.forEach(item => { %>
+    <div class="cart-card position-relative <%= !item.productStatus ? 'cart-disabled' : '' %>"
+         data-cart-id="<%= item.cartItemId %>"
+         data-price="<%= item.price_snapshot %>"
+         data-stock="<%= item.stock %>"
+         data-active="<%= item.productStatus %>"
+         data-title="<%= item.title %>">
+
+      <% if (!item.productStatus) { %>
+        <div class="cart-badge">Unavailable</div>
       <% } %>
 
-      <% cartItems.forEach(item => { %>
-        <div class="cart-card"
-          data-cart-id="<%= item.cartItemId %>"
-          data-price="<%= item.price_snapshot %>"
-          data-stock="<%= item.stock %>">
+          <!-- DISABLED INTERACTION WRAPPER -->
+      <div class="<%= !item.productStatus ? 'disable-interaction d-flex gap-3' : 'd-flex gap-3' %>">
 
-          <img src="/uploads/<%= item.image %>">
+        <img src="/uploads/<%= item.image %>">
 
-          <div class="flex-grow-1">
-            <h6><%= item.title %></h6>
+        <div class="flex-grow-1">
+          <h6 class="mb-1" style="max-width:75%;">
+            <%= item.title %>
+          </h6>
 
-            <div class="small text-muted mb-2">
-              Size: <%= item.size %> · Color: <%= item.color %>
-            </div>
+          <div class="small text-muted mb-2">
+            Size: <%= item.size %> · Color: <%= item.color %>
+          </div>
 
-            <div class="d-flex align-items-center gap-2 mb-2">
-              <button class="qty-btn minus" data-delta="-1">−</button>
-              <span class="qty"><%= item.quantity %></span>
-              <button class="qty-btn plus" data-delta="1">+</button>
-            </div>
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <button class="qty-btn minus"
+                    data-delta="-1"
+                    <%= !item.productStatus ? 'disabled' : '' %>>−</button>
 
-            <div class="small">
-              <a href="javascript:void(0)"
-                 onclick="addToWishlistFromCart('<%= item.cartItemId %>')"
-                 class="me-3 text-decoration-none">
-                <i class="bi bi-heart"></i> Wishlist
-              </a>
+            <span class="qty"><%= item.quantity %></span>
 
-              <a href="javascript:void(0)"
-                 onclick="removeItem('<%= item.cartItemId %>')"
-                 class="text-danger text-decoration-none">
-                Remove
-              </a>
-            </div>
+            <button class="qty-btn plus"
+                    data-delta="1"
+                    <%= !item.productStatus ? 'disabled' : '' %>>+</button>
+          </div>
+
+          <div class="small">
+            <a href="javascript:void(0)"
+              class="me-3 text-decoration-none <%= !item.productStatus ? 'text-muted' : '' %>"
+              <%= item.productStatus
+                ? `onclick="addToWishlistFromCart('${item.cartItemId}')"`
+                : '' %>>
+              <i class="bi bi-heart"></i> Wishlist
+            </a>
           </div>
         </div>
-      <% }) %>
-    </div>
+      </div>
 
-    <!-- ORDER SUMMARY -->
+      <!-- ✅ REMOVE BUTTON (PUT THIS IMMEDIATELY AFTER THE WRAPPER) -->
+      <div class="ms-auto align-self-start">
+        <a href="javascript:void(0)"
+          onclick="removeItem('<%= item.cartItemId %>')"
+          class="text-danger text-decoration-none small fw-semibold">
+          Remove
+        </a>
+      </div>
+
+    </div>
+  <% }) %>
+</div>
+
+
+    <!-- SUMMARY -->
     <div class="col-lg-3">
       <div class="summary-box">
         <h6 class="fw-semibold">Order Summary</h6>
 
-        <div class="d-flex justify-content-between mb-2">
-          <span>Order Subtotal</span>
-          <span id="subtotal">₹ 0</span>
-        </div>
-
-        <div class="d-flex justify-content-between mb-2">
-          <span>Shipping</span>
-          <span class="text-success">FREE</span>
-        </div>
+        <div id="summaryItems" class="mb-3"></div>
 
         <hr>
 
-        <div class="d-flex justify-content-between mb-3">
+        <div class="d-flex justify-content-between mb-2">
           <strong>Total</strong>
           <strong id="grandTotal">₹ 0</strong>
         </div>
 
-        <a href="/user/checkout" class="btn btn-dark w-100">
+        <a href="<%= hasDisabledProduct ? 'javascript:void(0)' : '/user/checkout' %>"
+           class="btn btn-dark w-100 <%= hasDisabledProduct ? 'disabled' : '' %>">
           Proceed to Checkout
         </a>
       </div>
@@ -208,44 +263,39 @@
 <script>
 let cartState = [];
 
-/* INIT */
 document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.cart-card').forEach(card => {
+    if (card.dataset.active !== 'true') return;
+
     cartState.push({
       id: card.dataset.cartId,
+      title: card.dataset.title,
       price: Number(card.dataset.price),
-      stock: Number(card.dataset.stock),
       qty: Number(card.querySelector('.qty').innerText)
     });
-    syncButtons(card);
   });
 
   renderSummary();
 });
 
-/* QTY HANDLER */
 document.addEventListener('click', e => {
   const btn = e.target.closest('.qty-btn');
   if (!btn) return;
 
   const card = btn.closest('.cart-card');
-  const delta = Number(btn.dataset.delta);
-  if (!card || !delta) return;
+  if (card.dataset.active !== 'true') return;
 
-  changeQty(card, delta);
+  changeQty(card, Number(btn.dataset.delta));
 });
 
 async function changeQty(card, delta) {
   const item = cartState.find(i => i.id === card.dataset.cartId);
   if (!item) return;
 
-  const newQty = item.qty + delta;
-  if (newQty < 1 || newQty > item.stock) return;
-
   const res = await fetch(`/user/cart/item/${item.id}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ delta })
+    method:'PATCH',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({ delta })
   });
 
   const data = await res.json();
@@ -253,53 +303,44 @@ async function changeQty(card, delta) {
 
   item.qty = data.newQty;
   card.querySelector('.qty').innerText = data.newQty;
-  syncButtons(card);
   renderSummary();
 }
 
-function calculateSubtotal() {
-  return cartState.reduce((sum, i) => sum + i.price * i.qty, 0);
-}
-
 function renderSummary() {
-  const subtotal = calculateSubtotal();
-  document.getElementById('subtotal').innerText = `₹ ${subtotal}`;
-  document.getElementById('grandTotal').innerText = `₹ ${subtotal}`;
-}
+  const box = document.getElementById('summaryItems');
+  box.innerHTML = '';
 
-function syncButtons(card) {
-  const item = cartState.find(i => i.id === card.dataset.cartId);
-  card.querySelector('.minus').disabled = item.qty <= 1;
-  card.querySelector('.plus').disabled  = item.qty >= item.stock;
-}
+  let total = 0;
 
-/* REMOVE ITEM */
-async function removeItem(cartItemId) {
-  const res = await fetch(`/user/cart/item/${cartItemId}`, {
-    method: 'DELETE'
+  cartState.forEach(i => {
+    const line = i.price * i.qty;
+    total += line;
+
+    box.innerHTML += `
+      <div class="summary-item">
+        <div class="fw-semibold">${i.title}</div>
+        <div class="d-flex justify-content-between">
+          <span>₹ ${i.price} × ${i.qty}</span>
+          <span>₹ ${line}</span>
+        </div>
+      </div>
+    `;
   });
 
-  const data = await res.json();
-  if (!data.success) {
-    return alert(data.error || 'Failed to remove item');
-  }
+  document.getElementById('grandTotal').innerText = `₹ ${total}`;
+}
 
+async function removeItem(id) {
+  await fetch(`/user/cart/item/${id}`, { method:'DELETE' });
   location.reload();
 }
 
-/* MOVE TO WISHLIST */
-async function addToWishlistFromCart(cartItemId) {
-  const res = await fetch('/user/wishlist/add-from-cart', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ cartItemId })
+async function addToWishlistFromCart(id) {
+  await fetch('/user/wishlist/add-from-cart', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({ cartItemId:id })
   });
-
-  const data = await res.json();
-  if (!data.success) {
-    return alert(data.error || 'Failed to move to wishlist');
-  }
-
   location.reload();
 }
 </script>

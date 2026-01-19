@@ -67,6 +67,23 @@
       flex-direction: column;
       min-height: 140px;
     }
+    .product-disabled {
+      opacity: 0.55;
+      pointer-events: none; /* disables click */
+    }
+
+    .unavailable-badge {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      background: #dc3545;
+      color: #fff;
+      font-size: 12px;
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-weight: 600;
+      z-index: 2;
+    }
 
     .product-card h6 {
       font-size: 14px;
@@ -230,10 +247,14 @@
         %>
 
           <div class="col-xl-3 col-lg-3 col-md-4 col-sm-6">
-            <a href="/user/product/<%= p.product_id %>"
-               class="text-decoration-none text-dark">
+            <a href="<%= p.status ? `/user/product/${p.product_id}` : 'javascript:void(0)' %>"
+            class="text-decoration-none text-dark">
 
-              <div class="card product-card">
+            <div class="card product-card <%= !p.status ? 'product-disabled' : '' %>"
+                style="position:relative;">
+                <% if (!p.status) { %>
+                  <div class="unavailable-badge">Currently Unavailable</div>
+                <% } %>
                 <img src="/uploads/<%= p.thumbnail %>" alt="<%= p.title %>">
 
                 <div class="card-body">

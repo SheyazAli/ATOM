@@ -104,7 +104,7 @@
             <textarea
               class="form-control mt-3"
               name="message_<%= item.variant_id %>"
-              placeholder="Reason for this item (optional)"></textarea>
+              placeholder="Reason for this item (required*)"></textarea>
 
           </div>
         <% }) %>
@@ -139,19 +139,61 @@
     }
   }
 
-  function confirmAction() {
-    Swal.fire({
-      title: 'Are you sure?',
-      text: 'This action cannot be undone',
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonText: 'Yes, proceed'
-    }).then(result => {
-      if (result.isConfirmed) {
-        document.getElementById('actionForm').submit();
-      }
-    });
+async function confirmAction() {
+  const checkboxes = document.querySelectorAll('input[name="items[]"]:checked');
+
+  if (checkboxes.length === 0) {
+    return Swal.fire(
+      'Error',
+      'Please select at least one item',
+      'error'
+    );
   }
+
+  for (const checkbox of checkboxes) {
+    const variantId = checkbox.value;
+    const messageInput = document.querySelector(
+      `textarea[name="message_${variantId}"]`
+    );
+
+    if (!messageInput || !messageInput.value.trim()) {
+      return Swal.fire(
+        'Error',
+        'Please provide a reason for all selected items',
+        'error'
+      );
+    }
+  }
+
+  const result = await Swal.fire({
+    title: 'Are you sure?',
+    text: 'This action cannot be undone',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'Yes, proceed'
+  });
+
+  if (!result.isConfirmed) return;
+
+  const form = document.getElementById('actionForm');
+  const formData = new URLSearchParams(new FormData(form));
+
+  const res = await fetch(form.action, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    body: formData.toString()
+  });
+
+  const data = await res.json();
+
+  if (!data.success) {
+    return Swal.fire('Error', data.message, 'error');
+  }
+
+  window.location.href = '/user/orders';
+}
 </script>
 
 </body>
