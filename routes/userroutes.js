@@ -16,10 +16,16 @@ router.get('/home',userController.getHome);
 router.get('/login',noCache, blockIfLoggedIn, userController.getLogin)
 router.post('/login',userController.postLogin)
 
-router.get('/forgot-password',blockIfLoggedIn,userController.getForgotPassword);
+// FORGOT PASSWORD
+router.get('/forgot-password', blockIfLoggedIn, userController.getForgotPassword);
 router.post('/forgot-password', userController.postForgotPassword);
-router.get('/reset-password',blockIfLoggedIn, userController.getResetPassword);
-router.post('/reset-password', userController.postResetPassword); //
+
+// RESET PASSWORD (OTP + new password)
+router.get('/reset-password', blockIfLoggedIn, userController.getResetPassword);
+router.put('/reset-password', userController.postResetPassword);
+
+// RESEND OTP (PASSWORD RESET ONLY)
+router.post('/password/resend-otp', userController.passwordResendOtp);
 //router.put('/reset-password', userController.resetPassword);
 
 router.post('/resend-otp', userController.passwordResendOtp);
@@ -29,16 +35,15 @@ router.post('/signup',userController.postSignup)
 
 router.get('/google',passport.authenticate('google', {scope: ['profile', 'email']}));
 router.get('/google/callback',passport.authenticate('google', { session: false }),userController.googleAuthSuccess);
-
-router.get('/verify-otp',blockIfLoggedIn,userController.getOtpPage)
-router.post('/verify-otp',userController.postOtpPage)
-router.post('/resend-otp', userController.resendOtp);
-
+//SIGNUP OTP
+router.get('/verify-otp', userController.getOtpPage);
+router.post('/verify-otp', userController.postOtpPage);
+router.post('/signup/resend-otp', userController.resendOtp);
 //PROFILE
-router.get('/profile', verifyUser, userController.getProfile);
+router.get('/profile',noCache, verifyUser, userController.getProfile);
 
-router.get('/profile/edit', verifyUser, userController.getEditProfile);
-router.post('/profile/edit', verifyUser, userController.postEditProfile); //
+router.get('/profile/edit',noCache, verifyUser, userController.getEditProfile);
+router.patch('/profile/edit', verifyUser, userController.postEditProfile); 
 
 router.get('/profile/verify-otp', verifyUser, userController.getProfileOtpPage);
 router.post('/profile/verify-otp', verifyUser, userController.postProfileOtp);
@@ -48,10 +53,10 @@ router.get('/profile/update-password',verifyUser,userController.getUpdatePasswor
 //router.post('/profile/update-password',verifyUser,userController.postUpdatePassword); 
 router.put('/profile/update-password',verifyUser,userController.putUpdatePassword);
 
-router.get('/address', verifyUser, addressController.getAddressPage);
-router.get('/address/add', verifyUser, addressController.getAddAddress);
+router.get('/address',noCache, verifyUser, addressController.getAddressPage);
+router.get('/address/add',noCache, verifyUser, addressController.getAddAddress);
 router.post('/address', verifyUser, addressController.postAddAddress);
-router.get('/address/:id/edit',verifyUser,addressController.getEditAddress);
+router.get('/address/:id/edit',noCache,verifyUser,addressController.getEditAddress);
 router.put('/address/:id', verifyUser, addressController.updateAddress); 
 router.delete('/address/:id', verifyUser, addressController.deleteAddress);
 
@@ -96,7 +101,7 @@ router.post('/coupon/apply',verifyUser,userController.applyCoupon);
 router.delete('/coupon/remove',verifyUser,userController.removeCoupon);
 
 //WALLET
-router.get('/wallet',verifyUser,walletController.getWallet)
+router.get('/wallet',noCache,verifyUser,walletController.getWallet)
 router.get('/wallet/add-money',verifyUser,walletController.getAddMoneyPage)
 router.post('/wallet/add-money',verifyUser,walletController.createWalletStripeSession);
 router.get('/wallet/stripe-success',walletController.walletStripeSuccess);
