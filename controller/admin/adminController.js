@@ -15,7 +15,8 @@ const ExcelJS = require('exceljs');
 const fs = require('fs');
 const mongoose = require('mongoose');
 const path = require('path');
-const { exportRevenueExcel } = require(__basedir +'/services/revenueExportService');
+const exportRevenueExcel = require( __basedir + '/services/revenueExportService');
+const exportRevenuePdf = require(__basedir + '/services/exportRevenuePdf');
 const { processRefund } = require(__basedir +'/services/refundService');
 
 
@@ -552,7 +553,6 @@ exports.postUpdateOrderDetails = async (req, res) => {
   }
 };
 
-
 /*RETURN*/
 exports.getReturnRequests = async (req, res) => {
   try {
@@ -796,7 +796,195 @@ exports.updateStock = async (req, res) => {
   }
 };
 
-// 
+/*REVENUE*/ 
+// exports.getRevenue = async (req, res) => {
+//   try {
+//     const { from, to, range, page = 1 } = req.query;
+//     const LIMIT = 10;
+//     const currentPage = Number(page);
+
+//     const dateFilter = {};
+//     const now = new Date();
+    
+//     if (range === 'today') {
+//       const start = new Date();
+//       start.setHours(0, 0, 0, 0);
+
+//       const end = new Date();
+//       end.setHours(23, 59, 59, 999);
+
+//       dateFilter.$gte = start;
+//       dateFilter.$lte = end;
+//     }
+//     else if (range === 'yesterday') {
+//       const start = new Date();
+//       start.setDate(start.getDate() - 1);
+//       start.setHours(0, 0, 0, 0);
+
+//       const end = new Date(start);
+//       end.setHours(23, 59, 59, 999);
+
+//       dateFilter.$gte = start;
+//       dateFilter.$lte = end;
+//     }
+//     else if (range === 'week') {
+//       const start = new Date();
+//       start.setDate(now.getDate() - 7);
+//       dateFilter.$gte = start;
+//     }
+//     else if (range === 'month') {
+//       dateFilter.$gte = new Date(now.getFullYear(), now.getMonth(), 1);
+//     }
+//     else if (range === 'year') {
+//       dateFilter.$gte = new Date(now.getFullYear(), 0, 1);
+//     }
+
+//     if (from) dateFilter.$gte = new Date(from);
+//     if (to) {
+//       const end = new Date(to);
+//       end.setHours(23, 59, 59, 999);
+//       dateFilter.$lte = end;
+//     }
+
+//     const query = {};
+//     if (Object.keys(dateFilter).length) {
+//       query.created_at = dateFilter;
+//     }
+
+//     const orders = await Order.find(query)
+//       .sort({ created_at: -1 })
+//       .lean();
+//     let totalRevenue = 0;
+//     let totalDiscount = 0;
+//     let paidValue = 0;
+//     let pendingValue = 0;
+//     let refundedValue = 0;
+//     let cancelledValue = 0;
+
+//     const dailyRevenue = {};  
+//     const tableData = [];
+
+//     orders.forEach(order => {
+//       let orderQty = 0;
+//       let cancelledQty = 0;
+//       let returnedQty = 0;
+//       let refundedAmount = 0;
+//       let cancelledRefundAmount = 0;
+
+//       order.items.forEach(item => {
+//         orderQty += item.quantity;
+//         cancelledQty += item.cancelledQty || 0;
+//         returnedQty += item.returnedQty || 0;
+
+//         refundedAmount += (item.returnedQty || 0) * item.price;
+
+//         if (order.paymentStatus === 'paid') {
+//           cancelledRefundAmount += (item.cancelledQty || 0) * item.price;
+//         }
+//       });
+
+//       const totalRefund = refundedAmount + cancelledRefundAmount;
+
+//       const netTotal = Math.max(
+//         order.total - totalRefund,
+//         0
+//       );
+
+//       if (order.paymentStatus === 'paid') {
+//         totalRevenue += netTotal;
+//         totalDiscount += order.discount || 0;
+//         paidValue += netTotal;
+//         refundedValue += totalRefund;
+//       } else {
+//         pendingValue += order.total;
+//       }
+
+//       cancelledValue += cancelledQty;
+
+//       const day = new Date(order.created_at).toLocaleDateString();
+//       dailyRevenue[day] = (dailyRevenue[day] || 0) + netTotal;
+//       tableData.push({
+//         orderNumber: order.orderNumber,
+//         quantity: orderQty,
+//         cancelledQty,
+//         returnedQty,
+//         refundAmount: totalRefund,
+//         date: new Date(order.created_at).toLocaleDateString(),
+//         paymentMethod: order.paymentMethod,
+//         paymentStatus: order.paymentStatus,
+//         subtotal: order.subtotal,
+//         discount: order.discount,
+//         total: netTotal
+//       });
+//     });
+
+//     if (req.query.download === 'excel') {
+//       return exportRevenueExcel(res, tableData);
+//     }
+
+//     if (req.query.download === 'pdf') {
+//       return exportRevenuePdf(res, {
+//         metrics,
+//         tableData,
+//         dailyRevenue,
+//         paymentStats,
+//         from,
+//         to
+//       });
+//     }
+//     const totalPages = Math.ceil(tableData.length / LIMIT);
+//     const paginatedTable = tableData.slice(
+//       (currentPage - 1) * LIMIT,
+//       currentPage * LIMIT
+//     );
+
+//     const netRevenue = totalRevenue - totalDiscount;
+//     const metrics = {
+//       totalRevenue,
+//       totalDiscount,
+//       netRevenue,
+//       totalOrders: orders.length
+//     };
+
+//     const totalPie =
+//       paidValue + pendingValue + refundedValue + cancelledValue || 1;
+
+//     const paymentStats = {
+//       paid: ((paidValue / totalPie) * 100).toFixed(2),
+//       pending: ((pendingValue / totalPie) * 100).toFixed(2),
+//       refunded: ((refundedValue / totalPie) * 100).toFixed(2),
+//       cancelled: ((cancelledValue / totalPie) * 100).toFixed(2)
+//     };
+
+//     if (req.xhr || req.headers.accept?.includes('application/json')) {
+//       return res.json({
+//         tableData: paginatedTable,
+//         currentPage,
+//         totalPages
+//       });
+//     }
+
+//     return res.render('admin/revenue', {
+//       metrics,
+//       paymentStats,
+//       dailyRevenue,
+//       tableData: paginatedTable,
+//       currentPage,
+//       totalPages,
+//       from,
+//       to,
+//       range,
+//       currentPage: 'revenue'
+//     });
+
+//   } catch (error) {
+//     console.error('GET REVENUE ERROR:', error);
+//     return res
+//       .status(HttpStatus.INTERNAL_SERVER_ERROR)
+//       .render('admin/500');
+//   }
+// };
+
 exports.getRevenue = async (req, res) => {
   try {
     const { from, to, range, page = 1 } = req.query;
@@ -805,7 +993,7 @@ exports.getRevenue = async (req, res) => {
 
     const dateFilter = {};
     const now = new Date();
-    
+
     if (range === 'today') {
       const start = new Date();
       start.setHours(0, 0, 0, 0);
@@ -854,6 +1042,7 @@ exports.getRevenue = async (req, res) => {
     const orders = await Order.find(query)
       .sort({ created_at: -1 })
       .lean();
+
     let totalRevenue = 0;
     let totalDiscount = 0;
     let paidValue = 0;
@@ -861,7 +1050,7 @@ exports.getRevenue = async (req, res) => {
     let refundedValue = 0;
     let cancelledValue = 0;
 
-    const dailyRevenue = {};  
+    const dailyRevenue = {};
     const tableData = [];
 
     orders.forEach(order => {
@@ -885,10 +1074,7 @@ exports.getRevenue = async (req, res) => {
 
       const totalRefund = refundedAmount + cancelledRefundAmount;
 
-      const netTotal = Math.max(
-        order.total - totalRefund,
-        0
-      );
+      const netTotal = Math.max(order.total - totalRefund, 0);
 
       if (order.paymentStatus === 'paid') {
         totalRevenue += netTotal;
@@ -903,6 +1089,7 @@ exports.getRevenue = async (req, res) => {
 
       const day = new Date(order.created_at).toLocaleDateString();
       dailyRevenue[day] = (dailyRevenue[day] || 0) + netTotal;
+
       tableData.push({
         orderNumber: order.orderNumber,
         quantity: orderQty,
@@ -917,17 +1104,17 @@ exports.getRevenue = async (req, res) => {
         total: netTotal
       });
     });
-    if (req.query.download === 'excel') {
-      return exportRevenueExcel(res, tableData);
-    }
 
-    const totalPages = Math.ceil(tableData.length / LIMIT);
-    const paginatedTable = tableData.slice(
-      (currentPage - 1) * LIMIT,
-      currentPage * LIMIT
-    );
+    /* ================= FIX: CALCULATE FIRST ================= */
 
     const netRevenue = totalRevenue - totalDiscount;
+
+    const metrics = {
+      totalRevenue,
+      totalDiscount,
+      netRevenue,
+      totalOrders: orders.length
+    };
 
     const totalPie =
       paidValue + pendingValue + refundedValue + cancelledValue || 1;
@@ -939,6 +1126,31 @@ exports.getRevenue = async (req, res) => {
       cancelled: ((cancelledValue / totalPie) * 100).toFixed(2)
     };
 
+    /* ================= DOWNLOAD HANDLERS ================= */
+
+    if (req.query.download === 'excel') {
+      return exportRevenueExcel(res, tableData);
+    }
+
+    if (req.query.download === 'pdf') {
+      return exportRevenuePdf(res, {
+        metrics,
+        tableData,
+        dailyRevenue,
+        paymentStats,
+        from,
+        to
+      });
+    }
+
+    /* ================= PAGINATION ================= */
+
+    const totalPages = Math.ceil(tableData.length / LIMIT);
+    const paginatedTable = tableData.slice(
+      (currentPage - 1) * LIMIT,
+      currentPage * LIMIT
+    );
+
     if (req.xhr || req.headers.accept?.includes('application/json')) {
       return res.json({
         tableData: paginatedTable,
@@ -948,12 +1160,7 @@ exports.getRevenue = async (req, res) => {
     }
 
     return res.render('admin/revenue', {
-      metrics: {
-        totalRevenue,
-        totalDiscount,
-        netRevenue,
-        totalOrders: orders.length
-      },
+      metrics,
       paymentStats,
       dailyRevenue,
       tableData: paginatedTable,
@@ -972,7 +1179,6 @@ exports.getRevenue = async (req, res) => {
       .render('admin/500');
   }
 };
-
 
 
 /* LOGOUT */
