@@ -116,6 +116,14 @@ const orderSchema = new mongoose.Schema(
       type: Number,
       default: 0
     },
+    refund_amount: {
+      type: Number,
+      default: 0
+    },
+    cancelled_amount: {
+      type: Number,
+      default: 0
+    },
 
     total: {
       type: Number,
