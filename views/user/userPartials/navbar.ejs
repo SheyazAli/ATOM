@@ -110,28 +110,74 @@
 
       <!-- RIGHT -->
       <form class="d-flex align-items-center gap-3 ms-auto"
-            method="GET"
-            action="/user/products">
+      method="GET"
+      action="/user/products">
 
-        <!-- SEARCH WITH ICON -->
-        <div class="nav-search-wrapper">
-          <input
-            type="text"
-            name="search"
-            class="form-control nav-search"
-            placeholder="Search products"
-          >
-          <button type="submit" class="search-btn" aria-label="Search">
-            <i class="bi bi-search"></i>
-          </button>
-        </div>
+  <!-- Preserve filters ONLY if they exist -->
+  <% if (typeof category !== 'undefined') { %>
+    <% category.forEach(c => { %>
+      <input type="hidden" name="category" value="<%= c %>">
+    <% }) %>
+  <% } %>
 
-        <a href="/user/profile"><i class="bi bi-person"></i></a>
-        <a href="/user/cart"><i class="bi bi-bag"></i></a>
-      </form>
+  <% if (typeof size !== 'undefined') { %>
+    <% size.forEach(s => { %>
+      <input type="hidden" name="size" value="<%= s %>">
+    <% }) %>
+  <% } %>
+
+  <% if (typeof color !== 'undefined') { %>
+    <% color.forEach(c => { %>
+      <input type="hidden" name="color" value="<%= c %>">
+    <% }) %>
+  <% } %>
+
+  <% if (typeof sort !== 'undefined' && sort) { %>
+    <input type="hidden" name="sort" value="<%= sort %>">
+  <% } %>
+
+  <!-- SEARCH -->
+  <div class="nav-search-wrapper">
+
+  <input
+    type="text"
+    name="search"
+    class="form-control nav-search"
+    placeholder="Search products"
+    value="<%= typeof search !== 'undefined' ? search : '' %>"
+  >
+
+  <% if (typeof search !== 'undefined' && search) { %>
+    <!-- Clear search button -->
+    <button
+      type="button"
+      class="search-btn"
+      onclick="clearSearch(this.form)"
+      title="Clear search">
+        <i class="bi bi-x-circle"></i>
+    </button>
+  <% } else { %>
+    <!-- Normal search button -->
+    <button type="submit" class="search-btn" aria-label="Search">
+      <i class="bi bi-search"></i>
+    </button>
+  <% } %>
+
+</div>
+
+  <a href="/user/profile"><i class="bi bi-person"></i></a>
+  <a href="/user/cart"><i class="bi bi-bag"></i></a>
+</form>
+
 
     </div>
   </div>
 </nav>
-
+<script>
+  function clearSearch(form) {
+    const input = form.querySelector('input[name="search"]');
+    if (input) input.value = '';
+    form.submit();
+  }
+</script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

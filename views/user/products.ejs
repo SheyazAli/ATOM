@@ -149,6 +149,9 @@
     <!-- FILTERS -->
     <div class="col-lg-2 col-md-3">
       <form method="GET" action="/user/products" class="filter-box">
+        <% if (search) { %>
+          <input type="hidden" name="search" value="<%= search %>">
+        <% } %>
 
         <h6 class="fw-semibold mb-2">Sort</h6>
         <select name="sort" class="form-select mb-3" onchange="this.form.submit()">
@@ -289,10 +292,12 @@
           <% for (let i = 1; i <= totalPages; i++) { %>
             <li class="page-item <%= i === currentPageNum ? 'active' : '' %>">
               <a class="page-link"
-                 href="?page=<%= i %>&sort=<%= sort %>
-                 <% category.forEach(c=>{ %>&category=<%= c %><% }) %>
-                 <% size.forEach(s=>{ %>&size=<%= s %><% }) %>
-                 <% color.forEach(c=>{ %>&color=<%= c %><% }) %>">
+                href="?page=<%= i %>
+                &search=<%= search %>
+                &sort=<%= sort %>
+                <% category.forEach(c=>{ %>&category=<%= c %><% }) %>
+                <% size.forEach(s=>{ %>&size=<%= s %><% }) %>
+                <% color.forEach(c=>{ %>&color=<%= c %><% }) %>">
                 <%= i %>
               </a>
             </li>
