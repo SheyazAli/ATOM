@@ -805,8 +805,29 @@ exports.getRevenue = async (req, res) => {
 
     const dateFilter = {};
     const now = new Date();
+    
+    if (range === 'today') {
+      const start = new Date();
+      start.setHours(0, 0, 0, 0);
 
-    if (range === 'week') {
+      const end = new Date();
+      end.setHours(23, 59, 59, 999);
+
+      dateFilter.$gte = start;
+      dateFilter.$lte = end;
+    }
+    else if (range === 'yesterday') {
+      const start = new Date();
+      start.setDate(start.getDate() - 1);
+      start.setHours(0, 0, 0, 0);
+
+      const end = new Date(start);
+      end.setHours(23, 59, 59, 999);
+
+      dateFilter.$gte = start;
+      dateFilter.$lte = end;
+    }
+    else if (range === 'week') {
       const start = new Date();
       start.setDate(now.getDate() - 7);
       dateFilter.$gte = start;

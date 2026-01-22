@@ -38,7 +38,7 @@
       <h6 class="fw-semibold mb-3">Basic Information</h6>
 
       <input class="form-control mb-3" name="title" placeholder="Product title" required>
-      <textarea class="form-control mb-3" name="description" placeholder="Description"></textarea>
+      <textarea class="form-control mb-3" name="description" placeholder="Description" required></textarea>
 
       <select name="category_id" class="form-select" required>
         <option value="">Select category</option>
@@ -64,10 +64,10 @@
       <h6 class="fw-semibold mb-3">Pricing</h6>
       <div class="row">
         <div class="col-md-6">
-          <input class="form-control" name="regular_price" type="number" required>
+          <input class="form-control" name="regular_price" type="number" min="1" required>
         </div>
         <div class="col-md-6">
-          <input class="form-control" name="sale_price" type="number">
+          <input class="form-control" name="sale_price" type="number" min="1">
         </div>
       </div>
     </div>
@@ -121,11 +121,11 @@ function addColorVariant() {
 
       <div class="col-md-5">
         <input type="file"
-          name="variants[${variantIndex}][images]"
-          class="form-control variant-images"
-          accept="image/*"
-          multiple
-          required>
+        name="variants[${variantIndex}][images]"
+        class="form-control variant-images"
+        accept="image/*"
+        multiple>
+        <div class="variant-preview d-flex gap-2 mt-2 flex-wrap"></div>
         <small class="hint">Min 3, Max 5 images</small>
       </div>
     </div>
@@ -138,9 +138,10 @@ function addColorVariant() {
         </div>
         <div class="col-md-3">
           <input type="number"
-            name="variants[${variantIndex}][sizes][${s}][stock]"
-            class="form-control"
-            placeholder="Stock">
+              name="variants[${variantIndex}][sizes][${s}][stock]"
+              class="form-control"
+              min="0"
+              required>
         </div>
       </div>
     `).join('')}
@@ -153,6 +154,63 @@ function addColorVariant() {
 addColorVariant();
 
 /* ---------------- IMAGE COUNT VALIDATION ---------------- */
+const variantCrops = new Map();
+
+document.addEventListener('change', e => {
+  if (!e.target.classList.contains('variant-images')) return;
+
+  const preview = e.target.nextElementSibling;
+
+  if (!variantCrops.has(e.target)) {
+    variantCrops.set(e.target, []);
+  }
+
+  [...e.target.files].forEach(file => {
+    if (variantCrops.get(e.target).length >= MAX_IMAGES) return;
+
+    const imgWrap = document.createElement('div');
+    imgWrap.style.position = 'relative';
+
+    const img = document.createElement('img');
+    img.style.width = '120px';
+    imgWrap.appendChild(img);
+
+    const btn = document.createElement('span');
+    btn.innerHTML = '×';
+    btn.style.cssText =
+      'position:absolute;top:2px;right:6px;cursor:pointer;color:white;background:black;border-radius:50%;padding:0 6px;';
+    imgWrap.appendChild(btn);
+
+    preview.appendChild(imgWrap);
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      img.src = reader.result;
+
+      const cropper = new Cropper(img, {
+        aspectRatio: 2 / 3,
+        viewMode: 1,
+        autoCropArea: 1
+      });
+
+      btn.onclick = () => {
+        cropper.destroy();
+        imgWrap.remove();
+        variantCrops.set(
+          e.target,
+          variantCrops.get(e.target).filter(c => c !== cropper)
+        );
+      };
+
+      variantCrops.get(e.target).push(cropper);
+    };
+
+    reader.readAsDataURL(file);
+  });
+
+  // allow re-selecting same file later
+  e.target.value = '';
+});
 
 document.addEventListener('change', e => {
   if (!e.target.classList.contains('variant-images')) return;
@@ -190,35 +248,51 @@ thumbInput.addEventListener('change', e => {
   reader.readAsDataURL(file);
 });
 
+
 /* ---------------- FORM SUBMIT ---------------- */
 
 document.getElementById('productForm').addEventListener('submit', async e => {
-
-  for (const input of document.querySelectorAll('.variant-images')) {
-    const count = input.files.length;
-
-    if (count < MIN_IMAGES || count > MAX_IMAGES) {
-      alert(`Each color must have ${MIN_IMAGES}–${MAX_IMAGES} images`);
-      e.preventDefault();
-      return;
-    }
-  }
-
-  if (!cropper) return;
+  if (!e.target.checkValidity()) {
+  e.target.reportValidity(); 
+  return;
+}
 
   e.preventDefault();
 
+  // validate variant images
+  for (const input of document.querySelectorAll('.variant-images')) {
+    const croppers = variantCrops.get(input) || [];
+
+    if (croppers.length < 3 || croppers.length > 5) {
+      Swal.fire('Error', 'Each color needs 3–5 images', 'error');
+      return;
+    }
+
+    const dt = new DataTransfer();
+    for (const cropper of croppers) {
+      const canvas = cropper.getCroppedCanvas({ width:800, height:1200 });
+      const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.9));
+      dt.items.add(new File([blob], 'variant.jpg', { type:'image/jpeg' }));
+    }
+    input.files = dt.files;
+  }
+
+  if (!cropper) {
+    Swal.fire('Error', 'Please crop thumbnail image', 'error');
+    return;
+  }
+
   const canvas = cropper.getCroppedCanvas({ width:600, height:600 });
   const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.9));
-
-  const file = new File([blob], 'thumbnail.jpg', { type: 'image/jpeg' });
   const dt = new DataTransfer();
-  dt.items.add(file);
+  dt.items.add(new File([blob], 'thumbnail.jpg', { type:'image/jpeg' }));
   thumbInput.files = dt.files;
 
   e.target.submit();
 });
+
 </script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 </body>
 </html>

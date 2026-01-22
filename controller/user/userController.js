@@ -937,6 +937,28 @@ exports.getCheckout = async (req, res) => {
       const variant = await Variant.findById(item.variant_id).lean();
       if (!variant) continue;
 
+      if (item.quantity > variant.stock) {
+        await Cart.updateOne(
+          {
+            user_id: userId,
+            'items._id': item._id
+          },
+          {
+            $set: {
+              'items.$.quantity': variant.stock
+            }
+          }
+        );
+        const product = await Product.findOne({
+          product_id: variant.product_id,
+          status: true
+        }).lean();
+        const message = `Only ${variant.stock} qty left for ${product.title} - ${variant.color} ${variant.size}. Quantity has been updated.`;
+        return res.redirect(
+          `/user/cart?error=${encodeURIComponent(message)}`
+        );
+      }
+
       const product = await Product.findOne({
         product_id: variant.product_id,
         status: true

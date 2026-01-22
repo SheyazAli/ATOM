@@ -19,7 +19,7 @@ router.get('/products', verifyAdmin, productController.getProducts);
 router.get('/products/add', verifyAdmin, productController.getAddProducts);
 router.post('/products', verifyAdmin,upload.any(), productController.postAddProduct);
 router.get('/products/:productId/edit', verifyAdmin, productController.getEditProduct);
-router.put('/products/:productId', verifyAdmin,upload.any(), productController.postEditProduct);
+router.patch('/products/:productId', verifyAdmin,upload.any(), productController.patchEditProduct);
 router.patch('/products/:productId/status', verifyAdmin, productController.toggleProductStatus);
 router.delete('/products/:productId', verifyAdmin, productController.deleteProduct);
 // variant

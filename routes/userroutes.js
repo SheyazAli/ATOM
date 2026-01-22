@@ -9,6 +9,7 @@ const paymentController = require(__basedir +'/controller/user/paymentController
 const productStatus = require(__basedir +'/middleware/checkProductActive')
 const wishlistController = require(__basedir +'/controller/user/wishlistController')
 const { verifyUser, noCache, blockIfLoggedIn } = require(__basedir +'/middleware/userMiddleware');
+const validateCartStock = require(__basedir +'/middleware/validateCartStock');
 const passport = require('passport');
 
 router.get('/home',userController.getHome);
@@ -45,14 +46,15 @@ router.get('/profile',noCache, verifyUser, userController.getProfile);
 router.get('/profile/edit',noCache, verifyUser, userController.getEditProfile);
 router.patch('/profile/edit', verifyUser, userController.postEditProfile); 
 
-router.get('/profile/verify-otp', verifyUser, userController.getProfileOtpPage);
+router.get('/profile/verify-otp',noCache , verifyUser, userController.getProfileOtpPage);
 router.post('/profile/verify-otp', verifyUser, userController.postProfileOtp);
 router.post('/profile/resend-otp', verifyUser, userController.resendProfileOtp);
 
-router.get('/profile/update-password',verifyUser,userController.getUpdatePassword);
+router.get('/profile/update-password',noCache,verifyUser,userController.getUpdatePassword);
 //router.post('/profile/update-password',verifyUser,userController.postUpdatePassword); 
 router.put('/profile/update-password',verifyUser,userController.putUpdatePassword);
 
+//ADDRESS
 router.get('/address',noCache, verifyUser, addressController.getAddressPage);
 router.get('/address/add',noCache, verifyUser, addressController.getAddAddress);
 router.post('/address', verifyUser, addressController.postAddAddress);
@@ -80,9 +82,9 @@ router.delete('/wishlist/remove',verifyUser,wishlistController.removeFromWishlis
 //checkuot
 router.get('/checkout',verifyUser,userController.getCheckout)
 
-router.post('/checkout/pay', verifyUser, paymentController.placeOrderCOD);
-router.post('/checkout/pay-wallet', verifyUser, paymentController.placeOrderWallet);
-router.post('/checkout/stripe/create-session',verifyUser,paymentController.createStripeSession);
+router.post('/checkout/pay', verifyUser,validateCartStock, paymentController.placeOrderCOD);
+router.post('/checkout/pay-wallet', verifyUser,validateCartStock, paymentController.placeOrderWallet);
+router.post('/checkout/stripe/create-session',verifyUser,validateCartStock,paymentController.createStripeSession);
 router.get('/checkout/stripe/success',verifyUser,paymentController.stripeSuccess);
 router.get('/checkout/stripe/cancel',verifyUser,paymentController.stripeCancel);
 router.get('/payment-failed',verifyUser,paymentController.getPaymentFailed);
@@ -91,9 +93,9 @@ router.get('/payment-failed',verifyUser,paymentController.getPaymentFailed);
 router.get('/orders/:orderNumber/success', verifyUser, orderController.orderSuccessPage);
 router.get('/orders/:orderNumber/invoice',verifyUser,orderController.downloadInvoice);
 
-router.get('/orders',verifyUser, orderController.getOrders)
-router.get('/orders/:orderNumber',verifyUser,orderController.getOrderDetails);
-router.get('/orders/:orderNumber/cancel',verifyUser,orderController.getCancelOrder);
+router.get('/orders',noCache,verifyUser, orderController.getOrders)
+router.get('/orders/:orderNumber',noCache,verifyUser,orderController.getOrderDetails);
+router.get('/orders/:orderNumber/cancel',noCache,verifyUser,orderController.getCancelOrder);
 router.post('/orders/:orderNumber/cancel',verifyUser, orderController.postCancelOrder)
 
 //COUPON

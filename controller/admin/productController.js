@@ -91,8 +91,13 @@ exports.postAddProduct = async (req, res) => {
       status,
       variants
     } = req.body;
+    if (!title || !description || !category_id || !regular_price) {
+      throw new Error('Missing required fields');
+    }
 
     let thumbnail = null;
+    if (regular_price <= 0) throw new Error('Invalid price');
+    if (sale_price && sale_price <= 0) throw new Error('Invalid sale price');
 
     const thumbFile = req.files.find(f => f.fieldname === 'thumbnail');
     if (thumbFile) {
@@ -118,6 +123,9 @@ exports.postAddProduct = async (req, res) => {
       status: status === 'on',
       thumbnail
     });
+    if (!variants || Object.keys(variants).length === 0) {
+      throw new Error('No variants found');
+    }
 
     /* CREATE VARIANTS */
     for (const key in variants) {
@@ -127,8 +135,8 @@ exports.postAddProduct = async (req, res) => {
         f => f.fieldname === `variants[${key}][images]`
       );
 
-      if (imageFiles.length < 3) {
-        throw new Error('Each color must have at least 3 images');
+      if (imageFiles.length < 3 || imageFiles.length > 5) {
+        throw new Error('Each color must have 3–5 images');
       }
 
       const images = [];
@@ -145,8 +153,11 @@ exports.postAddProduct = async (req, res) => {
       }
 
       for (const sizeKey in v.sizes) {
+        if (v.sizes[sizeKey].stock < 0) {
+          throw new Error('Stock cannot be negative');
+        }
         await Variant.create({
-          product_id: product.product_id,
+          product_id:product.product_id,
           color: v.color,
           size: sizeKey,
           stock: Number(v.sizes[sizeKey].stock || 0),
@@ -165,7 +176,54 @@ exports.postAddProduct = async (req, res) => {
   }
 };
 
-exports.getEditProduct = async (req, res) => {
+// exports.getEditProduct = async (req, res) => {
+//   try {
+//     const { productId } = req.params;
+
+//     const product = await Product.findOne({
+//       product_id: productId
+//     }).lean();
+
+//     if (!product) {
+//       return res.redirect('/admin/products');
+//     }
+
+//     const variants = await Variant.find({
+//       product_id: productId
+//     }).lean();
+
+//     const categories = await Category.find({ status: true }).lean();
+
+//     const colorVariants = {};
+
+//     variants.forEach(v => {
+//       if (!colorVariants[v.color]) {
+//         colorVariants[v.color] = {
+//           color: v.color,
+//           images: v.images || [],
+//           sizes: {}
+//         };
+//       }
+
+//       // size → stock mapping
+//       colorVariants[v.color].sizes[v.size] = v.stock;
+//     });
+
+//     /* RENDER EDIT PAGE */
+//     res.render('admin/edit-product', {
+//       product,
+//       categories,
+//       colorVariants,          
+//       currentPage: 'products'
+//     });
+
+//   } catch (error) {
+//     console.error('GET EDIT PRODUCT ERROR:', error);
+//     return res.redirect('/admin/products');
+//   }
+// };
+
+exports.getEditProduct = async (req, res, next) => {
   try {
     const { productId } = req.params;
 
@@ -177,43 +235,180 @@ exports.getEditProduct = async (req, res) => {
       return res.redirect('/admin/products');
     }
 
+    const categories = await Category.find({ status: true }).lean();
+
     const variants = await Variant.find({
       product_id: productId
     }).lean();
 
-    const categories = await Category.find({ status: true }).lean();
+    /* 🔁 GROUP VARIANTS BY COLOR (CRITICAL) */
+    const variantMap = {};
 
-    const colorVariants = {};
-
-    variants.forEach(v => {
-      if (!colorVariants[v.color]) {
-        colorVariants[v.color] = {
+    for (const v of variants) {
+      if (!variantMap[v.color]) {
+        variantMap[v.color] = {
           color: v.color,
-          images: v.images || [],
+          images: v.images, // same for all sizes
           sizes: {}
         };
       }
 
-      // size → stock mapping
-      colorVariants[v.color].sizes[v.size] = v.stock;
-    });
+      variantMap[v.color].sizes[v.size] = {
+        stock: v.stock
+      };
+    }
 
-    /* RENDER EDIT PAGE */
+    const groupedVariants = Object.values(variantMap);
+
     res.render('admin/edit-product', {
       product,
       categories,
-      colorVariants,          
+      variants: groupedVariants,
       currentPage: 'products'
     });
 
   } catch (error) {
-    console.error('GET EDIT PRODUCT ERROR:', error);
-    return res.redirect('/admin/products');
+    error.statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
+    next(error);
   }
 };
-exports.postEditProduct = async (req, res) => {
+
+// exports.postEditProduct = async (req, res) => {
+//   try {
+//     console.log('EDIT PRODUCT HIT', req.method);
+
+//     const { productId } = req.params;
+//     const {
+//       title,
+//       description,
+//       category_id,
+//       regular_price,
+//       sale_price,
+//       status,
+//       variants
+//     } = req.body;
+
+//     if (!title || !description || !category_id || Number(regular_price) <= 0) {
+//       throw new Error('Invalid product details');
+//     }
+
+//     // ---------- UPDATE PRODUCT ----------
+//     await Product.findOneAndUpdate(
+//       { product_id: productId },
+//       {
+//         title,
+//         description,
+//         category_id,
+//         regular_price,
+//         sale_price: sale_price || null,
+//         discount_percentage: sale_price
+//           ? Math.round(((regular_price - sale_price) / regular_price) * 100)
+//           : 0,
+//         status: status === 'on'
+//       }
+//     );
+
+//     if (!variants || typeof variants !== 'object') {
+//       throw new Error('Variants data missing');
+//     }
+
+//     const existingVariants = await Variant.find({ product_id: productId });
+//     const usedVariantIds = new Set();
+
+//     // ---------- HANDLE VARIANTS ----------
+//     for (const key in variants) {
+//       const v = variants[key];
+
+//       // uploaded images
+//       const files = (req.files || []).filter(
+//         f => f.fieldname === `variants[${key}][images]`
+//       );
+
+//       let images = [];
+
+//       if (files.length > 0) {
+//         if (files.length < 3 || files.length > 5) {
+//           throw new Error(`Each color (${v.color}) needs 3–5 images`);
+//         }
+
+//         for (const file of files) {
+//           const name = `var-${Date.now()}-${Math.round(Math.random() * 1e9)}.webp`;
+
+//           await sharp(file.buffer)
+//             .resize(800, 1200)
+//             .toFormat('webp')
+//             .toFile(path.join('uploads/products', name));
+
+//           images.push(`products/${name}`);
+//         }
+//       } else if (v.existingImages) {
+//         images = Array.isArray(v.existingImages)
+//           ? v.existingImages
+//           : [v.existingImages];
+//       }
+
+//       if (images.length < 3 || images.length > 5) {
+//         throw new Error(`Each color (${v.color}) must have 3–5 images`);
+//       }
+
+//       // ---------- HANDLE SIZES ----------
+//       for (const size in v.sizes) {
+//         const stock = Number(v.sizes[size]?.stock || 0);
+
+//         let variant = await Variant.findOne({
+//           product_id: productId,
+//           color: v.color,
+//           size
+//         });
+
+//         if (variant) {
+//           variant.stock = stock;
+//           variant.images = images;
+//           variant.status = true;
+//           await variant.save();
+//           usedVariantIds.add(variant._id.toString());
+//         } else {
+//           const newVariant = await Variant.create({
+//             product_id: productId,
+//             color: v.color,
+//             size,
+//             stock,
+//             sku: `${productId}-${v.color}-${size}`,
+//             images,
+//             status: true
+//           });
+//           usedVariantIds.add(newVariant._id.toString());
+//         }
+//       }
+//     }
+
+//     // ---------- DISABLE REMOVED VARIANTS ----------
+//     for (const v of existingVariants) {
+//       if (!usedVariantIds.has(v._id.toString())) {
+//         v.status = false;
+//         await v.save();
+//       }
+//     }
+
+//     return res.status(200).json({
+//       success: true,
+//       message: 'Product updated successfully'
+//     });
+
+//   } catch (error) {
+//     console.error('EDIT PRODUCT ERROR:', error);
+
+//     return res.status(400).json({
+//       success: false,
+//       message: error.message || 'Failed to update product'
+//     });
+//   }
+// };
+
+exports.patchEditProduct = async (req, res) => {
   try {
     const { productId } = req.params;
+
     const {
       title,
       description,
@@ -224,6 +419,48 @@ exports.postEditProduct = async (req, res) => {
       variants
     } = req.body;
 
+    /* ================= VALIDATIONS ================= */
+
+    if (!title || !description || !category_id || !regular_price) {
+      throw new Error('Missing required fields');
+    }
+
+    if (regular_price <= 0) throw new Error('Invalid price');
+    if (sale_price && sale_price <= 0) throw new Error('Invalid sale price');
+
+    if (!variants || Object.keys(variants).length === 0) {
+      throw new Error('No variants found');
+    }
+
+    /* ================= PREVENT DUPLICATE COLORS ================= */
+
+    const colorSet = new Set();
+    for (const key in variants) {
+      const color = variants[key].color?.trim();
+      if (!color) throw new Error('Variant color missing');
+
+      if (colorSet.has(color)) {
+        throw new Error(`Duplicate color found: ${color}`);
+      }
+      colorSet.add(color);
+    }
+
+    /* ================= UPDATE PRODUCT ================= */
+
+    let thumbnail = null;
+
+    const thumbFile = req.files.find(f => f.fieldname === 'thumbnail');
+    if (thumbFile) {
+      const name = `thumb-${Date.now()}.webp`;
+
+      await sharp(thumbFile.buffer)
+        .resize(600, 600)
+        .toFormat('webp')
+        .toFile(path.join('uploads/products', name));
+
+      thumbnail = `products/${name}`;
+    }
+
     await Product.findOneAndUpdate(
       { product_id: productId },
       {
@@ -232,89 +469,94 @@ exports.postEditProduct = async (req, res) => {
         category_id,
         regular_price,
         sale_price,
-        discount_percentage:
-          sale_price && sale_price < regular_price
-            ? Math.round(((regular_price - sale_price) / regular_price) * 100)
-            : 0,
-        status: status === 'on'
+        discount_percentage: sale_price
+          ? Math.round(((regular_price - sale_price) / regular_price) * 100)
+          : 0,
+        status: status === 'on',
+        ...(thumbnail && { thumbnail }),
+        updated_at: new Date()
       }
     );
 
-    const existingVariants = await Variant.find({ product_id: productId });
+    /* ================= UPDATE VARIANTS ================= */
 
-    const usedVariantIds = new Set();
     for (const key in variants) {
       const v = variants[key];
+      const color = v.color;
 
+      /* -------- EXISTING IMAGES -------- */
+      const existingImages = Array.isArray(v.existingImages)
+        ? v.existingImages
+        : v.existingImages ? [v.existingImages] : [];
+
+      /* -------- NEW IMAGES -------- */
       const imageFiles = req.files.filter(
         f => f.fieldname === `variants[${key}][images]`
       );
 
-      let images = [];
+      const newImages = [];
 
-      if (imageFiles.length) {
-        for (const file of imageFiles) {
-          const name = `var-${Date.now()}-${Math.round(Math.random() * 1e9)}.webp`;
+      for (const file of imageFiles) {
+        const name = `var-${Date.now()}-${Math.round(Math.random() * 1e9)}.webp`;
 
-          await sharp(file.buffer)
-            .resize(800, 800, { fit: 'inside', withoutEnlargement: true })
-            .toFormat('webp')
-            .toFile(path.join('uploads/products', name));
+        await sharp(file.buffer)
+          .resize(800, 800, { fit: 'inside', withoutEnlargement: true })
+          .toFormat('webp')
+          .toFile(path.join('uploads/products', name));
 
-          images.push(`products/${name}`);
-        }
-      } else if (v.existingImages) {
-        images = Array.isArray(v.existingImages)
-          ? v.existingImages
-          : [v.existingImages];
-      } else {
-        throw new Error(`Images missing for color ${v.color}`);
+        newImages.push(`products/${name}`);
       }
+
+      const finalImages = [...existingImages, ...newImages];
+
+      if (finalImages.length < 3 || finalImages.length > 5) {
+        throw new Error(`Each color must have 3–5 images (${color})`);
+      }
+
+      /* -------- UPDATE IMAGES FOR ALL SIZES OF THIS COLOR -------- */
+      await Variant.updateMany(
+        { product_id: productId, color },
+        {
+          $set: {
+            images: finalImages,
+            updated_at: new Date()
+          }
+        }
+      );
+
+      /* -------- UPDATE STOCK PER SIZE -------- */
       for (const sizeKey in v.sizes) {
         const stock = Number(v.sizes[sizeKey].stock || 0);
 
-        const existingVariant = await Variant.findOne({
-          product_id: productId,
-          color: v.color,
-          size: sizeKey
-        });
-
-        if (existingVariant) {
-          existingVariant.stock = stock;
-          existingVariant.images = images;
-          existingVariant.status = true;
-
-          await existingVariant.save();
-          usedVariantIds.add(existingVariant._id.toString());
-        } else {
-          const newVariant = await Variant.create({
-            product_id: productId,
-            color: v.color,
-            size: sizeKey,
-            stock,
-            sku: `${productId}-${v.color}-${sizeKey}`,
-            images,
-            status: true
-          });
-
-          usedVariantIds.add(newVariant._id.toString());
+        if (stock < 0) {
+          throw new Error('Stock cannot be negative');
         }
-      }
-    }
 
-    for (const variant of existingVariants) {
-      if (!usedVariantIds.has(variant._id.toString())) {
-        variant.status = false; // soft delete
-        await variant.save();
+        await Variant.findOneAndUpdate(
+          {
+            product_id: productId,
+            color,
+            size: sizeKey
+          },
+          {
+            $set: {
+              stock,
+              updated_at: new Date()
+            }
+          }
+        );
       }
     }
 
     return res.redirect('/admin/products');
 
   } catch (error) {
-    console.error('EDIT PRODUCT ERROR:', error);
-    return res.redirect('/admin/products');
-  }
+  console.error('EDIT PRODUCT ERROR:', error.message);
+
+  return res.redirect(
+    `/admin/products/${req.params.productId}/edit?error=${encodeURIComponent(error.message)}`
+  );
+}
 };
 
 

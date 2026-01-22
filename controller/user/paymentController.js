@@ -298,9 +298,21 @@ exports.createStripeSession = async (req, res) => {
 
     for (const item of cart.items) {
       const variant = await Variant.findById(item.variant_id);
+
       if (!variant || variant.stock < item.quantity) {
-        return res.json({ error: 'STOCK_ISSUE' });
+        const product = await Product.findOne({
+          product_id: variant.product_id
+        }).lean();
+
+        return res.status(400).json({
+          success: false,
+          reason: PAYMENT_FAILURE_REASONS.STOCK_ISSUE,
+          redirect: `/user/cart?error=${encodeURIComponent(
+            `Only ${variant.stock} qty left for ${product.title} - ${variant.color} ${variant.size}.`
+          )}`
+        });
       }
+
       subtotal += item.price_snapshot * item.quantity;
     }
     let discount = 0;

@@ -12,7 +12,12 @@ const Wishlist = require(__basedir + '/db/WishlistModel')
 
 exports.getCartPage = async (req, res) => {
   try {
-    const userId = req.user._id;
+    const userId = req.user?._id;
+
+    if (!userId) {
+      return res.redirect('/user/login');
+    }
+
     const cartDoc = await Cart.findOne({ user_id: userId }).lean();
 
     let cartItems = [];
@@ -26,6 +31,7 @@ exports.getCartPage = async (req, res) => {
 
         const variant = await Variant.findById(item.variant_id).lean();
 
+        // Skip invalid references safely
         if (!product || !variant) continue;
 
         const isActive = product.status === true;
@@ -37,6 +43,7 @@ exports.getCartPage = async (req, res) => {
         cartItems.push({
           cartItemId: item._id,
           product_id: item.product_id,
+          variant_id: item.variant_id,
           productStatus: isActive,
           title: product.title,
           image: variant.images?.[0] || 'default-product.webp',
@@ -53,7 +60,7 @@ exports.getCartPage = async (req, res) => {
       .limit(4)
       .lean();
 
-    res.render('user/cart', {
+    return res.render('user/cart', {
       cartItems,
       subtotal,
       appliedCoupon: cartDoc?.applied_coupon || null,
@@ -61,8 +68,9 @@ exports.getCartPage = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('GET CART PAGE ERROR:', error);
-    res.status(HttpStatus.INTERNAL_SERVER_ERROR).render('user/500');
+    return res
+      .status(HttpStatus.INTERNAL_SERVER_ERROR)
+      .render('user/500');
   }
 };
 
@@ -194,44 +202,33 @@ exports.removeCartItem = async (req, res) => {
 exports.addToWishlistFromCart = async (req, res) => {
   try {
     const userId = req.user._id;
-    const { cartItemId } = req.body;
+    const { variant_id, cartItemId } = req.body;
 
-    if (!cartItemId) {
-      return res
-        .status(HttpStatus.BAD_REQUEST)
-        .json({ error: 'Invalid request' });
+    if (!variant_id) {
+      return res.status(HttpStatus.BAD_REQUEST).json({
+        success: false,
+        message: 'Invalid request'
+      });
     }
 
-    const cart = await Cart.findOne({ user_id: userId });
-    if (!cart) {
-      return res
-        .status(HttpStatus.NOT_FOUND)
-        .json({ error: 'Cart not found' });
-    }
-
-    const cartItem = cart.items.id(cartItemId);
-    if (!cartItem) {
-      return res
-        .status(HttpStatus.NOT_FOUND)
-        .json({ error: 'Cart item not found' });
-    }
-
-    const variant = await Variant.findById(cartItem.variant_id);
-    if (!variant) {
-      return res
-        .status(HttpStatus.BAD_REQUEST)
-        .json({ error: 'Variant not found' });
+    const variant = await Variant.findById(variant_id);
+    if (!variant || variant.stock === 0) {
+      return res.status(HttpStatus.BAD_REQUEST).json({
+        success: false,
+        message: 'Variant out of stock'
+      });
     }
 
     const product = await Product.findOne({
-      product_id: cartItem.product_id,
+      product_id: variant.product_id,
       status: true
     }).lean();
 
     if (!product) {
-      return res
-        .status(HttpStatus.BAD_REQUEST)
-        .json({ error: 'Product not available' });
+      return res.status(HttpStatus.BAD_REQUEST).json({
+        success: false,
+        message: 'Product not available'
+      });
     }
 
     let wishlist = await Wishlist.findOne({ user_id: userId });
@@ -239,30 +236,35 @@ exports.addToWishlistFromCart = async (req, res) => {
       wishlist = new Wishlist({ user_id: userId, items: [] });
     }
 
-    const exists = wishlist.items.find(
+    const exists = wishlist.items.some(
       i => i.variant_id.toString() === variant._id.toString()
     );
 
     if (exists) {
-      return res
-        .status(HttpStatus.BAD_REQUEST)
-        .json({ error: 'Already in wishlist' });
+      return res.status(HttpStatus.BAD_REQUEST).json({
+        success: false,
+        message: 'Already in wishlist'
+      });
     }
 
     wishlist.items.push({
       product_id: product.product_id,
       variant_id: variant._id,
-      price_snapshot: cartItem.price_snapshot
+      price_snapshot: product.sale_price
     });
 
     await wishlist.save();
 
-    res.status(HttpStatus.OK).json({ success: true });
+    return res.status(HttpStatus.OK).json({
+      success: true
+    });
 
   } catch (error) {
     console.error('ADD TO WISHLIST FROM CART ERROR:', error);
-    res
-      .status(HttpStatus.INTERNAL_SERVER_ERROR)
-      .json({ error: 'Server error' });
+    return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+      success: false,
+      message: 'Server error'
+    });
   }
 };
+
