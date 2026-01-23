@@ -466,7 +466,7 @@ exports.getOtpPage = (req, res) => {
     });
 
     req.session.destroy();
-    res.redirect('user/home');
+    res.redirect('/user/home');
 
   } catch (error) {
     console.error('POST OTP ERROR:', error);
@@ -773,7 +773,8 @@ exports.getProducts = async (req, res) => {
     category = [].concat(category);
     size = [].concat(size);
     color = [].concat(color);
-
+    search = search.trim();
+    sort = sort.trim();
 
     let variantFilter = {};
 
@@ -907,15 +908,32 @@ exports.getProductDetails = async (req, res) => {
       rp.colorsCount = [...new Set(rVariants.map(v => v.color))].length;
     }
 
-    return res.render('user/product-details', {
-      product,
-      category,
-      colorMap,
-      colors,
-      defaultColor,
-      isOutOfStock,
-      relatedProducts
-    });
+ return res.render('user/product-details', {
+  // product page
+  product,
+  productCategory: category,
+  colorMap,
+  colors,
+  defaultColor,
+  isOutOfStock,
+  relatedProducts,
+
+  // navbar REQUIRED data
+  category: [],
+  size: [],
+  color: [],
+  sort: '',
+  search: '',
+
+  navCategories: req.navCategories || {
+    hoodiId: '',
+    poloId: '',
+    oversizedId: '',
+    sweatshirtId: ''
+  }
+});
+
+
 
   } catch (error) {
     console.error('PRODUCT DETAILS ERROR:', error);
@@ -936,6 +954,28 @@ exports.getCheckout = async (req, res) => {
     for (const item of cart.items) {
       const variant = await Variant.findById(item.variant_id).lean();
       if (!variant) continue;
+
+      if (item.quantity > variant.stock) {
+        await Cart.updateOne(
+          {
+            user_id: userId,
+            'items._id': item._id
+          },
+          {
+            $set: {
+              'items.$.quantity': variant.stock
+            }
+          }
+        );
+        const product = await Product.findOne({
+          product_id: variant.product_id,
+          status: true
+        }).lean();
+        const message = `Only ${variant.stock} qty left for ${product.title} - ${variant.color} ${variant.size}. Quantity has been updated.`;
+        return res.redirect(
+          `/user/cart?error=${encodeURIComponent(message)}`
+        );
+      }
 
       const product = await Product.findOne({
         product_id: variant.product_id,

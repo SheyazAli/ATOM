@@ -39,6 +39,26 @@
     object-fit:cover;
     border-radius:6px;
   }
+  .wishlist-disabled {
+    opacity: .55;
+  }
+
+  .wishlist-disabled .disable-interaction {
+    pointer-events: none;
+  }
+
+  .wishlist-badge {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    background: #dc3545;
+    color: #fff;
+    font-size: 12px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-weight: 600;
+  }
+
 </style>
 
 <div class="container py-4">
@@ -67,7 +87,15 @@
       <% } %>
 
       <% wishlistItems.forEach(item => { %>
-        <div class="cart-card">
+      <div class="cart-card position-relative <%= !item.productStatus ? 'wishlist-disabled' : '' %>">
+
+        <% if (!item.productStatus) { %>
+          <div class="wishlist-badge">Unavailable</div>
+        <% } %>
+
+        <!-- DISABLED INTERACTION WRAPPER -->
+        <div class="<%= !item.productStatus ? 'disable-interaction d-flex gap-3' : 'd-flex gap-3' %>">
+
           <img src="/uploads/<%= item.image %>" alt="<%= item.title %>">
 
           <div class="flex-grow-1">
@@ -83,25 +111,31 @@
 
             <div class="small">
               <a href="javascript:void(0)"
-                 onclick="moveToCart('<%= item.wishlistItemId %>')"
-                 class="me-3 text-decoration-none">
+                onclick="moveToCart('<%= item.wishlistItemId %>')"
+                class="me-3 text-decoration-none <%= !item.productStatus ? 'text-muted' : '' %>"
+                <%= !item.productStatus ? 'aria-disabled="true"' : '' %>>
                 <i class="bi bi-cart"></i> Move to Cart
               </a>
 
-              <a href="javascript:void(0)"
-                 onclick="removeFromWishlist('<%= item.wishlistItemId %>')"
-                 class="text-danger text-decoration-none">
-                Remove
-              </a>
-
-              <a href="/user/product/<%= item.product_id %>"
-                 class="text-success text-decoration-none">
+              <a href="<%= item.productStatus ? `/user/product/${item.product_id}` : 'javascript:void(0)' %>"
+                class="text-success text-decoration-none <%= !item.productStatus ? 'text-muted' : '' %>">
                 View Product
               </a>
             </div>
           </div>
         </div>
-      <% }) %>
+
+        <!-- REMOVE BUTTON (ALWAYS ACTIVE) -->
+        <div class="ms-auto align-self-start">
+          <a href="javascript:void(0)"
+            onclick="removeFromWishlist('<%= item.wishlistItemId %>')"
+            class="text-danger text-decoration-none small fw-semibold">
+            Remove
+          </a>
+        </div>
+
+      </div>
+    <% }) %>
     </div>
 
   </div>

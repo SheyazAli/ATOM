@@ -495,10 +495,6 @@ exports.postCancelOrder = async (req, res) => {
       if (isReturn) {
         item.returnedQty = (item.returnedQty || 0) + qty;
 
-        if (item.returnedQty === item.quantity) {
-          item.status = 'returned';
-        }
-
         item.returnStatus = 'pending';
       }
       //  CANCEL FLOW
@@ -516,14 +512,12 @@ exports.postCancelOrder = async (req, res) => {
         );
 
         // Refund
-        if (allowDirectRefund) {
-          await processRefund({
-            order,
-            item,
-            refundQty: qty,
-            reason: 'refund'
-          });
-        }
+        await processRefund({
+          order,
+          item,
+          refundQty: qty,
+          reason: 'cancel'
+        });
       }
 
       item.message = message;

@@ -122,6 +122,18 @@
     <span>Shipping</span>
     <span><%= price.shipping === 0 ? 'Free' : '₹' + price.shipping %></span>
   </div>
+  <% if (order.cancelled_amount && order.cancelled_amount > 0) { %>
+    <div class="d-flex justify-content-between text-danger">
+      <span>Cancelled Amount</span>
+      <span>- ₹<%= order.cancelled_amount %></span>
+    </div>
+  <% } %>
+  <% if (order.refund_amount && order.refund_amount > 0) { %>
+    <div class="d-flex justify-content-between text-danger">
+        <span>Refund</span>
+         <span>- ₹<%= order.refund_amount %></span>
+     </div>
+    <% } %>
 
   <% if (price.discount > 0 && price.couponCode) { %>
     <div class="d-flex justify-content-between text-success">
