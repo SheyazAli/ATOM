@@ -243,9 +243,17 @@
       <div class="row g-4">
 
         <% products.forEach(p => { 
-          const samePrice = p.regular_price === p.sale_price;
-          const discount = !samePrice
-            ? Math.round(((p.regular_price - p.sale_price) / p.regular_price) * 100)
+          const hasValidSale =
+            p.sale_price &&
+            Number(p.sale_price) > 0 &&
+            Number(p.sale_price) < Number(p.regular_price);
+
+          const samePrice = !hasValidSale;
+
+          const discount = hasValidSale
+            ? Math.round(
+                ((p.regular_price - p.sale_price) / p.regular_price) * 100
+              )
             : 0;
         %>
 
@@ -265,8 +273,10 @@
 
                   <div class="price-box">
                     <% if (samePrice) { %>
-                      <span class="single-price">₹ <%= p.sale_price %></span>
+                      <!-- No sale or invalid sale -->
+                      <span class="single-price">₹ <%= p.regular_price %></span>
                     <% } else { %>
+                      <!-- Valid sale -->
                       <span class="mrp">₹ <%= p.regular_price %></span>
                       <span class="sale">₹ <%= p.sale_price %></span>
                       <span class="discount"><%= discount %>% OFF</span>
@@ -291,13 +301,18 @@
         <ul class="pagination">
           <% for (let i = 1; i <= totalPages; i++) { %>
             <li class="page-item <%= i === currentPageNum ? 'active' : '' %>">
-              <a class="page-link"
-                href="?page=<%= i %>
-                &search=<%= search %>
-                &sort=<%= sort %>
-                <% category.forEach(c=>{ %>&category=<%= c %><% }) %>
-                <% size.forEach(s=>{ %>&size=<%= s %><% }) %>
-                <% color.forEach(c=>{ %>&color=<%= c %><% }) %>">
+              <%
+                const qs = new URLSearchParams();
+                qs.set('page', i);
+
+                if (search) qs.set('search', search);
+                if (sort) qs.set('sort', sort);
+
+                category.forEach(c => qs.append('category', c));
+                size.forEach(s => qs.append('size', s));
+                color.forEach(c => qs.append('color', c));
+              %>
+              <a class="page-link" href="?<%= qs.toString() %>">
                 <%= i %>
               </a>
             </li>

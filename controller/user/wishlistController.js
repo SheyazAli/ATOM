@@ -53,12 +53,16 @@ exports.addToWishlist = async (req, res) => {
         .json({ error: 'Already in wishlist' });
     }
 
-    wishlist.items.push({
-      product_id,
-      variant_id: variant._id,
-      price_snapshot: product.sale_price
-    });
+      const priceSnapshot =
+      product.sale_price && product.sale_price > 0
+        ? product.sale_price
+        : product.regular_price;
 
+        wishlist.items.push({
+          product_id,
+          variant_id: variant._id,
+          price_snapshot: priceSnapshot
+        });
     await wishlist.save();
 
     res.status(HttpStatus.OK).json({ success: true });
@@ -83,7 +87,6 @@ exports.getWishlistPage = async (req, res) => {
       for (const item of wishlist.items) {
         const product = await Product.findOne({
           product_id: item.product_id,
-          status: true
         }).lean();
 
         const variant = await Variant.findById(item.variant_id).lean();
@@ -97,6 +100,7 @@ exports.getWishlistPage = async (req, res) => {
           image: variant.images?.[0] || 'default-product.webp',
           size: variant.size,
           color: variant.color,
+          productStatus: product.status === true,
           price: item.price_snapshot,
           stock: variant.stock
         });

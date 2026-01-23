@@ -91,18 +91,60 @@ exports.postAddProduct = async (req, res) => {
       status,
       variants
     } = req.body;
+
+    /* ================= BASIC VALIDATION ================= */
+
     if (!title || !description || !category_id || !regular_price) {
       throw new Error('Missing required fields');
     }
 
-    let thumbnail = null;
-    if (regular_price <= 0) throw new Error('Invalid price');
-    if (sale_price && sale_price <= 0) throw new Error('Invalid sale price');
+    const regPrice = Number(regular_price);
+    const salePrice = Number(sale_price);
 
+    if (isNaN(regPrice) || regPrice <= 0) {
+      throw new Error('Invalid regular price');
+    }
+
+    if (sale_price) {
+      if (isNaN(salePrice) || salePrice <= 0) {
+        throw new Error('Invalid sale price');
+      }
+
+      if (salePrice >= regPrice) {
+        throw new Error('Sale price must be less than regular price');
+      }
+    }
+
+    if (!variants || Object.keys(variants).length === 0) {
+      throw new Error('No variants found');
+    }
+
+    /* ================= VARIANT VALIDATION (BEFORE CREATE) ================= */
+
+    for (const key in variants) {
+      const v = variants[key];
+
+      const imageFiles = req.files.filter(
+        f => f.fieldname === `variants[${key}][images]`
+      );
+
+      if (imageFiles.length < 3 || imageFiles.length > 5) {
+        throw new Error(`Each color must have 3–5 images (${v.color})`);
+      }
+
+      for (const sizeKey in v.sizes) {
+        const stock = Number(v.sizes[sizeKey].stock);
+        if (stock < 0) throw new Error('Stock cannot be negative');
+      }
+    }
+
+    /* ================= THUMBNAIL ================= */
+
+    let thumbnail = null;
     const thumbFile = req.files.find(f => f.fieldname === 'thumbnail');
+
     if (thumbFile) {
       const name = `thumb-${Date.now()}.webp`;
-
       await sharp(thumbFile.buffer)
         .resize(600, 600)
         .toFormat('webp')
@@ -110,6 +152,8 @@ exports.postAddProduct = async (req, res) => {
 
       thumbnail = `products/${name}`;
     }
+
+    /* ================= CREATE PRODUCT ================= */
 
     const product = await Product.create({
       title,
@@ -123,11 +167,9 @@ exports.postAddProduct = async (req, res) => {
       status: status === 'on',
       thumbnail
     });
-    if (!variants || Object.keys(variants).length === 0) {
-      throw new Error('No variants found');
-    }
 
-    /* CREATE VARIANTS */
+    /* ================= CREATE VARIANTS ================= */
+
     for (const key in variants) {
       const v = variants[key];
 
@@ -135,17 +177,13 @@ exports.postAddProduct = async (req, res) => {
         f => f.fieldname === `variants[${key}][images]`
       );
 
-      if (imageFiles.length < 3 || imageFiles.length > 5) {
-        throw new Error('Each color must have 3–5 images');
-      }
-
       const images = [];
 
       for (const file of imageFiles) {
-        const name = `var-${Date.now()}-${Math.round(Math.random() * 1e9)}.webp`;
+        const name = `var-${Date.now()}-${Math.random()}.webp`;
 
         await sharp(file.buffer)
-          .resize(800, 800, { fit: 'inside', withoutEnlargement: true })
+          .resize(800, 800, { fit: 'inside' })
           .toFormat('webp')
           .toFile(path.join('uploads/products', name));
 
@@ -153,14 +191,11 @@ exports.postAddProduct = async (req, res) => {
       }
 
       for (const sizeKey in v.sizes) {
-        if (v.sizes[sizeKey].stock < 0) {
-          throw new Error('Stock cannot be negative');
-        }
         await Variant.create({
-          product_id:product.product_id,
+          product_id: product.product_id,
           color: v.color,
           size: sizeKey,
-          stock: Number(v.sizes[sizeKey].stock || 0),
+          stock: Number(v.sizes[sizeKey].stock),
           sku: `${product.product_id}-${v.color}-${sizeKey}`,
           images,
           status: true
@@ -171,10 +206,14 @@ exports.postAddProduct = async (req, res) => {
     return res.redirect('/admin/products');
 
   } catch (error) {
-    console.error('ADD PRODUCT ERROR:', error);
-    return res.redirect('/admin/products/add');
+    console.error('ADD PRODUCT ERROR:', error.message);
+
+    return res.redirect(
+      `/admin/products/add?error=${encodeURIComponent(error.message)}`
+    );
   }
 };
+
 
 // exports.getEditProduct = async (req, res) => {
 //   try {

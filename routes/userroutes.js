@@ -83,8 +83,8 @@ router.delete('/wishlist/remove',verifyUser,wishlistController.removeFromWishlis
 router.get('/checkout',verifyUser,userController.getCheckout)
 
 router.post('/checkout/pay', verifyUser,validateCartStock, paymentController.placeOrderCOD);
-router.post('/checkout/pay-wallet', verifyUser,validateCartStock, paymentController.placeOrderWallet);
-router.post('/checkout/stripe/create-session',verifyUser,validateCartStock,paymentController.createStripeSession);
+router.post('/checkout/pay-wallet', verifyUser, paymentController.placeOrderWallet);
+router.post('/checkout/stripe/create-session',verifyUser,paymentController.createStripeSession);
 router.get('/checkout/stripe/success',verifyUser,paymentController.stripeSuccess);
 router.get('/checkout/stripe/cancel',verifyUser,paymentController.stripeCancel);
 router.get('/payment-failed',verifyUser,paymentController.getPaymentFailed);

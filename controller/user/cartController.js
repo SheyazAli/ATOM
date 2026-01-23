@@ -13,30 +13,39 @@ const Wishlist = require(__basedir + '/db/WishlistModel')
 exports.getCartPage = async (req, res) => {
   try {
     const userId = req.user?._id;
-
-    if (!userId) {
-      return res.redirect('/user/login');
-    }
+    if (!userId) return res.redirect('/user/login');
 
     const cartDoc = await Cart.findOne({ user_id: userId }).lean();
 
     let cartItems = [];
     let subtotal = 0;
+    let stockAlertMessage = null;
 
     if (cartDoc?.items?.length) {
       for (const item of cartDoc.items) {
         const product = await Product.findOne({
           product_id: item.product_id
         }).lean();
-
         const variant = await Variant.findById(item.variant_id).lean();
-
-        // Skip invalid references safely
         if (!product || !variant) continue;
+        if (item.quantity > variant.stock) {
+          await Cart.updateOne(
+            {
+              user_id: userId,
+              'items._id': item._id
+            },
+            {
+              $set: {
+                'items.$.quantity': variant.stock
+              }
+            }
+          );
+          stockAlertMessage =
+            `Only ${variant.stock} qty left for ${product.title} - ${variant.color} ${variant.size}. Quantity has been updated.`;
+          break;
+        }
 
-        const isActive = product.status === true;
-
-        if (isActive) {
+        if (product.status === true) {
           subtotal += item.quantity * item.price_snapshot;
         }
 
@@ -44,7 +53,7 @@ exports.getCartPage = async (req, res) => {
           cartItemId: item._id,
           product_id: item.product_id,
           variant_id: item.variant_id,
-          productStatus: isActive,
+          productStatus: product.status,
           title: product.title,
           image: variant.images?.[0] || 'default-product.webp',
           size: variant.size,
@@ -55,11 +64,14 @@ exports.getCartPage = async (req, res) => {
         });
       }
     }
-
+    if (stockAlertMessage) {
+      return res.redirect(
+        `/user/cart?error=${encodeURIComponent(stockAlertMessage)}`
+      );
+    }
     const relatedProducts = await Product.find({ status: true })
       .limit(4)
       .lean();
-
     return res.render('user/cart', {
       cartItems,
       subtotal,
@@ -68,6 +80,7 @@ exports.getCartPage = async (req, res) => {
     });
 
   } catch (error) {
+    console.error('GET CART ERROR:', error);
     return res
       .status(HttpStatus.INTERNAL_SERVER_ERROR)
       .render('user/500');
@@ -113,11 +126,16 @@ exports.addToCart = async (req, res) => {
       }
       existingItem.quantity += 1;
     } else {
+      const priceSnapshot =
+        product.sale_price && Number(product.sale_price) > 0
+          ? Number(product.sale_price)
+          : Number(product.regular_price);
+
       cart.items.push({
         product_id,
-        variant_id: variant._id, 
+        variant_id: variant._id,
         quantity: 1,
-        price_snapshot: product.sale_price
+        price_snapshot: priceSnapshot
       });
     }
 
@@ -247,13 +265,19 @@ exports.addToWishlistFromCart = async (req, res) => {
       });
     }
 
-    wishlist.items.push({
-      product_id: product.product_id,
-      variant_id: variant._id,
-      price_snapshot: product.sale_price
-    });
+    const priceSnapshot =
+        product.sale_price && Number(product.sale_price) > 0
+          ? Number(product.sale_price)
+          : Number(product.regular_price);
 
-    await wishlist.save();
+      wishlist.items.push({
+        product_id: product.product_id,
+        variant_id: variant._id,
+        price_snapshot: priceSnapshot,
+        productStatus: product.status
+      });
+
+      await wishlist.save();
 
     return res.status(HttpStatus.OK).json({
       success: true

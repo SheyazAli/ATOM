@@ -64,10 +64,10 @@
       <h6 class="fw-semibold mb-3">Pricing</h6>
       <div class="row">
         <div class="col-md-6">
-          <input class="form-control" name="regular_price" type="number" min="1" required>
+          <input id="regularPrice" class="form-control" name="regular_price" type="number" min="1" required>
         </div>
         <div class="col-md-6">
-          <input class="form-control" name="sale_price" type="number" min="1">
+          <input id="salePrice" class="form-control" name="sale_price" type="number" min="1">
         </div>
       </div>
     </div>
@@ -256,6 +256,9 @@ document.getElementById('productForm').addEventListener('submit', async e => {
   e.target.reportValidity(); 
   return;
 }
+const regularInput = document.getElementById('regularPrice');
+const saleInput = document.getElementById('salePrice');
+
 
   e.preventDefault();
 
@@ -292,6 +295,18 @@ document.getElementById('productForm').addEventListener('submit', async e => {
 });
 
 </script>
+<script>
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('error')) {
+    Swal.fire({
+      icon: 'error',
+      title: 'Error',
+      text: params.get('error'),
+      confirmButtonColor: '#e0553f'
+    });
+  }
+</script>
+
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 </body>

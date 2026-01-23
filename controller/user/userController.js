@@ -466,7 +466,7 @@ exports.getOtpPage = (req, res) => {
     });
 
     req.session.destroy();
-    res.redirect('user/home');
+    res.redirect('/user/home');
 
   } catch (error) {
     console.error('POST OTP ERROR:', error);
@@ -773,7 +773,8 @@ exports.getProducts = async (req, res) => {
     category = [].concat(category);
     size = [].concat(size);
     color = [].concat(color);
-
+    search = search.trim();
+    sort = sort.trim();
 
     let variantFilter = {};
 
@@ -907,15 +908,32 @@ exports.getProductDetails = async (req, res) => {
       rp.colorsCount = [...new Set(rVariants.map(v => v.color))].length;
     }
 
-    return res.render('user/product-details', {
-      product,
-      category,
-      colorMap,
-      colors,
-      defaultColor,
-      isOutOfStock,
-      relatedProducts
-    });
+ return res.render('user/product-details', {
+  // product page
+  product,
+  productCategory: category,
+  colorMap,
+  colors,
+  defaultColor,
+  isOutOfStock,
+  relatedProducts,
+
+  // navbar REQUIRED data
+  category: [],
+  size: [],
+  color: [],
+  sort: '',
+  search: '',
+
+  navCategories: req.navCategories || {
+    hoodiId: '',
+    poloId: '',
+    oversizedId: '',
+    sweatshirtId: ''
+  }
+});
+
+
 
   } catch (error) {
     console.error('PRODUCT DETAILS ERROR:', error);
