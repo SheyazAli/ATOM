@@ -66,51 +66,59 @@
     <!-- LEFT -->
     <div class="col-lg-7">
 
-      <!-- ADDRESS -->
-      <div class="checkout-card">
-        <h6 class="fw-semibold mb-3">Ship to</h6>
+<!-- ADDRESS -->
+<div class="checkout-card">
+  <h6 class="fw-semibold mb-3">Ship to</h6>
 
-        <div id="selectedAddress">
-          <% if (defaultAddress) { %>
-            <p><strong><%= user.name %></strong></p>
-            <p><%= defaultAddress.building_name %></p>
-            <p><%= defaultAddress.address_line_1 %></p>
-            <p><%= defaultAddress.city %>, <%= defaultAddress.state %> <%= defaultAddress.postal_code %></p>
-            <p><%= defaultAddress.country %></p>
-          <% } %>
-        </div>
+  <div id="selectedAddress">
+    <% if (defaultAddress) { %>
+      <p><strong><%= user.name %></strong></p>
+      <p><%= defaultAddress.building_name %></p>
+      <p><%= defaultAddress.address_line_1 %></p>
+      <p>
+        <%= defaultAddress.city %>, <%= defaultAddress.state %>
+        <%= defaultAddress.postal_code %>
+      </p>
+      <p><%= defaultAddress.country %></p>
+    <% } %>
+  </div>
 
-        <select class="form-select mt-3" id="addressSelect">
-          <% addresses.forEach(addr => { %>
-            <option value="<%= addr.address_id %>"
-              <%= defaultAddress && addr.address_id === defaultAddress.address_id ? 'selected' : '' %>>
-              <%= addr.building_name %>, <%= addr.city %>, <%= addr.state %>
-            </option>
-          <% }) %>
-          <option value="add_new">➕ Add new address</option>
-        </select>
-      </div>
+  <select class="form-select mt-3" id="addressSelect">
+    <% addresses.forEach(addr => { %>
+      <option value="<%= addr.address_id %>"
+        <%= defaultAddress && addr.address_id === defaultAddress.address_id ? 'selected' : '' %>>
+        <%= addr.building_name %>, <%= addr.city %>, <%= addr.state %>
+      </option>
+    <% }) %>
+  </select>
 
-      <!-- PAYMENT -->
-      <div class="checkout-card">
-        <h6 class="fw-semibold mb-2">Payment</h6>
+    <!-- ✅ ADD NEW ADDRESS BUTTON -->
+    <a href="/user/address/add"
+      class="btn btn-outline-dark w-100 mt-2">
+      ➕ Add new address
+    </a>
+  </div>
 
-        <label class="payment-option">
-          <input type="radio" name="paymentMethodRadio" value="cod" checked>
-          Cash on Delivery (COD)
-        </label>
+  <!-- PAYMENT -->
+  <div class="checkout-card">
+    <h6 class="fw-semibold mb-2">Payment</h6>
 
-        <label class="payment-option">
-          <input type="radio" name="paymentMethodRadio" value="stripe">
-          Card
-        </label>
+    <label class="payment-option">
+      <input type="radio" name="paymentMethodRadio" value="cod" checked>
+      Cash on Delivery (COD)
+    </label>
 
-        <!-- ✅ WALLET -->
-        <label class="payment-option">
-          <input type="radio" name="paymentMethodRadio" value="wallet">
-          Wallet
-        </label>
-      </div>
+    <label class="payment-option">
+      <input type="radio" name="paymentMethodRadio" value="stripe">
+      Card
+    </label>
+
+    <label class="payment-option">
+      <input type="radio" name="paymentMethodRadio" value="wallet">
+      Wallet
+    </label>
+  </div>
+
 
       <!-- COUPONS -->
       <div class="checkout-card">

@@ -172,6 +172,7 @@ exports.placeOrderWallet = async (req, res) => {
 
     for (const item of cart.items) {
       const variant = await Variant.findById(item.variant_id);
+
       if (!variant || variant.stock < item.quantity) {
         return res.json({
           success: false,
@@ -286,12 +287,20 @@ exports.createStripeSession = async (req, res) => {
 
     const cart = await Cart.findOne({ user_id: userId });
     if (!cart || !cart.items.length) {
-      return res.json({ error: 'CART_EMPTY' });
+      return res.json({
+        success: false,
+        reason: PAYMENT_FAILURE_REASONS.CART_EMPTY,
+        redirect: `/user/payment-failed?reason=${PAYMENT_FAILURE_REASONS.CART_EMPTY}`
+      });
     }
 
     const address = await Address.findOne({ user_id: userId, address_id }).lean();
     if (!address) {
-      return res.json({ error: 'INVALID_ADDRESS' });
+       return res.json({
+        success: false,
+        reason: PAYMENT_FAILURE_REASONS.INVALID_ADDRESS,
+        redirect: `/user/payment-failed?reason=${PAYMENT_FAILURE_REASONS.INVALID_ADDRESS}`
+      });
     }
 
     let subtotal = 0;
@@ -304,12 +313,10 @@ exports.createStripeSession = async (req, res) => {
           product_id: variant.product_id
         }).lean();
 
-        return res.status(400).json({
+        return res.json({
           success: false,
           reason: PAYMENT_FAILURE_REASONS.STOCK_ISSUE,
-          redirect: `/user/cart?error=${encodeURIComponent(
-            `Only ${variant.stock} qty left for ${product.title} - ${variant.color} ${variant.size}.`
-          )}`
+          redirect: `/user/payment-failed?reason=${PAYMENT_FAILURE_REASONS.STOCK_ISSUE}`
         });
       }
 
@@ -326,11 +333,19 @@ exports.createStripeSession = async (req, res) => {
         coupon.expiry_date < new Date() ||
         coupon.user_ids.includes(userId)
       ) {
-        return res.json({ error: 'INVALID_COUPON' });
+        return res.json({
+          success: false,
+          reason: PAYMENT_FAILURE_REASONS.INVALID_COUPON,
+          redirect: `/user/payment-failed?reason=${PAYMENT_FAILURE_REASONS.INVALID_COUPON}`
+        });
       }
 
       if (subtotal < coupon.minimum_purchase) {
-        return res.json({ error: 'COUPON_MIN_NOT_MET' });
+        return res.json({
+          success: false,
+          reason: PAYMENT_FAILURE_REASONS.COUPON_MIN_NOT_MET,
+          redirect: `/user/payment-failed?reason=${PAYMENT_FAILURE_REASONS.COUPON_MIN_NOT_MET}`
+        });
       }
 
       discount = cart.applied_coupon.discount;
@@ -456,8 +471,6 @@ exports.stripeSuccess = async (req, res) => {
       total: Math.max(subtotal - discount, 0),
       status: 'placed'
     });
-
-    // ✅ Record coupon usage (same as COD & Wallet)
     if (cart.applied_coupon?.coupon_id) {
       await Coupon.findByIdAndUpdate(
         cart.applied_coupon.coupon_id,
@@ -550,7 +563,6 @@ exports.getPaymentFailed = async (req, res) => {
     }
     await Cart.findOne({ user_id: userId }).lean();
 
-/* ✅ ADD THIS BLOCK */
     if (cart?.items?.length) {
       for (const item of cart.items) {
         const variant = await Variant.findById(item.variant_id).lean();

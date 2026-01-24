@@ -516,7 +516,7 @@ exports.postCancelOrder = async (req, res) => {
           order,
           item,
           refundQty: qty,
-          reason: 'cancel'
+          reason: 'refund'
         });
       }
 
