@@ -12,7 +12,7 @@ const { verifyUser, noCache, blockIfLoggedIn } = require(__basedir +'/middleware
 const validateCartStock = require(__basedir +'/middleware/validateCartStock');
 const passport = require('passport');
 
-router.get('/home',userController.getHome);
+router.get('/home',noCache,userController.getHome);
 //AUTH
 router.get('/login',noCache, blockIfLoggedIn, userController.getLogin)
 router.post('/login',userController.postLogin)
@@ -26,10 +26,10 @@ router.get('/reset-password', blockIfLoggedIn, userController.getResetPassword);
 router.put('/reset-password', userController.postResetPassword);
 
 // RESEND OTP (PASSWORD RESET ONLY)
-router.post('/password/resend-otp', userController.passwordResendOtp);
+router.post('/password/resend-otp', verifyUser, userController.passwordResendOtp);
 //router.put('/reset-password', userController.resetPassword);
 
-router.post('/resend-otp', userController.passwordResendOtp);
+//router.post('/resend-otp', userController.passwordResendOtp);
 
 router.get('/signup',noCache, blockIfLoggedIn, userController.getSignup);
 router.post('/signup',userController.postSignup)
@@ -37,20 +37,20 @@ router.post('/signup',userController.postSignup)
 router.get('/google',passport.authenticate('google', {scope: ['profile', 'email']}));
 router.get('/google/callback',passport.authenticate('google', { session: false }),userController.googleAuthSuccess);
 //SIGNUP OTP
-router.get('/verify-otp', userController.getOtpPage);
+router.get('/verify-otp',blockIfLoggedIn, userController.getOtpPage);
 router.post('/verify-otp', userController.postOtpPage);
 router.post('/signup/resend-otp', userController.resendOtp);
 //PROFILE
 router.get('/profile',noCache, verifyUser, userController.getProfile);
 
 router.get('/profile/edit',noCache, verifyUser, userController.getEditProfile);
-router.patch('/profile/edit', verifyUser, userController.postEditProfile); 
+router.patch('/profile/edit', verifyUser, userController.patchEditProfile); 
 
-router.get('/profile/verify-otp',noCache , verifyUser, userController.getProfileOtpPage);
+router.get('/profile/verify-otp' , verifyUser, userController.getProfileOtpPage);
 router.post('/profile/verify-otp', verifyUser, userController.postProfileOtp);
 router.post('/profile/resend-otp', verifyUser, userController.resendProfileOtp);
 
-router.get('/profile/update-password',noCache,verifyUser,userController.getUpdatePassword);
+router.get('/profile/update-password',verifyUser,userController.getUpdatePassword);
 //router.post('/profile/update-password',verifyUser,userController.postUpdatePassword); 
 router.put('/profile/update-password',verifyUser,userController.putUpdatePassword);
 
@@ -104,7 +104,7 @@ router.delete('/coupon/remove',verifyUser,userController.removeCoupon);
 
 //WALLET
 router.get('/wallet',noCache,verifyUser,walletController.getWallet)
-router.get('/wallet/add-money',verifyUser,walletController.getAddMoneyPage)
+router.get('/wallet/add-money',noCache,verifyUser,walletController.getAddMoneyPage)
 router.post('/wallet/add-money',verifyUser,walletController.createWalletStripeSession);
 router.get('/wallet/stripe-success',walletController.walletStripeSuccess);
 router.get('/wallet/stripe-cancel',walletController.walletStripeCancel);

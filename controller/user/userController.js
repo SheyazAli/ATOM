@@ -66,42 +66,78 @@ exports.getEditProfile = async (req, res) => {
   });
 };
 
-exports.postEditProfile = async (req, res) => {
-  const { first_name, last_name, email, phone_number } = req.body;
-  const user = req.user;
+exports.patchEditProfile = async (req, res) => {
+  try {
+    const { first_name, last_name, email, phone_number } = req.body;
+    const user = req.user;
 
-  const emailChanged = email !== user.email;
-  const phoneChanged = phone_number !== (user.phone_number || '');
+    if (!user) {
+      return res
+        .status(HttpStatus.UNAUTHORIZED)
+        .json({ message: 'Unauthorized' });
+    }
 
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const phoneRegex = /^\d{10}$/;
 
-  req.session.profileUpdate = {
-    first_name,
-    last_name,
-    email,
-    phone_number
-  };
+    if (!emailRegex.test(email)) {
+      return res
+        .status(HttpStatus.BAD_REQUEST)
+        .json({ message: 'Invalid email address' });
+    }
 
-  if (emailChanged || phoneChanged) {
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    console.log("Profile update OTP: ",otp)
-    req.session.otp = otp;
-    req.session.otpExpires = Date.now() + 2 * 60 * 1000;
-    req.session.otpAttempts = 0;
-    req.session.otpSentAt = Date.now();
+    if (phone_number && !phoneRegex.test(phone_number)) {
+      return res
+        .status(HttpStatus.BAD_REQUEST)
+        .json({
+          message: 'Phone number must be 10 digits and should only contain numbers'
+        });
+    }
 
-    await sendOtpMail(email, otp);
-    return res.redirect('/user/profile/verify-otp');
+    const emailChanged = email !== user.email;
+    const phoneChanged = phone_number !== (user.phone_number || '');
+
+    req.session.profileUpdate = {
+      first_name,
+      last_name,
+      email,
+      phone_number
+    };
+
+    if (emailChanged || phoneChanged) {
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      console.log("Profile update ",otp)
+
+      req.session.otp = otp;
+      req.session.otpExpires = Date.now() + 2 * 60 * 1000;
+      req.session.otpAttempts = 0;
+
+      await sendOtpMail(email, otp);
+
+      return res.status(HttpStatus.OK).json({
+        redirect: '/user/profile/verify-otp'
+      });
+    }
+
+    await User.findByIdAndUpdate(user._id, {
+      first_name,
+      last_name,
+      email,
+      phone_number
+    });
+
+    res.status(HttpStatus.OK).json({
+      redirect: '/user/profile'
+    });
+
+  } catch (err) {
+    res
+      .status(HttpStatus.INTERNAL_SERVER_ERROR)
+      .json({ message: 'Something went wrong' });
   }
-
-  await User.findByIdAndUpdate(user._id, {
-    first_name,
-    last_name,
-    email,
-    phone_number
-  });
-
-  res.redirect('/user/profile');
 };
+
+
 
 //CHANGE PASSWORD
 exports.putUpdatePassword = async (req, res) => {
@@ -690,7 +726,7 @@ exports.passwordResendOtp = async (req, res) => {
     }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    console.log(otp)
+    console.log("passwordResendOtp ",otp)
 
     req.session.otp = otp;
     req.session.otpExpires = Date.now() + 5 * 60 * 1000;
