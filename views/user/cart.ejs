@@ -1,4 +1,5 @@
 <%- include('./userPartials/navbar') %>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
 
 <style>
   body { background:#fafafa; }
@@ -183,11 +184,16 @@
 
           <div class="small">
             <a href="javascript:void(0)"
-              class="me-3 text-decoration-none <%= !item.productStatus ? 'text-muted' : '' %>"
-              <%= item.productStatus
-                ? `onclick="addToWishlistFromCart('${item.cartItemId}')"`
-                : '' %>>
+              class="me-3 text-decoration-none wishlist-btn <%= !item.productStatus ? 'text-muted' : '' %>"
+              data-product-id="<%= item.product_id %>"
+              data-variant-id="<%= item.variant_id %>"
+              data-cart-item-id="<%= item.cartItemId %>"
+              <%= !item.productStatus ? 'aria-disabled="true"' : '' %>>
               <i class="bi bi-heart"></i> Wishlist
+            </a>
+           <a href="/user/product/<%= item.product_id %>"
+              class="text-success text-decoration-none ms-2">
+              <i class="bi bi-eye"></i> View Product
             </a>
           </div>
         </div>
@@ -335,14 +341,61 @@ async function removeItem(id) {
   location.reload();
 }
 
-async function addToWishlistFromCart(id) {
-  await fetch('/user/wishlist/add-from-cart', {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({ cartItemId:id })
-  });
-  location.reload();
+async function addToWishlistFromCart(productId, variantId, cartItemId) {
+  try {
+    const res = await fetch('/user/wishlist/add-from-cart', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        product_id: productId,
+        variant_id: variantId,
+        cartItemId
+      })
+    });
+
+    const data = await res.json();
+
+    if (!data.success) {
+      Swal.fire('Error', data.message || 'Unable to add to wishlist', 'error');
+      return;
+    }
+
+    Swal.fire({
+      icon: 'success',
+      title: 'Moved to wishlist ❤️',
+      timer: 1200,
+      showConfirmButton: false
+    }).then(() => location.reload());
+
+  } catch (err) {
+    console.error(err);
+    Swal.fire('Error', 'Something went wrong', 'error');
+  }
 }
+
 </script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('error')) {
+    Swal.fire('Stock issue', params.get('error'), 'warning');
+  }
+</script>
+<script>
+document.addEventListener('click', e => {
+  const btn = e.target.closest('.wishlist-btn');
+  if (!btn) return;
+
+  const productId = btn.dataset.productId;
+  const variantId = btn.dataset.variantId;
+  const cartItemId = btn.dataset.cartItemId;
+
+  if (!productId || !variantId || !cartItemId) return;
+
+  addToWishlistFromCart(productId, variantId, cartItemId);
+});
+</script>
+
 
 <%- include('./userPartials/footer') %>

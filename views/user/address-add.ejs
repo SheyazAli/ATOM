@@ -47,7 +47,7 @@
     <div class="col-lg-9">
       <h3 class="mb-4">Addresses</h3>
 
-      <form method="POST" action="/user/address">
+      <form id="addAddressForm">
         <div class="row g-4">
 
           <div class="col-md-6">
@@ -83,11 +83,13 @@
           </div>
 
           <div class="col-md-6">
-            <input name="postal_code" class="address-input w-100" placeholder="Postal code" required>
+            <input name="postal_code" class="address-input w-100" placeholder="Postal code"
+               inputmode="numeric" maxlength="6">
           </div>
 
           <div class="col-md-6">
-            <input name="phone_number" class="address-input w-100" placeholder="Mobile number" required>
+            <input name="phone_number" class="address-input w-100" placeholder="Mobile number"
+              inputmode="numeric" maxlength="10">
           </div>
 
           <div class="col-md-12">
@@ -114,5 +116,44 @@
 </div>
 
 <%- include('./userPartials/footer') %>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<script>
+document.getElementById('addAddressForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const form = e.target;
+  const formData = new FormData(form);
+  const data = Object.fromEntries(formData.entries());
+
+  try {
+    const res = await fetch('/user/address', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+
+    const result = await res.json();
+
+    if (!res.ok) {
+      return Swal.fire({
+        icon: 'error',
+        title: 'Validation Error',
+        text: result.message
+      });
+    }
+
+    window.location.href = result.redirect;
+
+  } catch (err) {
+    Swal.fire({
+      icon: 'error',
+      title: 'Network Error',
+      text: 'Please try again later'
+    });
+  }
+});
+</script>
+
 </body>
 </html>

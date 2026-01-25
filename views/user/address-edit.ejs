@@ -108,13 +108,15 @@
           </div>
 
           <div class="col-md-6">
-            <input name="postal_code" class="address-input"
-                   value="<%= address.postal_code %>" required>
+           <input name="postal_code" class="address-input"
+              value="<%= address.postal_code %>"
+              inputmode="numeric" maxlength="6" required>
           </div>
 
           <div class="col-md-6">
             <input name="phone_number" class="address-input"
-                   value="<%= address.phone_number %>" required>
+                value="<%= address.phone_number %>"
+                inputmode="numeric" maxlength="10" required>
           </div>
 
           <div class="col-12">
@@ -150,40 +152,48 @@
 </div>
 
 <%- include('./userPartials/footer') %>
-
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-  const form = document.getElementById('editAddressForm');
+const form = document.getElementById('editAddressForm');
 
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
 
-    const formData = new FormData(form);
-    const data = Object.fromEntries(formData.entries());
+  const formData = new FormData(form);
+  const data = Object.fromEntries(formData.entries());
 
-    // checkbox fix
-    data.is_default = formData.get('is_default') === 'on';
+  data.is_default = formData.get('is_default') === 'on';
 
-    try {
-      const res = await fetch('/user/address/<%= address._id %>', {
-        credentials: 'include',
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(data)
+  try {
+    const res = await fetch('/user/address/<%= address._id %>', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(data)
+    });
+
+    const result = await res.json();
+
+    if (!res.ok) {
+      return Swal.fire({
+        icon: 'error',
+        title: 'Validation Error',
+        text: result.message
       });
-
-      if (res.ok) {
-        window.location.href = '/user/address';
-      } else {
-        alert('Update failed');
-      }
-    } catch (err) {
-      console.error(err);
-      alert('Something went wrong');
     }
-  });
+
+    window.location.href = result.redirect;
+
+  } catch (err) {
+    Swal.fire({
+      icon: 'error',
+      title: 'Network Error',
+      text: 'Please try again later'
+    });
+  }
+});
 </script>
+
 
 </body>
 </html>

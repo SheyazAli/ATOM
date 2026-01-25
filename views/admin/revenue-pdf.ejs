@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Revenue Report</title>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 30px;
+      color: #111;
+    }
+
+    h1 {
+      margin-bottom: 4px;
+    }
+
+    .date-range {
+      color: #555;
+      margin-bottom: 25px;
+      font-size: 14px;
+    }
+
+    /* METRICS */
+    .stats {
+      display: flex;
+      gap: 20px;
+      margin-bottom: 35px;
+    }
+
+    .card {
+      border: 1px solid #ddd;
+      padding: 14px;
+      border-radius: 6px;
+      width: 25%;
+      text-align: center;
+      font-size: 14px;
+    }
+
+    /* CHARTS */
+    .charts {
+      display: flex;
+      gap: 30px;
+      align-items: center;
+      margin-bottom: 40px;
+    }
+
+    .line-chart {
+      flex: 4;
+      height: 340px;
+    }
+
+    .pie-chart {
+      flex: 1;
+      height: 200px;
+    }
+
+    /* TABLE */
+    .page-break {
+      page-break-before: always;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      font-size: 12px;
+    }
+
+    th, td {
+      border: 1px solid #ddd;
+      padding: 7px;
+      text-align: center;
+    }
+
+    th {
+      background: #f3f3f3;
+    }
+  </style>
+</head>
+
+<body>
+
+<h1>Revenue Report</h1>
+
+<div class="date-range">
+  From
+  <strong>
+    <%= from ? new Date(from).toDateString() : 'Start' %>
+  </strong>
+  to
+  <strong>
+    <%= to ? new Date(to).toDateString() : 'Today' %>
+  </strong>
+</div>
+
+<!-- METRICS -->
+<div class="stats">
+  <div class="card">
+    Total Revenue<br>
+    <strong>₹ <%= metrics.totalRevenue %></strong>
+  </div>
+
+  <div class="card">
+    Discounts<br>
+    <strong>₹ <%= metrics.totalDiscount %></strong>
+  </div>
+
+  <div class="card">
+    Net Revenue<br>
+    <strong>₹ <%= metrics.netRevenue %></strong>
+  </div>
+
+  <div class="card">
+    Orders<br>
+    <strong><%= metrics.totalOrders %></strong>
+  </div>
+</div>
+
+<!-- CHARTS -->
+<div class="charts">
+  <div class="line-chart">
+    <canvas id="revenueChart"></canvas>
+  </div>
+
+  <div class="pie-chart">
+    <canvas id="paymentChart"></canvas>
+  </div>
+</div>
+
+<!-- TABLE (PAGE 2) -->
+<div class="page-break">
+  <table>
+    <thead>
+      <tr>
+        <th>Order #</th>
+        <th>Qty</th>
+        <th>Cancelled</th>
+        <th>Returned</th>
+        <th>Date</th>
+        <th>Payment</th>
+        <th>Status</th>
+        <th>Refund</th>
+        <th>Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% tableData.forEach(o => { %>
+        <tr>
+          <td><%= o.orderNumber %></td>
+          <td><%= o.quantity %></td>
+          <td><%= o.cancelledQty %></td>
+          <td><%= o.returnedQty %></td>
+          <td><%= o.date %></td>
+          <td><%= o.paymentMethod %></td>
+          <td><%= o.paymentStatus %></td>
+          <td>₹ <%= o.refundAmount %></td>
+          <td>₹ <%= o.total %></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+  /* LINE CHART */
+  new Chart(document.getElementById('revenueChart'), {
+    type: 'line',
+    data: {
+      labels: <%- JSON.stringify(Object.keys(dailyRevenue)) %>,
+      datasets: [{
+        data: <%- JSON.stringify(Object.values(dailyRevenue)) %>,
+        borderWidth: 2,
+        fill: false,
+        tension: 0.4
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false } // ✅ removes "undefined"
+      },
+      scales: {
+        y: { beginAtZero: true }
+      }
+    }
+  });
+
+  /* PIE CHART */
+  new Chart(document.getElementById('paymentChart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Paid', 'Pending', 'Refunded', 'Cancelled'],
+      datasets: [{
+        data: [
+          <%= paymentStats.paid %>,
+          <%= paymentStats.pending %>,
+          <%= paymentStats.refunded %>,
+          <%= paymentStats.cancelled %>
+        ]
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: { boxWidth: 12 }
+        }
+      }
+    }
+  });
+</script>
+
+</body>
+</html>

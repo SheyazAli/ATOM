@@ -28,6 +28,15 @@ exports.verifyUser = async (req, res, next) => {
 
       return res.redirect('/user/login');
     }
+     if (user.status === 'blocked') {
+      res.clearCookie('userToken');
+
+      if (req.method === 'POST') {
+        return res.status(HttpStatus.FORBIDDEN).send('User blocked');
+      }
+      return res.redirect('/user/login');
+    }
+    
     if (user.isVerified === false) {
       res.clearCookie('userToken');
 
