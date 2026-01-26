@@ -47,6 +47,19 @@
     font-size:15px;
     cursor:pointer;
   }
+    .unavailable-item {
+      position: relative;
+      opacity: 0.5;
+    }
+
+    .unavailable-item::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.35);
+      border-radius: 8px;
+      pointer-events: none;
+    }
 
   .cart-btn {
     width:100%;
@@ -149,13 +162,24 @@
       <div class="summary-box">
 
         <h6 class="fw-semibold mb-3">Order Summary</h6>
+        <% if (hasUnavailableItem) { %>
+          <div class="alert alert-danger small">
+            One or more products in your cart are currently unavailable.
+            Please remove them to proceed to checkout.
+          </div>
+        <% } %>
 
         <% cart.items.forEach(item => { %>
-          <div class="d-flex align-items-start mb-3">
+          <div class="d-flex align-items-start mb-3 <%= item.unavailable ? 'unavailable-item' : '' %>">
             <img src="/uploads/<%= item.image %>" width="60" class="rounded">
 
             <div class="ms-3 flex-grow-1">
-              <div class="fw-medium"><%= item.name %></div>
+              <div class="fw-medium">
+                <%= item.name %>
+                <% if (item.unavailable) { %>
+                  <span class="badge bg-danger ms-2">Unavailable</span>
+                <% } %>
+              </div>
               <div class="text-muted small"><%= item.variant %></div>
               <div class="text-muted small">Qty × <%= item.quantity %></div>
 
@@ -198,7 +222,12 @@
           <span>₹ <%= summary.total %></span>
         </div>
 
-        <button id="payNowBtn" class="pay-btn">Pay now</button>
+        <button
+          id="payNowBtn"
+          class="pay-btn"
+          <%= hasUnavailableItem ? 'disabled' : '' %>>
+          Pay now
+        </button>
 
         <form action="/user/cart" method="get">
           <button class="cart-btn">Back to cart</button>

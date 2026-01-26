@@ -66,6 +66,8 @@ router.delete('/address/:id', verifyUser, addressController.deleteAddress);
 router.get('/products', userController.getProducts);
 router.get('/product/:id',productStatus, userController.getProductDetails) 
 
+router.get('/search-suggestions', userController.searchSuggestions);
+
 //CART
 router.get('/cart',verifyUser, cartController.getCartPage)
 router.post('/cart/add', verifyUser, cartController.addToCart);

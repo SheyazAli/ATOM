@@ -17,7 +17,7 @@ const HttpStatus = require(__basedir +'/constants/httpStatus')
 const mongoose = require('mongoose');
 const Wishlist = require(__basedir + '/db/WishlistModel')
 const couponService = require(__basedir + '/services/couponService');
-
+const searchService = require(__basedir +'/services/searchService');
 
 // HOME PAGE
 exports.getHome = (req, res) => {
@@ -56,7 +56,6 @@ exports.getProfile = async (req, res, next) => {
     next(error);
   }
 };
-
 
 exports.getEditProfile = async (req, res) => {
   res.render('user/edit-profile', {
@@ -986,7 +985,7 @@ exports.getCheckout = async (req, res) => {
 
     let items = [];
     let subtotal = 0;
-
+    let hasUnavailableItem = false;
     for (const item of cart.items) {
       const variant = await Variant.findById(item.variant_id).lean();
       if (!variant) continue;
@@ -1014,10 +1013,23 @@ exports.getCheckout = async (req, res) => {
       }
 
       const product = await Product.findOne({
-        product_id: variant.product_id,
-        status: true
+        product_id: variant.product_id
       }).lean();
-      if (!product) continue;
+      if (!product || product.status === false) {
+      hasUnavailableItem = true;
+
+        items.push({
+          name: product?.title || 'Unavailable product',
+          image: variant.images?.[0] || 'default-product.webp',
+          variant: `${variant.size} · ${variant.color}`,
+          quantity: item.quantity,
+          itemTotal: 0,
+          unavailable: true
+        });
+
+        continue;
+      }
+
 
       // 🔹 PRICE LOGIC (ONLY ADDITION)
       let finalPrice = item.price_snapshot;
@@ -1098,6 +1110,7 @@ exports.getCheckout = async (req, res) => {
       appliedCoupon,
       coupons: couponList,
       addresses,
+      hasUnavailableItem,
       defaultAddress,
       user: {
         name: `${req.user.first_name} ${req.user.last_name}`
@@ -1158,6 +1171,62 @@ exports.removeCoupon = async (req, res) => {
 
   res.json({ success: true });
 };
+
+exports.searchSuggestions = async (req, res) => {
+  try {
+    const q = req.query.q?.trim();
+    const categoryFilter = req.query.category;
+
+    if (!q || q.length < 2) {
+      return res.json([]);
+    }
+
+    const query = {
+      title: { $regex: q, $options: 'i' },
+      status: true
+    };
+
+    // ✅ Apply category filter if present
+    if (categoryFilter) {
+      query.category_id = categoryFilter;
+    }
+
+    const products = await Product.find(query)
+      .limit(8)
+      .select('title thumbnail category_id');
+
+    if (!products.length) {
+      return res.json([]);
+    }
+
+    const categoryIds = [...new Set(products.map(p => p.category_id))];
+
+    const categories = await Category.find({
+      category_id: { $in: categoryIds },
+      status: true
+    }).select('category_id name');
+
+    const categoryMap = {};
+    categories.forEach(c => {
+      categoryMap[c.category_id] = c.name;
+    });
+
+    const suggestions = products.map(p => ({
+      name: p.title,
+      image: p.thumbnail
+        ? `/uploads/${p.thumbnail}`
+        : '/images/no-image.png',
+      category: categoryMap[p.category_id] || 'Products'
+    }));
+
+    res.json(suggestions);
+  } catch (err) {
+    res.json([]);
+  }
+};
+
+
+
 
 exports.logout = (req, res) => {
   res.clearCookie('userToken', {
