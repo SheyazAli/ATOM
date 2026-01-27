@@ -98,6 +98,16 @@
     text-decoration: none;
   }
 
+.input-group.has-validation.is-invalid + .invalid-feedback {
+  display: block;
+}
+
+
+
+  .form-control.is-invalid {
+    background-image: none !important;
+  }
+
   .divider {
     margin: 14px 0;
     text-decoration: none;
@@ -140,42 +150,65 @@
 
       <div class="mb-3 text-start">
         <label class="form-label">First name <span class="text-danger">*</span></label>
-        <input type="text" name="firstName" class="form-control" required>
+        <input type="text" name="firstName" id="firstName" class="form-control">
+        <div class="invalid-feedback">First name is required</div>
       </div>
 
       <div class="mb-3 text-start">
         <label class="form-label">Last name <span class="text-danger">*</span></label>
-        <input type="text" name="lastName" class="form-control" required>
+        <input type="text" name="lastName" id="lastName" class="form-control">
+        <div class="invalid-feedback">Last name is required</div>
       </div>
 
       <div class="mb-3 text-start">
         <label class="form-label">Enter your email id <span class="text-danger">*</span></label>
-        <input type="email" name="email" class="form-control" required>
+        <input type="email" name="email" id="email" class="form-control">
+        <div class="invalid-feedback">Enter a valid email address</div>
       </div>
 
-      <div class="mb-3 text-start">
-        <label class="form-label">
-          Enter your password <span class="text-danger">*</span>
-        </label>
-        <div class="input-group">
-          <input type="password" name="password" id="password" class="form-control" required >
-          <span class="input-group-text" id="togglePassword" role="button">
-            <i class="bi bi-eye"></i>
-          </span>
-        </div>
-      </div>
+<div class="mb-3 text-start">
+  <label class="form-label">
+    Enter your password <span class="text-danger">*</span>
+  </label>
 
-    <div class="mb-3 text-start">
-        <label class="form-label">
-          Confirm your password <span class="text-danger">*</span>
-        </label>
-        <div class="input-group">
-          <input type="password"name="confirmPassword"id="confirmPassword"class="form-control"required>
-          <span class="input-group-text" id="toggleConfirm" role="button">
-            <i class="bi bi-eye"></i>
-          </span>
-        </div>
-      </div>
+  <div class="input-group has-validation" id="passwordGroup">
+    <input
+      type="password"
+      id="password"
+      name="password"
+      class="form-control"
+    />
+    <span class="input-group-text" id="togglePassword">
+      <i class="bi bi-eye"></i>
+    </span>
+  </div>
+
+  <div class="invalid-feedback">
+    Password must be at least 6 characters
+  </div>
+</div>
+
+<div class="mb-3 text-start">
+  <label class="form-label">
+    Confirm your password <span class="text-danger">*</span>
+  </label>
+
+  <div class="input-group has-validation" id="confirmPasswordGroup">
+    <input
+      type="password"
+      id="confirmPassword"
+      name="confirmPassword"
+      class="form-control"
+    />
+    <span class="input-group-text" id="toggleConfirm">
+      <i class="bi bi-eye"></i>
+    </span>
+  </div>
+
+  <div class="invalid-feedback">
+    Passwords must match and be at least 6 characters
+  </div>
+</div>
 
       <div class="mb-3 text-start">
         <label class="form-label">Referral code</label>
@@ -231,6 +264,86 @@
 
   togglePassword('password', 'togglePassword');
   togglePassword('confirmPassword', 'toggleConfirm');
+
+    function validateNotEmpty(input, message) {
+    input.addEventListener('blur', () => {
+      if (input.value.trim() === '') {
+        input.classList.add('is-invalid');
+        input.nextElementSibling.textContent = message;
+      } else {
+        input.classList.remove('is-invalid');
+      }
+    });
+  }
+
+  function validateEmail(input) {
+    input.addEventListener('blur', () => {
+      const value = input.value.trim();
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+      if (!emailRegex.test(value)) {
+        input.classList.add('is-invalid');
+      } else {
+        input.classList.remove('is-invalid');
+      }
+    });
+  }
+
+  validateNotEmpty(
+    document.getElementById('firstName'),
+    'First name cannot be empty'
+  );
+
+  validateNotEmpty(
+    document.getElementById('lastName'),
+    'Last name cannot be empty'
+  );
+
+  validateEmail(document.getElementById('email'));
+
+  //Password
+
+ const password = document.getElementById('password');
+const confirmPassword = document.getElementById('confirmPassword');
+
+const passwordGroup = document.getElementById('passwordGroup');
+const confirmPasswordGroup = document.getElementById('confirmPasswordGroup');
+
+function validatePassword() {
+  if (password.value.trim().length < 6) {
+    password.classList.add('is-invalid');
+    passwordGroup.classList.add('is-invalid');
+    return false;
+  }
+  password.classList.remove('is-invalid');
+  passwordGroup.classList.remove('is-invalid');
+  return true;
+}
+
+function validateConfirmPassword() {
+  if (
+    confirmPassword.value.trim().length < 6 ||
+    confirmPassword.value !== password.value
+  ) {
+    confirmPassword.classList.add('is-invalid');
+    confirmPasswordGroup.classList.add('is-invalid');
+    return false;
+  }
+  confirmPassword.classList.remove('is-invalid');
+  confirmPasswordGroup.classList.remove('is-invalid');
+  return true;
+}
+
+password.addEventListener('blur', validatePassword);
+confirmPassword.addEventListener('blur', validateConfirmPassword);
+
+password.addEventListener('input', () => {
+  if (confirmPassword.value.length > 0) {
+    validateConfirmPassword();
+  }
+});
+
+
 </script>
 
 </body>

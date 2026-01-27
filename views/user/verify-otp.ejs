@@ -155,7 +155,7 @@
         Resend OTP
       </button>
       <p class="mt-2 text-muted" style="font-size: 13px;">
-        <span id="timerText">Resend available in 01:30</span>
+        <span id="timerText">Resend available in 30</span>
       </p>
     </form>
 
@@ -182,7 +182,7 @@
   });
 </script>
 <script>
-  const RESEND_DELAY = 90; // seconds
+  const RESEND_DELAY = 30; // seconds
   const otpSentAt = <%= otpSentAt || Date.now() %>;
 
   const resendBtn = document.getElementById('resendBtn');

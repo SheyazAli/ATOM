@@ -32,6 +32,19 @@
   .btn-save:hover {
     background: #157347;
   }
+  .address-input.is-invalid {
+  border: 1px solid #dc3545;
+}
+
+.address-input.is-invalid + .invalid-feedback {
+  display: block;
+}
+
+.invalid-feedback {
+  display: none;
+  font-size: 12px;
+}
+
 </style>
 </head>
 
@@ -51,7 +64,8 @@
         <div class="row g-4">
 
           <div class="col-md-6">
-            <input name="first_name" class="address-input w-100" placeholder="First name" required>
+            <input name="first_name" class="address-input w-100" placeholder="First name">
+            <div class="invalid-feedback">This field cannot be empty</div>
           </div>
 
           <div class="col-md-6">
@@ -60,10 +74,12 @@
 
           <div class="col-12">
             <input name="building_name" class="address-input w-100" placeholder="Flat/House No / Building name">
+            <div class="invalid-feedback">This field cannot be empty</div>
           </div>
 
           <div class="col-12">
             <input name="address_line_1" class="address-input w-100" placeholder="Address line 1" required>
+            <div class="invalid-feedback">This field cannot be empty</div>
           </div>
 
           <div class="col-12">
@@ -72,28 +88,34 @@
 
           <div class="col-md-4">
             <input name="city" class="address-input w-100" placeholder="City" required>
+            <div class="invalid-feedback">This field cannot be empty</div>
           </div>
 
           <div class="col-md-4">
             <input name="state" class="address-input w-100" placeholder="State" required>
+            <div class="invalid-feedback">This field cannot be empty</div>
           </div>
 
           <div class="col-md-4">
             <input name="country" class="address-input w-100" placeholder="Country" required>
+            <div class="invalid-feedback">This field cannot be empty</div>
           </div>
 
           <div class="col-md-6">
             <input name="postal_code" class="address-input w-100" placeholder="Postal code"
                inputmode="numeric" maxlength="6">
+               <div class="invalid-feedback">Postal code must be 6 digits</div>
           </div>
 
           <div class="col-md-6">
             <input name="phone_number" class="address-input w-100" placeholder="Mobile number"
               inputmode="numeric" maxlength="10">
+              <div class="invalid-feedback">Mobile number must be 10 digits</div>
           </div>
 
           <div class="col-md-12">
             <input name="email" class="address-input w-100" placeholder="Email ID">
+            <div class="invalid-feedback">Enter a valid email address</div>
           </div>
 
           <div class="col-12">
@@ -117,6 +139,66 @@
 
 <%- include('./userPartials/footer') %>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+const form = document.getElementById('addAddressForm');
+
+const rules = {
+  first_name: v => v.trim() !== '',
+  building_name: v => v.trim() !== '',
+  address_line_1: v => v.trim() !== '',
+  city: v => v.trim() !== '',
+  state: v => v.trim() !== '',
+  country: v => v.trim() !== '',
+  email: v => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v),
+  postal_code: v => !v || /^\d{6}$/.test(v),
+  phone_number: v => !v || /^\d{10}$/.test(v)
+};
+
+function validateField(input) {
+  const rule = rules[input.name];
+  if (!rule) return true;
+
+  const valid = rule(input.value);
+  input.classList.toggle('is-invalid', !valid);
+  return valid;
+}
+
+// validate on blur
+form.querySelectorAll('input').forEach(input => {
+  input.addEventListener('blur', () => validateField(input));
+});
+
+// validate on submit
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  let valid = true;
+  form.querySelectorAll('input').forEach(input => {
+    if (!validateField(input)) valid = false;
+  });
+
+  if (!valid) return;
+
+  const data = Object.fromEntries(new FormData(form).entries());
+
+  try {
+    const res = await fetch('/user/address', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.message);
+
+    window.location.href = result.redirect;
+
+  } catch {
+    alert('Something went wrong. Try again.');
+  }
+});
+</script>
+
 
 <script>
 document.getElementById('addAddressForm').addEventListener('submit', async (e) => {

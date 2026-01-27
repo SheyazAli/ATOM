@@ -19,7 +19,8 @@
     .main-img {
       width: 100%;
       height: 100%;
-      object-fit: cover;
+       object-fit: cover;
+      background: #f8f8f8;
       cursor: zoom-in;
     }
     
@@ -125,6 +126,18 @@
       top: 16px;
       right: 16px;
       z-index: 10;
+    }
+    .image-wrapper {
+      position: relative;
+    }
+
+    .main-img {
+      transition: transform 0.15s ease;
+    }
+
+    .main-img.zoom-hover {
+      transform: scale(2);
+      cursor: zoom-out;
     }
   </style>
 </head>
@@ -390,6 +403,22 @@
     scale = Math.min(Math.max(1, scale + e.deltaY * -0.0015), 4);
     zoomImg.style.transform = `scale(${scale})`;
   }, { passive:false });
+  /* HOVER ZOOM */
+mainImage.addEventListener('mousemove', (e) => {
+  const rect = mainImage.getBoundingClientRect();
+
+  const x = ((e.clientX - rect.left) / rect.width) * 100;
+  const y = ((e.clientY - rect.top) / rect.height) * 100;
+
+  mainImage.style.transformOrigin = `${x}% ${y}%`;
+  mainImage.classList.add('zoom-hover');
+});
+
+mainImage.addEventListener('mouseleave', () => {
+  mainImage.classList.remove('zoom-hover');
+  mainImage.style.transformOrigin = 'center center';
+});
+
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

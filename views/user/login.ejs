@@ -109,6 +109,10 @@
     .forgot-link:hover {
       text-decoration: underline;
     }
+
+    .form-control.is-invalid {
+    background-image: none !important;
+  }
   </style>
 </head>
 
@@ -132,36 +136,45 @@
       <% } %>
 
       <div class="mb-3 text-start">
-        <label class="form-label">Enter your email id <span class="text-danger">*</span></label>
-        <input type="email" name="email" class="form-control" required>
+        <label class="form-label">
+          Enter your email id <span class="text-danger">*</span>
+        </label>
+
+        <input
+          type="email"
+          name="email"
+          id="loginEmail"
+          class="form-control"
+        />
+
+        <div class="invalid-feedback">
+          Enter a valid email address
+        </div>
       </div>
 
-      <div class="mb-2 text-start position-relative">
+
+      <div class="mb-2 text-start">
         <label class="form-label">
           Enter your password <span class="text-danger">*</span>
         </label>
 
-        <input
-          type="password"
-          name="password"
-          id="passwordInput"
-          class="form-control pe-5"
-          required
-        >
+        <div class="input-group has-validation" id="loginPasswordGroup">
+          <input
+            type="password"
+            name="password"
+            id="loginPassword"
+            class="form-control"
+          />
+          <span class="input-group-text" id="toggleLoginPassword">
+            <i class="bi bi-eye"></i>
+          </span>
+        </div>
 
-        <i
-          class="bi bi-eye-slash"
-          id="togglePassword"
-          style="
-            position:absolute;
-            top:38px;
-            right:12px;
-            cursor:pointer;
-            font-size:16px;
-            color:#6c757d;
-          ">
-        </i>
+        <div class="invalid-feedback">
+          Password is required
+        </div>
       </div>
+
 
       <!-- FORGOT PASSWORD -->
       <div class="text-end mb-3">
@@ -215,6 +228,47 @@
     togglePassword.classList.toggle('bi-eye-slash');
   });
 </script>
+<script>
+  const loginEmail = document.getElementById('loginEmail');
+  const loginPassword = document.getElementById('loginPassword');
+  const loginPasswordGroup = document.getElementById('loginPasswordGroup');
+  const toggleLoginPassword = document.getElementById('toggleLoginPassword');
+
+  // email validation
+  loginEmail.addEventListener('blur', () => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(loginEmail.value.trim())) {
+      loginEmail.classList.add('is-invalid');
+    } else {
+      loginEmail.classList.remove('is-invalid');
+    }
+  });
+
+  // password validation
+  loginPassword.addEventListener('blur', () => {
+    if (loginPassword.value.trim() === '') {
+      loginPassword.classList.add('is-invalid');
+      loginPasswordGroup.classList.add('is-invalid');
+    } else {
+      loginPassword.classList.remove('is-invalid');
+      loginPasswordGroup.classList.remove('is-invalid');
+    }
+  });
+
+  // toggle password
+  toggleLoginPassword.addEventListener('click', () => {
+    const isPassword = loginPassword.type === 'password';
+    loginPassword.type = isPassword ? 'text' : 'password';
+
+    toggleLoginPassword
+      .querySelector('i')
+      .classList.toggle('bi-eye');
+    toggleLoginPassword
+      .querySelector('i')
+      .classList.toggle('bi-eye-slash');
+  });
+</script>
+
 
 </body>
 </html>
