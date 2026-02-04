@@ -4,21 +4,32 @@
   <meta charset="UTF-8" />
   <title>Edit Product | ATOM</title>
 
+  <!-- Bootstrap -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+
+  <!-- Cropper -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
+
+  <!-- SweetAlert -->
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
   <style>
     body { background:#f6eeec; font-family:Inter,sans-serif; }
     .content { margin-left:250px; padding:40px; }
     .card-box { background:#fff; border-radius:14px; padding:20px; margin-bottom:20px; }
-    .variant-row { background:#faf7f6; padding:15px; border-radius:10px; margin-bottom:15px; }
-    .variant-images img {
-      width:46px; height:46px; object-fit:cover;
-      border-radius:6px; margin-right:6px; border:1px solid #ddd;
+    .variant-row { background:#faf7f6; padding:15px; border-radius:10px; margin-bottom:15px; position:relative; }
+    .remove-variant { position:absolute; top:10px; right:10px; color:#dc3545; cursor:pointer; }
+    .save-btn { background:#e0553f; color:white; border:none; padding:12px; border-radius:10px; }
+    .img-wrap { position:relative; }
+    .img-remove {
+      position:absolute; top:2px; right:6px;
+      cursor:pointer; color:white;
+      background:black; border-radius:50%;
+      padding:0 6px;
     }
-    .add-variant { cursor:pointer; color:#e0553f; font-weight:500; }
-    .save-btn { background:#e0553f; color:#fff; border:none; padding:12px; border-radius:10px; }
-    small.hint { font-size:12px; color:#6c757d; }
+    #cropPreview { max-width:300px; display:none; margin-top:10px; }
   </style>
 </head>
 
@@ -29,147 +40,243 @@
 <div class="content">
   <h3 class="fw-bold mb-4">Edit Product</h3>
 
-  <form
-    action="/admin/products/<%= product.product_id %>?_method=PUT"
-    method="POST"
-    enctype="multipart/form-data"
-  >
+  <form id="productForm"
+        action="/admin/products/<%= product.product_id %>?_method=PATCH"
+        method="POST"
+        enctype="multipart/form-data">
 
     <!-- BASIC INFO -->
     <div class="card-box">
-      <h6 class="fw-semibold mb-3">Basic Information</h6>
-
       <input class="form-control mb-3" name="title" value="<%= product.title %>" required>
-      <textarea class="form-control mb-3" name="description"><%= product.description %></textarea>
+      <textarea class="form-control mb-3" name="description" required><%= product.description %></textarea>
 
-      <select name="category_id" class="form-select">
-        <% categories.forEach(cat => { %>
-          <option value="<%= cat.category_id %>"
-            <%= cat.category_id === product.category_id ? 'selected' : '' %>>
-            <%= cat.name %>
+      <select name="category_id" class="form-select" required>
+        <% categories.forEach(c => { %>
+          <option value="<%= c.category_id %>"
+            <%= c.category_id === product.category_id ? 'selected' : '' %>>
+            <%= c.name %>
           </option>
         <% }) %>
       </select>
     </div>
 
+    <!-- THUMBNAIL -->
+    <div class="card-box">
+      <h6 class="fw-semibold mb-2">Thumbnail</h6>
+
+      <img src="/uploads/<%= product.thumbnail %>"
+           style="width:140px;border-radius:8px">
+
+      <input type="file" id="thumbnailInput"
+             name="thumbnail"
+             class="form-control mt-2"
+             accept="image/*">
+
+      <img id="cropPreview">
+    </div>
+
     <!-- PRICING -->
     <div class="card-box">
-      <h6 class="fw-semibold mb-3">Pricing</h6>
       <div class="row">
         <div class="col-md-6">
-          <input class="form-control" name="regular_price" type="number"
+          <input class="form-control"
+                 name="regular_price"
+                 type="number"
                  value="<%= product.regular_price %>" required>
         </div>
         <div class="col-md-6">
-          <input class="form-control" name="sale_price" type="number"
-                 value="<%= product.sale_price || '' %>">
+          <input class="form-control"
+                 name="sale_price"
+                 type="number"
+                 value="<%= product.sale_price %>">
         </div>
       </div>
     </div>
 
     <!-- VARIANTS -->
     <div class="card-box">
-      <div class="d-flex justify-content-between align-items-center mb-3">
-        <h6 class="fw-semibold mb-0">Variants (Color wise)</h6>
-        <span class="add-variant" id="addVariantBtn">
-          <i class="bi bi-plus-circle"></i> Add Color
-        </span>
-      </div>
+      <% variants.forEach((v,i) => { %>
+        <div class="variant-row">
 
-      <div id="variantContainer"></div>
+          <% if (i === 1) { %>
+            <i class="bi bi-trash remove-variant"
+               onclick="this.closest('.variant-row').remove()"></i>
+          <% } %>
+
+          <select class="form-select mb-2"
+                  name="variants[<%= i %>][color]">
+            <option selected><%= v.color %></option>
+          </select>
+
+          <!-- EXISTING IMAGES -->
+          <div class="variant-preview d-flex gap-2 flex-wrap mt-2">
+            <% v.images.forEach(img => { %>
+              <div class="img-wrap">
+                <img src="/uploads/<%= img %>" style="width:120px">
+                <span class="img-remove"
+                      onclick="this.parentElement.remove()">×</span>
+                <input type="hidden"
+                       name="variants[<%= i %>][existingImages][]"
+                       value="<%= img %>">
+              </div>
+            <% }) %>
+          </div>
+
+          <!-- NEW IMAGES -->
+          <input type="file"
+                 class="form-control variant-images mt-2"
+                 name="variants[<%= i %>][images]"
+                 accept="image/*"
+                 multiple>
+
+          <small class="hint">Min 3, Max 5 images</small>
+
+          <% Object.keys(v.sizes).forEach(size => { %>
+            <div class="row g-2 mt-2">
+              <div class="col-md-3">
+                <input class="form-control" value="<%= size %>" disabled>
+              </div>
+              <div class="col-md-3">
+                <input type="number"
+                       class="form-control"
+                       name="variants[<%= i %>][sizes][<%= size %>][stock]"
+                       value="<%= v.sizes[size].stock %>"
+                       min="0">
+              </div>
+            </div>
+          <% }) %>
+
+        </div>
+      <% }) %>
     </div>
 
     <!-- STATUS -->
     <div class="card-box">
-      <div class="form-check mb-3">
-        <input type="checkbox" name="status" class="form-check-input"
-               <%= product.status ? 'checked' : '' %>>
-        <label class="form-check-label">Set Active</label>
-      </div>
-
-      <button class="save-btn w-100">Update Product</button>
+      <input type="checkbox" name="status"
+             <%= product.status ? 'checked' : '' %>>
+      Active
+      <button class="save-btn w-100 mt-3">Update Product</button>
     </div>
 
   </form>
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', () => {
+/* ================= ERROR DISPLAY ================= */
+const params = new URLSearchParams(window.location.search);
+if (params.get('error')) {
+  Swal.fire('Error', params.get('error'), 'error');
+}
 
-  const existingVariants = <%- JSON.stringify(colorVariants || {}) %>;
-  let index = 0;
+/* ================= IMAGE CROPPING (SAME AS ADD PAGE) ================= */
 
-  const sizes = ['Small','Medium','Large','X-Large'];
-  const colors = ['Black','White','Yellow','Green','Red','Grey','Purple','Blue','Orange'];
+const MIN_IMAGES = 3;
+const MAX_IMAGES = 5;
+const variantCrops = new Map();
 
-  /* ---------------- ADD / PREFILL COLOR VARIANT ---------------- */
+/* Variant images */
+document.addEventListener('change', e => {
+  if (!e.target.classList.contains('variant-images')) return;
 
-  function addColorVariant(prefill = null) {
-    const container = document.getElementById('variantContainer');
-    const div = document.createElement('div');
-    div.className = 'variant-row';
+  const preview = e.target.previousElementSibling;
+  if (!variantCrops.has(e.target)) variantCrops.set(e.target, []);
 
-    div.innerHTML = `
-      <div class="row g-2 mb-2">
-        <div class="col-md-3">
-          <select name="variants[${index}][color]" class="form-select" required>
-            ${colors.map(c =>
-              `<option value="${c}" ${prefill?.color === c ? 'selected' : ''}>${c}</option>`
-            ).join('')}
-          </select>
-        </div>
+  [...e.target.files].forEach(file => {
+    if (variantCrops.get(e.target).length >= MAX_IMAGES) return;
 
-        <div class="col-md-5">
-          <input type="file"
-            name="variants[${index}][images]"
-            class="form-control"
-            accept="image/*"
-            multiple>
+    const wrap = document.createElement('div');
+    wrap.className = 'img-wrap';
 
-          <small class="hint">Upload only if you want to replace images</small>
+    const img = document.createElement('img');
+    img.style.width = '120px';
+    wrap.appendChild(img);
 
-          ${prefill?.images?.length ? `
-            <div class="variant-images mt-2">
-              ${prefill.images.map(img => `<img src="/uploads/${img}">`).join('')}
-            </div>
+    const btn = document.createElement('span');
+    btn.className = 'img-remove';
+    btn.innerHTML = '×';
+    wrap.appendChild(btn);
 
-            ${prefill.images.map(img => `
-              <input type="hidden"
-                name="variants[${index}][existingImages][]"
-                value="${img}">
-            `).join('')}
-          ` : ''}
-        </div>
-      </div>
+    preview.appendChild(wrap);
 
-      ${sizes.map(size => `
-        <div class="row g-2 mb-1">
-          <div class="col-md-3">
-            <input class="form-control" value="${size}" disabled>
-          </div>
-          <div class="col-md-3">
-            <input type="number"
-              name="variants[${index}][sizes][${size}][stock]"
-              class="form-control"
-              value="${prefill?.sizes?.[size] ?? ''}"
-              placeholder="Stock">
-          </div>
-        </div>
-      `).join('')}
-    `;
+    const reader = new FileReader();
+    reader.onload = () => {
+      img.src = reader.result;
 
-    container.appendChild(div);
-    index++;
-  }
+      const cropper = new Cropper(img, {
+        aspectRatio: 2 / 3,
+        viewMode: 1,
+        autoCropArea: 1
+      });
 
-  /* ---------------- PREFILL EXISTING VARIANTS ---------------- */
-  Object.values(existingVariants).forEach(v => addColorVariant(v));
+      btn.onclick = () => {
+        cropper.destroy();
+        wrap.remove();
+        variantCrops.set(
+          e.target,
+          variantCrops.get(e.target).filter(c => c !== cropper)
+        );
+      };
 
-  /* ---------------- ADD NEW COLOR VARIANT ---------------- */
-  document.getElementById('addVariantBtn').addEventListener('click', () => {
-    addColorVariant();   // empty variant
+      variantCrops.get(e.target).push(cropper);
+    };
+
+    reader.readAsDataURL(file);
   });
 
+  e.target.value = '';
+});
+
+/* Thumbnail crop */
+let cropper;
+const thumbInput = document.getElementById('thumbnailInput');
+const preview = document.getElementById('cropPreview');
+
+thumbInput.addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    preview.src = reader.result;
+    preview.style.display = 'block';
+
+    if (cropper) cropper.destroy();
+    cropper = new Cropper(preview, {
+      aspectRatio: 1,
+      viewMode: 1,
+      autoCropArea: 1
+    });
+  };
+  reader.readAsDataURL(file);
+});
+
+/* ================= FORM SUBMIT ================= */
+
+document.getElementById('productForm').addEventListener('submit', async e => {
+  e.preventDefault();
+
+  for (const input of document.querySelectorAll('.variant-images')) {
+    const croppers = variantCrops.get(input) || [];
+    if (!croppers.length) continue;
+
+    const dt = new DataTransfer();
+    for (const cropper of croppers) {
+      const canvas = cropper.getCroppedCanvas({ width:800, height:1200 });
+      const blob = await new Promise(r => canvas.toBlob(r, 'image/webp', 0.9));
+      dt.items.add(new File([blob], 'variant.webp', { type:'image/webp' }));
+    }
+    input.files = dt.files;
+  }
+
+  if (cropper) {
+    const canvas = cropper.getCroppedCanvas({ width:600, height:600 });
+    const blob = await new Promise(r => canvas.toBlob(r, 'image/webp', 0.9));
+    const dt = new DataTransfer();
+    dt.items.add(new File([blob], 'thumb.webp', { type:'image/webp' }));
+    thumbInput.files = dt.files;
+  }
+
+  e.target.submit();
 });
 </script>
 

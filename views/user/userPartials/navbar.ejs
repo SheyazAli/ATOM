@@ -27,6 +27,25 @@
       transform: translateX(-50%);
     }
 
+    #searchSuggestions {
+      top: calc(100% + 6px);
+      z-index: 9999;  
+      background: #fff;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+    }
+
+    #searchSuggestions .list-group-item {
+      cursor: pointer;
+      border: none;
+      padding: 10px 14px;
+    }
+
+    #searchSuggestions .list-group-item:hover {
+      background: #f5f5f5;
+    }
+
     .nav-center .nav-link {
       font-weight: 500;
       letter-spacing: 0.5px;
@@ -37,10 +56,11 @@
     /* SEARCH */
     .nav-search-wrapper {
       position: relative;
+      width: 280px;  
     }
 
     .nav-search {
-      width: 220px;
+      width: 280px;
       border-radius: 20px;
       padding: 6px 36px 6px 14px;
     }
@@ -57,8 +77,28 @@
       cursor: pointer;
     }
 
+    .suggestion-img {
+    width: 40px;
+    height: 40px;
+    object-fit: contain;
+    border-radius: 6px;
+    background: #f8f8f8;
+  }
+
+    #searchSuggestions {
+    max-height: 320px; 
+    overflow-y: auto;
+    right: 0;        
+    left: auto;               
+  }
+
     .search-btn:hover {
       color: #000;
+    }
+    
+    .suggestion-img {
+      width: 36px;
+      height: 36px;
     }
 
     /* MOBILE FIX */
@@ -110,28 +150,173 @@
 
       <!-- RIGHT -->
       <form class="d-flex align-items-center gap-3 ms-auto"
-            method="GET"
-            action="/user/products">
+      method="GET"
+      action="/user/products">
 
-        <!-- SEARCH WITH ICON -->
-        <div class="nav-search-wrapper">
-          <input
-            type="text"
-            name="search"
-            class="form-control nav-search"
-            placeholder="Search products"
-          >
-          <button type="submit" class="search-btn" aria-label="Search">
-            <i class="bi bi-search"></i>
-          </button>
-        </div>
+  <!-- Preserve filters ONLY if they exist -->
+  <% if (typeof category !== 'undefined') { %>
+    <% category.forEach(c => { %>
+      <input type="hidden" name="category" value="<%= c %>">
+    <% }) %>
+  <% } %>
 
-        <a href="/user/profile"><i class="bi bi-person"></i></a>
-        <a href="/user/cart"><i class="bi bi-bag"></i></a>
-      </form>
+  <% if (typeof size !== 'undefined') { %>
+    <% size.forEach(s => { %>
+      <input type="hidden" name="size" value="<%= s %>">
+    <% }) %>
+  <% } %>
+
+  <% if (typeof color !== 'undefined') { %>
+    <% color.forEach(c => { %>
+      <input type="hidden" name="color" value="<%= c %>">
+    <% }) %>
+  <% } %>
+
+  <% if (typeof sort !== 'undefined' && sort) { %>
+    <input type="hidden" name="sort" value="<%= sort %>">
+  <% } %>
+
+  <!-- SEARCH -->
+  <div class="nav-search-wrapper">
+
+ <input
+  type="text"
+  name="search"
+  id="searchInput"
+  class="form-control nav-search"
+  placeholder="Search products"
+  autocomplete="off"
+  value="<%= typeof search !== 'undefined' ? search : '' %>"
+>
+
+  <% if (typeof search !== 'undefined' && search) { %>
+    <!-- Clear search button -->
+    <button
+      type="button"
+      class="search-btn"
+      onclick="clearSearch(this.form)"
+      title="Clear search">
+        <i class="bi bi-x-circle"></i>
+    </button>
+  <% } else { %>
+    <!-- Normal search button -->
+    <button type="submit" class="search-btn" aria-label="Search">
+      <i class="bi bi-search"></i>
+    </button>
+  <% } %>
+  <div id="searchSuggestions"
+       class="list-group position-absolute w-100" style="display: none;"></div>
+
+</div>
+
+  <a href="/user/profile"><i class="bi bi-person"></i></a>
+  <a href="/user/cart"><i class="bi bi-bag"></i></a>
+</form>
+
 
     </div>
   </div>
 </nav>
+<script>
+  function clearSearch(form) {
+  const input = form.querySelector('input[name="search"]');
+  const suggestions = document.getElementById('searchSuggestions');
+
+  if (input) input.value = '';
+  if (suggestions) suggestions.innerHTML = '';
+
+  form.submit();
+}
+</script>
+<script>
+const input = document.getElementById('searchInput');
+const suggestionsBox = document.getElementById('searchSuggestions');
+let controller;
+
+input.addEventListener('input', async () => {
+  const query = input.value.trim();
+
+  if (query.length < 2) {
+    suggestionsBox.innerHTML = '';
+    suggestionsBox.style.display = 'none';
+    return;
+  }
+  suggestionsBox.style.display = 'block';
+
+  if (controller) controller.abort();
+  controller = new AbortController();
+
+  try {
+    const params = new URLSearchParams({
+        q: query
+      });
+
+      const categoryInput = document.querySelector('input[name="category"]');
+      if (categoryInput) {
+        params.append('category', categoryInput.value);
+      }
+
+    const res = await fetch(
+      `/user/search-suggestions?${params.toString()}`,
+      { signal: controller.signal }
+    );
+
+    const suggestions = await res.json();
+    suggestionsBox.innerHTML = '';
+
+    suggestions.forEach(item => {
+      const row = document.createElement('button');
+      row.type = 'button';
+      row.className = 'list-group-item list-group-item-action d-flex gap-3 align-items-center';
+
+      row.innerHTML = `
+        <img src="${item.image}" class="suggestion-img" alt="">
+        <div class="text-start">
+          <div class="fw-semibold text-truncate">${item.name}</div>
+          <small class="text-muted">${item.category}</small>
+        </div>
+      `;
+
+      row.onclick = () => {
+        input.value = item.name;
+        suggestionsBox.innerHTML = '';
+        suggestionsBox.style.display = 'none';
+        input.form.submit();
+      };
+
+      suggestionsBox.appendChild(row);
+    });
+    const fallback = document.createElement('button');
+    fallback.type = 'button';
+    fallback.className =
+      'list-group-item list-group-item-action text-center text-muted';
+
+    fallback.innerHTML = `
+      <div class="fw-semibold">Can’t find what you’re looking?</div>
+      <small>View all results</small>
+    `;
+
+    fallback.onclick = () => {
+      const searchValue = input.value.trim();
+      window.location.href = `/user/products?search=${encodeURIComponent(searchValue)}`;
+    };
+
+    suggestionsBox.appendChild(fallback);
+
+
+
+  } catch (err) {
+    // silent fail
+  }
+});
+
+// close suggestions when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.nav-search-wrapper')) {
+      suggestionsBox.innerHTML = '';
+      suggestionsBox.style.display = 'none';
+    }
+  });
+</script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

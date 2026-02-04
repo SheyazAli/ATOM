@@ -19,7 +19,8 @@
     .main-img {
       width: 100%;
       height: 100%;
-      object-fit: cover;
+       object-fit: cover;
+      background: #f8f8f8;
       cursor: zoom-in;
     }
     
@@ -126,6 +127,18 @@
       right: 16px;
       z-index: 10;
     }
+    .image-wrapper {
+      position: relative;
+    }
+
+    .main-img {
+      transition: transform 0.15s ease;
+    }
+
+    .main-img.zoom-hover {
+      transform: scale(2);
+      cursor: zoom-out;
+    }
   </style>
 </head>
 
@@ -139,11 +152,11 @@
     This product is currently unavailable.
   </div>
 <% } %>
-  <% if (category && category.hasOffer && category.offer && category.offer.active) { %>
+  <% if (productCategory?.offer?.active) { %>
   <div class="offer-marquee">
     <div class="offer-text">
-      GET <%= category.offer.discount_value %>
-      <%= category.offer.discount_type.toUpperCase() %>
+      GET <%= productCategory.offer.discount_value %>
+      <%= productCategory.offer.discount_type.toUpperCase() %>
       OFF ON ALL PRODUCTS AT THIS CATEGORY.
       YOU CAN CLAIM THIS AT CHECKOUT. t&c applied*
     </div>
@@ -212,21 +225,18 @@
       <div id="sizes"
           class="d-flex mb-4 <%= !product.status ? 'option-disabled' : '' %>">
       </div>
+        <button id="addToCartBtn"
+          class="btn btn-success w-100 mb-2"
+          <%= (!product.status || isOutOfStock) ? 'disabled' : '' %>>
+          <%= isOutOfStock ? 'OUT OF STOCK' : 'ADD TO CART' %>
+        </button>
 
-      <button id="addToCartBtn"
-        class="btn btn-success w-100 mb-2"
-        <%= (!product.status || isOutOfStock) ? 'disabled' : '' %>>
-        <%= isOutOfStock ? 'disabled' : '' %>
-        ADD TO CART
-      </button>
-
-      <button id="wishlistBtn"
-        class="btn btn-outline-dark w-100"
-        <%= (!product.status || isOutOfStock) ? 'disabled' : '' %>>
-        <%= isOutOfStock ? 'disabled' : '' %>
-        ❤️ MOVE TO WISHLIST
-      </button>
-    </div>
+          <button id="wishlistBtn"
+            class="btn btn-outline-dark w-100"
+            <%= (!product.status || isOutOfStock) ? 'disabled' : '' %>>
+            <%= isOutOfStock ? 'OUT OF STOCK' : '❤️ MOVE TO WISHLIST' %>
+          </button>
+              </div>
   </div>
 </div>
 
@@ -275,6 +285,15 @@
 
 
 <script>
+    const mainImage = document.getElementById('mainImage');
+  const thumbs = document.getElementById('thumbs');
+  const sizes = document.getElementById('sizes');
+  const addToCartBtn = document.getElementById('addToCartBtn');
+  const wishlistBtn = document.getElementById('wishlistBtn');
+
+  const zoomModal = document.getElementById('zoomModal');
+  const zoomContainer = document.getElementById('zoomContainer');
+  const zoomImg = document.getElementById('zoomImg');
   const colorMap = <%- JSON.stringify(colorMap) %>;
   let currentColor = "<%= defaultColor %>";
   let images = [];
@@ -384,6 +403,22 @@
     scale = Math.min(Math.max(1, scale + e.deltaY * -0.0015), 4);
     zoomImg.style.transform = `scale(${scale})`;
   }, { passive:false });
+  /* HOVER ZOOM */
+mainImage.addEventListener('mousemove', (e) => {
+  const rect = mainImage.getBoundingClientRect();
+
+  const x = ((e.clientX - rect.left) / rect.width) * 100;
+  const y = ((e.clientY - rect.top) / rect.height) * 100;
+
+  mainImage.style.transformOrigin = `${x}% ${y}%`;
+  mainImage.classList.add('zoom-hover');
+});
+
+mainImage.addEventListener('mouseleave', () => {
+  mainImage.classList.remove('zoom-hover');
+  mainImage.style.transformOrigin = 'center center';
+});
+
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

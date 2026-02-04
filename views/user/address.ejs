@@ -212,7 +212,7 @@
       cancelButtonText: 'Cancel'
     }).then(result => {
       if (result.isConfirmed) {
-        fetch(`/user/address/${addressId}`, {
+        fetch(`/user/address/${addressId}/default`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json'

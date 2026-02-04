@@ -37,6 +37,23 @@
       margin-bottom: 6px;
     }
 
+    .profile-input.is-invalid {
+      border: 1px solid #dc3545;
+      background: #fff;
+    }
+
+    .profile-input.is-invalid + .invalid-feedback {
+      display: block;
+    }
+
+    .invalid-feedback {
+      display: none;
+      font-size: 12px;
+      color: #dc3545;
+      margin-top: 4px;
+    }
+
+
     .profile-input {
       background: #fff5f5;
       border: 1px solid #eee;
@@ -89,7 +106,7 @@
           </div>
         <% } %>
 
-        <form action="/user/profile/edit?_method=PATCH" method="POST">
+        <form id="editProfileForm" >
           <div class="row g-4">
 
             <div class="col-md-6">
@@ -98,8 +115,8 @@
                 name="first_name"
                 class="profile-input w-100"
                 value="<%= user.first_name %>"
-                required
               >
+              <div class="invalid-feedback">First name is required</div>
             </div>
 
             <div class="col-md-6">
@@ -108,8 +125,8 @@
                 name="last_name"
                 class="profile-input w-100"
                 value="<%= user.last_name %>"
-                required
               >
+              <div class="invalid-feedback">Last name is required</div>
             </div>
 
             <div class="col-md-6">
@@ -119,8 +136,8 @@
                 type="email"
                 class="profile-input w-100"
                 value="<%= user.email %>"
-                required
               >
+              <div class="invalid-feedback">Enter a valid email address</div>
             </div>
 
             <div class="col-md-6">
@@ -129,7 +146,10 @@
                 name="phone_number"
                 class="profile-input w-100"
                 value="<%= user.phone_number || '' %>"
+                inputmode="numeric"
+                maxlength="10"
               >
+              <div class="invalid-feedback">Phone number must be 10 digits</div>
             </div>
 
           </div>
@@ -153,6 +173,127 @@
 
 <!-- FOOTER -->
 <%- include('./userPartials/footer') %>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+const form = document.getElementById('editProfileForm');
+
+const rules = {
+  first_name: v => v.trim() !== '',
+  last_name: v => v.trim() !== '',
+  email: v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v),
+  phone_number: v => !v || /^\d{10}$/.test(v)
+};
+
+function validateField(input) {
+  const rule = rules[input.name];
+  if (!rule) return true;
+
+  const valid = rule(input.value);
+  input.classList.toggle('is-invalid', !valid);
+  return valid;
+}
+
+form.querySelectorAll('input').forEach(input => {
+  input.addEventListener('blur', () => validateField(input));
+});
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  let isValid = true;
+  form.querySelectorAll('input').forEach(input => {
+    if (!validateField(input)) isValid = false;
+  });
+
+  if (!isValid) return;
+
+  const data = Object.fromEntries(new FormData(form).entries());
+
+  try {
+    const res = await fetch('/user/profile/edit', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+
+    const result = await res.json();
+
+    if (!res.ok) {
+      return Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: result.message || 'Validation failed'
+      });
+    }
+
+    window.location.href = result.redirect;
+
+  } catch {
+    Swal.fire({
+      icon: 'error',
+      title: 'Network Error',
+      text: 'Please try again later'
+    });
+  }
+});
+</script>
+
+<script>
+console.log('Edit profile script loaded');
+
+const form = document.getElementById('editProfileForm');
+
+if (!form) {
+  console.error('Form not found');
+}
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  console.log('Form submit triggered');
+
+  const formData = new FormData(form);
+  const data = Object.fromEntries(formData.entries());
+
+  console.log('Form data:', data);
+
+  try {
+    console.log('Sending PATCH request...');
+
+    const res = await fetch('/user/profile/edit', {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(data)
+    });
+
+    console.log('Response status:', res.status);
+
+    const result = await res.json();
+    console.log('Response body:', result);
+
+    if (!res.ok) {
+      console.error('Validation/server error');
+      return Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: result.message || 'Unknown error'
+      });
+    }
+
+    console.log('Redirecting to:', result.redirect);
+    window.location.href = result.redirect;
+
+  } catch (err) {
+    console.error('Fetch crashed:', err);
+    Swal.fire({
+      icon: 'error',
+      title: 'Network Error',
+      text: 'Request failed. Check console.'
+    });
+  }
+});
+</script>
 
 </body>
 </html>

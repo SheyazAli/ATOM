@@ -21,7 +21,6 @@ const methodOverride = require('method-override');
 const app = express();
 const port = process.env.PORT
 
-
 app.use(navbarMiddleware);
 app.use(passport.initialize());
 

@@ -47,6 +47,19 @@
     font-size:15px;
     cursor:pointer;
   }
+    .unavailable-item {
+      position: relative;
+      opacity: 0.5;
+    }
+
+    .unavailable-item::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.35);
+      border-radius: 8px;
+      pointer-events: none;
+    }
 
   .cart-btn {
     width:100%;
@@ -66,51 +79,59 @@
     <!-- LEFT -->
     <div class="col-lg-7">
 
-      <!-- ADDRESS -->
-      <div class="checkout-card">
-        <h6 class="fw-semibold mb-3">Ship to</h6>
+<!-- ADDRESS -->
+<div class="checkout-card">
+  <h6 class="fw-semibold mb-3">Ship to</h6>
 
-        <div id="selectedAddress">
-          <% if (defaultAddress) { %>
-            <p><strong><%= user.name %></strong></p>
-            <p><%= defaultAddress.building_name %></p>
-            <p><%= defaultAddress.address_line_1 %></p>
-            <p><%= defaultAddress.city %>, <%= defaultAddress.state %> <%= defaultAddress.postal_code %></p>
-            <p><%= defaultAddress.country %></p>
-          <% } %>
-        </div>
+  <div id="selectedAddress">
+    <% if (defaultAddress) { %>
+      <p><strong><%= user.name %></strong></p>
+      <p><%= defaultAddress.building_name %></p>
+      <p><%= defaultAddress.address_line_1 %></p>
+      <p>
+        <%= defaultAddress.city %>, <%= defaultAddress.state %>
+        <%= defaultAddress.postal_code %>
+      </p>
+      <p><%= defaultAddress.country %></p>
+    <% } %>
+  </div>
 
-        <select class="form-select mt-3" id="addressSelect">
-          <% addresses.forEach(addr => { %>
-            <option value="<%= addr.address_id %>"
-              <%= defaultAddress && addr.address_id === defaultAddress.address_id ? 'selected' : '' %>>
-              <%= addr.building_name %>, <%= addr.city %>, <%= addr.state %>
-            </option>
-          <% }) %>
-          <option value="add_new">➕ Add new address</option>
-        </select>
-      </div>
+  <select class="form-select mt-3" id="addressSelect">
+    <% addresses.forEach(addr => { %>
+      <option value="<%= addr.address_id %>"
+        <%= defaultAddress && addr.address_id === defaultAddress.address_id ? 'selected' : '' %>>
+        <%= addr.building_name %>, <%= addr.city %>, <%= addr.state %>
+      </option>
+    <% }) %>
+  </select>
 
-      <!-- PAYMENT -->
-      <div class="checkout-card">
-        <h6 class="fw-semibold mb-2">Payment</h6>
+    <!-- ✅ ADD NEW ADDRESS BUTTON -->
+    <a href="/user/address/add"
+      class="btn btn-outline-dark w-100 mt-2">
+      ➕ Add new address
+    </a>
+  </div>
 
-        <label class="payment-option">
-          <input type="radio" name="paymentMethodRadio" value="cod" checked>
-          Cash on Delivery (COD)
-        </label>
+  <!-- PAYMENT -->
+  <div class="checkout-card">
+    <h6 class="fw-semibold mb-2">Payment</h6>
 
-        <label class="payment-option">
-          <input type="radio" name="paymentMethodRadio" value="stripe">
-          Card
-        </label>
+    <label class="payment-option">
+      <input type="radio" name="paymentMethodRadio" value="cod" checked>
+      Cash on Delivery (COD)
+    </label>
 
-        <!-- ✅ WALLET -->
-        <label class="payment-option">
-          <input type="radio" name="paymentMethodRadio" value="wallet">
-          Wallet
-        </label>
-      </div>
+    <label class="payment-option">
+      <input type="radio" name="paymentMethodRadio" value="stripe">
+      Card
+    </label>
+
+    <label class="payment-option">
+      <input type="radio" name="paymentMethodRadio" value="wallet">
+      Wallet
+    </label>
+  </div>
+
 
       <!-- COUPONS -->
       <div class="checkout-card">
@@ -141,13 +162,24 @@
       <div class="summary-box">
 
         <h6 class="fw-semibold mb-3">Order Summary</h6>
+        <% if (hasUnavailableItem) { %>
+          <div class="alert alert-danger small">
+            One or more products in your cart are currently unavailable.
+            Please remove them to proceed to checkout.
+          </div>
+        <% } %>
 
         <% cart.items.forEach(item => { %>
-          <div class="d-flex align-items-start mb-3">
+          <div class="d-flex align-items-start mb-3 <%= item.unavailable ? 'unavailable-item' : '' %>">
             <img src="/uploads/<%= item.image %>" width="60" class="rounded">
 
             <div class="ms-3 flex-grow-1">
-              <div class="fw-medium"><%= item.name %></div>
+              <div class="fw-medium">
+                <%= item.name %>
+                <% if (item.unavailable) { %>
+                  <span class="badge bg-danger ms-2">Unavailable</span>
+                <% } %>
+              </div>
               <div class="text-muted small"><%= item.variant %></div>
               <div class="text-muted small">Qty × <%= item.quantity %></div>
 
@@ -190,7 +222,12 @@
           <span>₹ <%= summary.total %></span>
         </div>
 
-        <button id="payNowBtn" class="pay-btn">Pay now</button>
+        <button
+          id="payNowBtn"
+          class="pay-btn"
+          <%= hasUnavailableItem ? 'disabled' : '' %>>
+          Pay now
+        </button>
 
         <form action="/user/cart" method="get">
           <button class="cart-btn">Back to cart</button>
@@ -202,134 +239,6 @@
   </div>
 </div>
 
-<!-- <script>
-  const addressSelect = document.getElementById('addressSelect');
-  const payBtn = document.getElementById('payNowBtn');
-
-  function getSelectedPayment() {
-    const checked = document.querySelector('input[name="paymentMethodRadio"]:checked');
-    return checked ? checked.value : 'cod';
-  }
-
-  function getAddressId() {
-    return addressSelect.value;
-  }
-
-  addressSelect.addEventListener('change', () => {
-    if (addressSelect.value === 'add_new') {
-      window.location.href = '/user/address/add';
-    }
-  });
-
-  payBtn.addEventListener('click', async () => {
-    const paymentMethod = getSelectedPayment();
-    const addressId = getAddressId();
-
-    if (!addressId || addressId === 'add_new') {
-      alert('Please select a valid address');
-      return;
-    }
-
-    // // COD
-    // if (paymentMethod === 'cod') {
-    //   const form = document.createElement('form');
-    //   form.method = 'POST';
-    //   form.action = '/user/checkout/pay';
-
-    //   const addr = document.createElement('input');
-    //   addr.type = 'hidden';
-    //   addr.name = 'address_id';
-    //   addr.value = addressId;
-
-    //   form.appendChild(addr);
-    //   document.body.appendChild(form);
-    //   form.submit();
-    //   return;
-    // }
-    // COD
-    if (paymentMethod === 'cod') {
-      const form = document.createElement('form');
-      form.method = 'POST';
-      form.action = '/user/checkout/pay';
-
-      const addr = document.createElement('input');
-      addr.type = 'hidden';
-      addr.name = 'address_id';
-      addr.value = addressId;
-
-      form.appendChild(addr);
-      document.body.appendChild(form);
-      form.submit();
-      return;
-    }
-
-
-    // WALLET
-    // if (paymentMethod === 'wallet') {
-    //   const res = await fetch('/user/checkout/pay-wallet', {
-    //     method: 'POST',
-    //     headers: { 'Content-Type': 'application/json' },
-    //     body: JSON.stringify({ address_id: addressId })
-    //   });
-
-    //   const data = await res.json();
-
-    //   if (data.success && data.redirect) {
-    //     window.location.href = data.redirect;
-    //   } else {
-    //     window.location.href = '/user/payment-failed';
-    //   }
-    //   return;
-    // }
-
-      if (paymentMethod === 'wallet') {
-    const res = await fetch('/user/checkout/pay-wallet', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ address_id: addressId })
-    });
-
-    const data = await res.json();
-
-    if (data.redirect) {
-      window.location.href = data.redirect;
-    } else {
-      window.location.href = '/user/payment-failed?reason=PAYMENT_FAILED';
-    }
-    return;
-  }
-
-    // STRIPE
-  //   const res = await fetch('/user/checkout/stripe/create-session', {
-  //     method: 'POST',
-  //     headers: { 'Content-Type': 'application/json' },
-  //     body: JSON.stringify({ address_id: addressId })
-  //   });
-
-  //   const data = await res.json();
-  //   if (data.url) {
-  //     window.location.href = data.url;
-  //   } else {
-  //     alert(data.error || 'Payment failed');
-  //   }
-  // });
-
-const res = await fetch('/user/checkout/stripe/create-session', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ address_id: addressId })
-});
-
-const data = await res.json();
-
-if (data.url) {
-  window.location.href = data.url;
-} 
-else {
-  window.location.href = '/user/payment-failed?reason=PAYMENT_FAILED';
-}
-
-</script> -->
 
 <script>
   const addressSelect = document.getElementById('addressSelect');
@@ -386,12 +295,18 @@ else {
         body: JSON.stringify({ address_id: addressId })
       });
 
-      const data = await res.json();
+      if (res.redirected) {
+        window.location.href = res.url;
+        return;
+      }
 
-      if (data.redirect) {
+      const data = await res.json().catch(() => null);
+
+      if (data?.redirect) {
         window.location.href = data.redirect;
       } else {
-        window.location.href = '/user/payment-failed?reason=PAYMENT_FAILED';
+        window.location.href =
+          `/user/payment-failed?reason=${data?.reason || 'PAYMENT_FAILED'}`;
       }
       return;
     }

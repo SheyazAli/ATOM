@@ -29,11 +29,42 @@
   <!-- HEADER -->
   <div class="d-flex justify-content-between align-items-center mb-4">
     <h2 class="fw-bold">Revenue Dashboard</h2>
-
+<div class="d-flex gap-2">
     <form method="GET">
-      <input type="hidden" name="download" value="excel">
-      <button class="btn btn-outline-success">Export Excel</button>
-    </form>
+  <input type="hidden" name="download" value="excel">
+
+  <% if (from) { %>
+    <input type="hidden" name="from" value="<%= from %>">
+  <% } %>
+
+  <% if (to) { %>
+    <input type="hidden" name="to" value="<%= to %>">
+  <% } %>
+
+  <% if (range) { %>
+    <input type="hidden" name="range" value="<%= range %>">
+  <% } %>
+
+  <button class="btn btn-outline-success">Export Excel</button>
+</form>
+<form method="GET" class="d-inline">
+  <input type="hidden" name="download" value="pdf">
+
+  <% if (from) { %>
+    <input type="hidden" name="from" value="<%= from %>">
+  <% } %>
+
+  <% if (to) { %>
+    <input type="hidden" name="to" value="<%= to %>">
+  <% } %>
+
+  <% if (range) { %>
+    <input type="hidden" name="range" value="<%= range %>">
+  <% } %>
+
+  <button class="btn btn-outline-danger">Export PDF</button>
+</form>
+</div>
   </div>
 
   <!-- DATE FILTER -->
@@ -41,6 +72,8 @@
       <div class="col-md-2">
         <select name="range" class="form-select">
           <option value="">Custom</option>
+           <option value="today" <%= range==='today'?'selected':'' %>>Today</option>
+          <option value="yesterday" <%= range==='yesterday'?'selected':'' %>>Yesterday</option>
           <option value="week" <%= range==='week'?'selected':'' %>>This Week</option>
           <option value="month" <%= range==='month'?'selected':'' %>>This Month</option>
           <option value="year" <%= range==='year'?'selected':'' %>>This Year</option>

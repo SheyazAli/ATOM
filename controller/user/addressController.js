@@ -61,7 +61,44 @@ exports.postAddAddress = async (req, res) => {
       is_default
     } = req.body;
 
-    const userId = req.user._id; 
+    const userId = req.user?._id;
+
+    if (!userId) {
+      return res
+        .status(HttpStatus.UNAUTHORIZED)
+        .json({ message: 'Unauthorized' });
+    }
+
+    if (
+      !first_name || !last_name || !building_name || !address_line_1 || !city || !state ||
+      !country || !postal_code || !email || !phone_number
+    ) {
+      return res
+        .status(HttpStatus.BAD_REQUEST)
+        .json({ message: 'Please fill all required fields' });
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const phoneRegex = /^\d{10}$/;
+    const postalRegex = /^\d{6}$/;
+
+    if (!emailRegex.test(email)) {
+      return res
+        .status(HttpStatus.BAD_REQUEST)
+        .json({ message: 'Invalid email address' });
+    }
+
+    if (!phoneRegex.test(phone_number)) {
+      return res
+        .status(HttpStatus.BAD_REQUEST)
+        .json({ message: 'Mobile number must be 10 digits and numeric' });
+    }
+
+    if (!postalRegex.test(postal_code)) {
+      return res
+        .status(HttpStatus.BAD_REQUEST)
+        .json({ message: 'Postal code must be 6 digits and numeric' });
+    }
 
     if (is_default === 'on') {
       await Address.updateMany(
@@ -86,13 +123,17 @@ exports.postAddAddress = async (req, res) => {
       is_default: is_default === 'on'
     });
 
-    res.redirect('/user/address');
+    res.status(HttpStatus.OK).json({
+      redirect: '/user/address'
+    });
+
   } catch (error) {
-  console.error('ADD ADDRESS ERROR', error);
-  error.statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
-  next(error);
-}
+    res
+      .status(HttpStatus.INTERNAL_SERVER_ERROR)
+      .json({ message: 'Failed to add address' });
+  }
 };
+
 
 exports.getEditAddress = async (req, res) => {
   try {
@@ -116,12 +157,74 @@ exports.getEditAddress = async (req, res) => {
   }
 };
 
+
 exports.updateAddress = async (req, res) => {
   try {
-    const userId = req.user._id;   
+    const userId = req.user?._id;
     const addressId = req.params.id;
 
-    const makeDefault = req.body.is_default === true;
+    if (!userId) {
+      return res
+        .status(HttpStatus.UNAUTHORIZED)
+        .json({ message: 'Unauthorized' });
+    }
+
+    const {
+      first_name,
+      last_name,
+      building_name,
+      address_line_1,
+      address_line_2,
+      city,
+      state,
+      country,
+      postal_code,
+      email,
+      phone_number,
+      is_default
+    } = req.body;
+
+    // Required fields (address_line_2 optional)
+    if (
+      !first_name ||
+      !last_name ||
+      !building_name ||
+      !address_line_1 ||
+      !city ||
+      !state ||
+      !country ||
+      !postal_code ||
+      !email ||
+      !phone_number
+    ) {
+      return res
+        .status(HttpStatus.BAD_REQUEST)
+        .json({ message: 'All fields are required except Address Line 2' });
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const phoneRegex = /^\d{10}$/;
+    const postalRegex = /^\d{6}$/;
+
+    if (!emailRegex.test(email)) {
+      return res
+        .status(HttpStatus.BAD_REQUEST)
+        .json({ message: 'Invalid email address' });
+    }
+
+    if (!phoneRegex.test(phone_number)) {
+      return res
+        .status(HttpStatus.BAD_REQUEST)
+        .json({ message: 'Mobile number must be 10 digits and numeric' });
+    }
+
+    if (!postalRegex.test(postal_code)) {
+      return res
+        .status(HttpStatus.BAD_REQUEST)
+        .json({ message: 'Postal code must be 6 digits and numeric' });
+    }
+
+    const makeDefault = is_default === true;
 
     if (makeDefault) {
       await Address.updateMany(
@@ -133,33 +236,37 @@ exports.updateAddress = async (req, res) => {
     const updated = await Address.findOneAndUpdate(
       { _id: addressId, user_id: userId },
       {
-        first_name: req.body.first_name,
-        last_name: req.body.last_name,
-        building_name: req.body.building_name,
-        address_line_1: req.body.address_line_1,
-        address_line_2: req.body.address_line_2,
-        city: req.body.city,
-        state: req.body.state,
-        country: req.body.country,
-        postal_code: req.body.postal_code,
-        email: req.body.email,
-        phone_number: req.body.phone_number,
-        is_default: makeDefault  
+        first_name,
+        last_name,
+        building_name,
+        address_line_1,
+        address_line_2,
+        city,
+        state,
+        country,
+        postal_code,
+        email,
+        phone_number,
+        is_default: makeDefault
       },
       { new: true }
     );
 
     if (!updated) {
-      return res.status(404).json({ success: false });
+      return res
+        .status(HttpStatus.NOT_FOUND)
+        .json({ message: 'Address not found' });
     }
 
-    return res.json({ success: true });
+    res.status(HttpStatus.OK).json({
+      redirect: '/user/address'
+    });
+
   } catch (error) {
-  console.error('UPDATE ADDRESS ERROR', error);
-  return res
-    .status(HttpStatus.INTERNAL_SERVER_ERROR)
-    .json({ success: false });
-}
+    res
+      .status(HttpStatus.INTERNAL_SERVER_ERROR)
+      .json({ message: 'Failed to update address' });
+  }
 };
 
 exports.deleteAddress = async (req, res) => {
@@ -190,4 +297,37 @@ exports.deleteAddress = async (req, res) => {
     message: 'Server error'
   });
 }
+};
+
+exports.makeDefaultAddress = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    const addressId = req.params.id;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    await Address.updateMany(
+      { user_id: userId },
+      { $set: { is_default: false } }
+    );
+
+    const updated = await Address.findOneAndUpdate(
+      { _id: addressId, user_id: userId },
+      { $set: { is_default: true } },
+      { new: true }
+    );
+
+    if (!updated) {
+      return res.status(404).json({ success: false, message: 'Address not found' });
+    }
+
+    return res.json({ success: true });
+
+  } catch (error) {
+    res
+      .status(HttpStatus.INTERNAL_SERVER_ERROR)
+      .json({ message: 'Failed to add address' });
+  }
 };

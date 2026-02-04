@@ -17,7 +17,7 @@ const HttpStatus = require(__basedir +'/constants/httpStatus')
 const mongoose = require('mongoose');
 const Wishlist = require(__basedir + '/db/WishlistModel')
 const couponService = require(__basedir + '/services/couponService');
-
+const searchService = require(__basedir +'/services/searchService');
 
 // HOME PAGE
 exports.getHome = (req, res) => {
@@ -57,7 +57,6 @@ exports.getProfile = async (req, res, next) => {
   }
 };
 
-
 exports.getEditProfile = async (req, res) => {
   res.render('user/edit-profile', {
     user: req.user,
@@ -66,42 +65,78 @@ exports.getEditProfile = async (req, res) => {
   });
 };
 
-exports.postEditProfile = async (req, res) => {
-  const { first_name, last_name, email, phone_number } = req.body;
-  const user = req.user;
+exports.patchEditProfile = async (req, res) => {
+  try {
+    const { first_name, last_name, email, phone_number } = req.body;
+    const user = req.user;
 
-  const emailChanged = email !== user.email;
-  const phoneChanged = phone_number !== (user.phone_number || '');
+    if (!user) {
+      return res
+        .status(HttpStatus.UNAUTHORIZED)
+        .json({ message: 'Unauthorized' });
+    }
 
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const phoneRegex = /^\d{10}$/;
 
-  req.session.profileUpdate = {
-    first_name,
-    last_name,
-    email,
-    phone_number
-  };
+    if (!emailRegex.test(email)) {
+      return res
+        .status(HttpStatus.BAD_REQUEST)
+        .json({ message: 'Invalid email address' });
+    }
 
-  if (emailChanged || phoneChanged) {
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    console.log("Profile update OTP: ",otp)
-    req.session.otp = otp;
-    req.session.otpExpires = Date.now() + 2 * 60 * 1000;
-    req.session.otpAttempts = 0;
-    req.session.otpSentAt = Date.now();
+    if (phone_number && !phoneRegex.test(phone_number)) {
+      return res
+        .status(HttpStatus.BAD_REQUEST)
+        .json({
+          message: 'Phone number must be 10 digits and should only contain numbers'
+        });
+    }
 
-    await sendOtpMail(email, otp);
-    return res.redirect('/user/profile/verify-otp');
+    const emailChanged = email !== user.email;
+    const phoneChanged = phone_number !== (user.phone_number || '');
+
+    req.session.profileUpdate = {
+      first_name,
+      last_name,
+      email,
+      phone_number
+    };
+
+    if (emailChanged || phoneChanged) {
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      console.log("Profile update ",otp)
+
+      req.session.otp = otp;
+      req.session.otpExpires = Date.now() + 2 * 60 * 1000;
+      req.session.otpAttempts = 0;
+
+      await sendOtpMail(email, otp);
+
+      return res.status(HttpStatus.OK).json({
+        redirect: '/user/profile/verify-otp'
+      });
+    }
+
+    await User.findByIdAndUpdate(user._id, {
+      first_name,
+      last_name,
+      email,
+      phone_number
+    });
+
+    res.status(HttpStatus.OK).json({
+      redirect: '/user/profile'
+    });
+
+  } catch (err) {
+    res
+      .status(HttpStatus.INTERNAL_SERVER_ERROR)
+      .json({ message: 'Something went wrong' });
   }
-
-  await User.findByIdAndUpdate(user._id, {
-    first_name,
-    last_name,
-    email,
-    phone_number
-  });
-
-  res.redirect('/user/profile');
 };
+
+
 
 //CHANGE PASSWORD
 exports.putUpdatePassword = async (req, res) => {
@@ -147,7 +182,6 @@ exports.putUpdatePassword = async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
-    // Store temporarily until OTP verification
     req.session.profileUpdate = {
       password: hashedPassword
     };
@@ -173,6 +207,12 @@ exports.putUpdatePassword = async (req, res) => {
 };
 
 exports.getUpdatePassword = (req, res) => {
+   res.set({
+    'Cache-Control': 'no-store, no-cache, must-revalidate, private',
+    Pragma: 'no-cache',
+    Expires: '0'
+  });
+
   res.render('user/update-password',{ error: null,activePage: 'profile' });
 };
 
@@ -181,13 +221,31 @@ exports.getProfileOtpPage = (req, res) => {
     return res.redirect('/user/profile');
   }
 
+  res.set({
+    'Cache-Control': 'no-store, no-cache, must-revalidate, private',
+    Pragma: 'no-cache',
+    Expires: '0'
+  });
+
+  const error = req.session.otpError || null;
+  const success = req.session.otpSuccess || null;
+
+  req.session.otpError = null;
+  req.session.otpSuccess = null;
+
   res.render('user/verify-profile-otp', {
     activePage: 'profile',
+    error,
+    success,
     otpSentAt: req.session.otpSentAt
   });
 };
 
 exports.postProfileOtp = async (req, res) => {
+   res.set({
+      'Cache-Control': 'no-store, no-cache, must-revalidate, private'
+    });
+
   const { otp } = req.body;
 
   if (!req.session.otp || !req.session.profileUpdate) {
@@ -201,67 +259,64 @@ exports.postProfileOtp = async (req, res) => {
   }
 
   if (req.session.otp !== otp) {
-    req.session.otpAttempts = (req.session.otpAttempts || 0) + 1;
+  req.session.otpAttempts = (req.session.otpAttempts || 0) + 1;
 
-    return res.render('user/verify-profile-otp', {
-      activePage: 'profile',
-      error: 'Invalid OTP',
-      otpSentAt: req.session.otpSentAt
-    });
+  req.session.otpError = 'Invalid OTP';
+  return res.redirect('/user/profile/verify-otp');
+}
 
-  }
-
-  // ✅ OTP VALID → UPDATE PROFILE
+  
   await User.findByIdAndUpdate(req.user._id, req.session.profileUpdate);
 
-  req.session.otp = null;
-  req.session.profileUpdate = null;
+    req.session.otp = null;
+    req.session.profileUpdate = null;
 
-  res.redirect('/user/profile');
+    return res.redirect('/user/profile');
 };
+
 
 exports.resendProfileOtp = async (req, res) => {
   try {
-    if (!req.session.profileUpdate) {
+    // 🚫 no cache
+    res.set({
+      'Cache-Control': 'no-store, no-cache, must-revalidate, private',
+      Pragma: 'no-cache',
+      Expires: '0'
+    });
+
+    if (!req.session.otp || !req.session.profileUpdate) {
       return res.redirect('/user/profile');
     }
 
-    const RESEND_DELAY = 90 * 1000;
+    const RESEND_DELAY = 30 * 1000;
 
     if (
       req.session.otpSentAt &&
       Date.now() - req.session.otpSentAt < RESEND_DELAY
     ) {
-      return res.render('user/verify-profile-otp', {
-        error: 'Please wait before requesting another OTP',
-        otpSentAt: req.session.otpSentAt
-      });
+      req.session.otpError =
+        'Please wait before requesting another OTP';
+
+      return res.redirect('/user/profile/verify-otp');
     }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    console.log("Profile resend OTP",otp)
+    console.log('Profile resend OTP:', otp);
+
     req.session.otp = otp;
     req.session.otpExpires = Date.now() + 2 * 60 * 1000;
     req.session.otpAttempts = 0;
     req.session.otpSentAt = Date.now();
 
-    const targetEmail =
-      req.session.profileUpdate.email || req.user.email;
+    await sendOtpMail(req.user.email, otp);
 
-    await sendOtpMail(targetEmail, otp);
+    req.session.otpSuccess = 'A new OTP has been sent';
 
-    res.render('user/verify-profile-otp', {
-      activePage: 'profile',
-      success: 'A new OTP has been sent.',
-      otpSentAt: req.session.otpSentAt
-    });
+    return res.redirect('/user/profile/verify-otp');
+
   } catch (error) {
     console.error('RESEND PROFILE OTP ERROR:', error);
-    res.render('user/verify-profile-otp', {
-      activePage: 'profile',
-      error: 'Failed to resend OTP. Please try again.',
-      otpSentAt: req.session.otpSentAt
-    });
+    return res.redirect('/user/profile');
   }
 };
 
@@ -358,15 +413,21 @@ exports.getOtpPage = (req, res) => {
       return res.redirect('/user/signup');
     }
 
+    const flash = req.session.flash || {};
+    delete req.session.flash;
+
     res.render('user/verify-otp', {
-      otpSentAt: req.session.otpSentAt
+      otpSentAt: Number(req.session.otpSentAt) || Date.now(),
+      error: flash.error || null,
+      success: flash.success || null
     });
 
-  } catch (error) {
-    console.error('GET OTP PAGE ERROR:', error);
+  } catch (err) {
+    console.error('GET OTP PAGE ERROR:', err);
     res.redirect('/user/signup');
   }
 };
+
 
  exports.postOtpPage = async (req, res) => {
   try {
@@ -466,7 +527,7 @@ exports.getOtpPage = (req, res) => {
     });
 
     req.session.destroy();
-    res.redirect('user/home');
+    res.redirect('/user/home');
 
   } catch (error) {
     console.error('POST OTP ERROR:', error);
@@ -483,20 +544,21 @@ exports.resendOtp = async (req, res) => {
       return res.redirect('/user/signup');
     }
 
-    const RESEND_DELAY = 90 * 1000;
+    const RESEND_DELAY = 30 * 1000;
 
     if (
       req.session.otpSentAt &&
       Date.now() - req.session.otpSentAt < RESEND_DELAY
     ) {
-      return res.render('user/verify-otp', {
-        error: 'Please wait before requesting another OTP',
-        otpSentAt: req.session.otpSentAt
-      });
+      req.session.flash = {
+        error: 'Please wait before requesting another OTP'
+      };
+      return res.redirect('/user/verify-otp');
     }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    console.log(otp)
+    console.log(otp);
+
     req.session.otp = otp;
     req.session.otpExpires = Date.now() + 2 * 60 * 1000;
     req.session.otpAttempts = 0;
@@ -504,19 +566,21 @@ exports.resendOtp = async (req, res) => {
 
     await sendOtpMail(req.session.signupData.email, otp);
 
-    res.render('user/verify-otp', {
-      success: 'A new OTP has been sent to your email',
-      otpSentAt: req.session.otpSentAt
-    });
+    req.session.flash = {
+      success: 'A new OTP has been sent to your email'
+    };
+
+    res.redirect('/user/verify-otp');
 
   } catch (error) {
     console.error('SIGNUP RESEND OTP ERROR:', error);
-    res.render('user/verify-otp', {
-      error: 'Unable to resend OTP. Try again.',
-      otpSentAt: req.session.otpSentAt
-    });
+    req.session.flash = {
+      error: 'Unable to resend OTP. Try again.'
+    };
+    res.redirect('/user/verify-otp');
   }
 };
+
 
 
 //GOOGLE SIGNUP
@@ -619,10 +683,28 @@ exports.postLogin = async (req, res) => {
 
 // FORGOT PASSWORD
 exports.getForgotPassword = async (req, res) => {
+  if (req.cookies.userToken) {
+    return res.redirect('/user/profile');
+  }
+  if (req.session.passwordResetDone) {
+    return res.redirect('/user/login');
+  }
+
+  res.set({
+    'Cache-Control': 'no-store, no-cache, must-revalidate, private',
+    Pragma: 'no-cache',
+    Expires: '0'
+  });
+
   res.render('user/forgot-password', { error: null });
 };
 
+
 exports.postForgotPassword = async (req, res) => {
+  res.set({
+      'Cache-Control': 'no-store, no-cache, must-revalidate, private'
+    });
+
   const { email } = req.body;
 
   const user = await User.findOne({ email });
@@ -642,17 +724,26 @@ exports.postForgotPassword = async (req, res) => {
   req.session.otp = otp;
   req.session.otpExpires = Date.now() + 5 * 60 * 1000;
   req.session.otpAttempts = 0;
-  req.session.otpSentAt = Date.now(); // ⏱️ REQUIRED
+  req.session.otpSentAt = Date.now(); 
 
   await sendOtpMail(user.email, otp);
 
-  res.redirect('/user/reset-password');
+  return res.redirect('/user/reset-password');
 };
 
 exports.getResetPassword = async (req, res) => {
+  if (req.cookies.userToken) {
+      return res.redirect('/user/profile');
+    }
+
   if (!req.session.resetPassword) {
     return res.redirect('/user/forgot-password');
   }
+  res.set({
+      'Cache-Control': 'no-store, no-cache, must-revalidate, private',
+      Pragma: 'no-cache',
+      Expires: '0'
+    });
 
   res.render('user/reset-password', {
     error: null,
@@ -671,7 +762,7 @@ exports.passwordResendOtp = async (req, res) => {
       return res.redirect('/user/forgot-password');
     }
 
-    const RESEND_DELAY = 90 * 1000;
+    const RESEND_DELAY = 30 * 1000;
 
     if (
       req.session.otpSentAt &&
@@ -690,7 +781,7 @@ exports.passwordResendOtp = async (req, res) => {
     }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    console.log(otp)
+    console.log("passwordResendOtp ",otp)
 
     req.session.otp = otp;
     req.session.otpExpires = Date.now() + 5 * 60 * 1000;
@@ -747,11 +838,10 @@ exports.postResetPassword = async (req, res) => {
   await User.findByIdAndUpdate(req.session.resetPassword.userId, {
     password: hashedPassword
   });
+    req.session.otp = null;
+    req.session.resetPassword = null;
 
-  req.session.otp = null;
-  req.session.resetPassword = null;
-
-  res.redirect('/user/profile');
+    return res.redirect('/user/login');
 };
 
 
@@ -773,7 +863,8 @@ exports.getProducts = async (req, res) => {
     category = [].concat(category);
     size = [].concat(size);
     color = [].concat(color);
-
+    search = search.trim();
+    sort = sort.trim();
 
     let variantFilter = {};
 
@@ -907,15 +998,32 @@ exports.getProductDetails = async (req, res) => {
       rp.colorsCount = [...new Set(rVariants.map(v => v.color))].length;
     }
 
-    return res.render('user/product-details', {
-      product,
-      category,
-      colorMap,
-      colors,
-      defaultColor,
-      isOutOfStock,
-      relatedProducts
-    });
+ return res.render('user/product-details', {
+  // product page
+  product,
+  productCategory: category,
+  colorMap,
+  colors,
+  defaultColor,
+  isOutOfStock,
+  relatedProducts,
+
+  // navbar REQUIRED data
+  category: [],
+  size: [],
+  color: [],
+  sort: '',
+  search: '',
+
+  navCategories: req.navCategories || {
+    hoodiId: '',
+    poloId: '',
+    oversizedId: '',
+    sweatshirtId: ''
+  }
+});
+
+
 
   } catch (error) {
     console.error('PRODUCT DETAILS ERROR:', error);
@@ -932,16 +1040,51 @@ exports.getCheckout = async (req, res) => {
 
     let items = [];
     let subtotal = 0;
-
+    let hasUnavailableItem = false;
     for (const item of cart.items) {
       const variant = await Variant.findById(item.variant_id).lean();
       if (!variant) continue;
 
+      if (item.quantity > variant.stock) {
+        await Cart.updateOne(
+          {
+            user_id: userId,
+            'items._id': item._id
+          },
+          {
+            $set: {
+              'items.$.quantity': variant.stock
+            }
+          }
+        );
+        const product = await Product.findOne({
+          product_id: variant.product_id,
+          status: true
+        }).lean();
+        const message = `Only ${variant.stock} qty left for ${product.title} - ${variant.color} ${variant.size}. Quantity has been updated.`;
+        return res.redirect(
+          `/user/cart?error=${encodeURIComponent(message)}`
+        );
+      }
+
       const product = await Product.findOne({
-        product_id: variant.product_id,
-        status: true
+        product_id: variant.product_id
       }).lean();
-      if (!product) continue;
+      if (!product || product.status === false) {
+      hasUnavailableItem = true;
+
+        items.push({
+          name: product?.title || 'Unavailable product',
+          image: variant.images?.[0] || 'default-product.webp',
+          variant: `${variant.size} · ${variant.color}`,
+          quantity: item.quantity,
+          itemTotal: 0,
+          unavailable: true
+        });
+
+        continue;
+      }
+
 
       // 🔹 PRICE LOGIC (ONLY ADDITION)
       let finalPrice = item.price_snapshot;
@@ -1022,6 +1165,7 @@ exports.getCheckout = async (req, res) => {
       appliedCoupon,
       coupons: couponList,
       addresses,
+      hasUnavailableItem,
       defaultAddress,
       user: {
         name: `${req.user.first_name} ${req.user.last_name}`
@@ -1082,6 +1226,62 @@ exports.removeCoupon = async (req, res) => {
 
   res.json({ success: true });
 };
+
+exports.searchSuggestions = async (req, res) => {
+  try {
+    const q = req.query.q?.trim();
+    const categoryFilter = req.query.category;
+
+    if (!q || q.length < 2) {
+      return res.json([]);
+    }
+
+    const query = {
+      title: { $regex: q, $options: 'i' },
+      status: true
+    };
+
+    // ✅ Apply category filter if present
+    if (categoryFilter) {
+      query.category_id = categoryFilter;
+    }
+
+    const products = await Product.find(query)
+      .limit(8)
+      .select('title thumbnail category_id');
+
+    if (!products.length) {
+      return res.json([]);
+    }
+
+    const categoryIds = [...new Set(products.map(p => p.category_id))];
+
+    const categories = await Category.find({
+      category_id: { $in: categoryIds },
+      status: true
+    }).select('category_id name');
+
+    const categoryMap = {};
+    categories.forEach(c => {
+      categoryMap[c.category_id] = c.name;
+    });
+
+    const suggestions = products.map(p => ({
+      name: p.title,
+      image: p.thumbnail
+        ? `/uploads/${p.thumbnail}`
+        : '/images/no-image.png',
+      category: categoryMap[p.category_id] || 'Products'
+    }));
+
+    res.json(suggestions);
+  } catch (err) {
+    res.json([]);
+  }
+};
+
+
+
 
 exports.logout = (req, res) => {
   res.clearCookie('userToken', {
