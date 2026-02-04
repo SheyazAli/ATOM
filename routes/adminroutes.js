@@ -30,6 +30,7 @@ router.delete('/variants/:variantId', verifyAdmin, productController.deleteVaria
 router.get('/categories',verifyAdmin,adminController.getCategories);
 router.get('/categories/add', verifyAdmin, adminController.getEditCategory);
 router.get('/categories/:categoryId/edit', verifyAdmin, adminController.getEditCategory);
+router.patch('/categories/:id/status',verifyAdmin,adminController.toggleCategoryStatus);
 
 router.post('/categories', verifyAdmin, adminController.saveCategory);
 router.put('/categories/:categoryId', verifyAdmin, adminController.saveCategory);

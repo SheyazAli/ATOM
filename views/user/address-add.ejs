@@ -199,43 +199,5 @@ form.addEventListener('submit', async (e) => {
 });
 </script>
 
-
-<script>
-document.getElementById('addAddressForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-
-  const form = e.target;
-  const formData = new FormData(form);
-  const data = Object.fromEntries(formData.entries());
-
-  try {
-    const res = await fetch('/user/address', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-
-    const result = await res.json();
-
-    if (!res.ok) {
-      return Swal.fire({
-        icon: 'error',
-        title: 'Validation Error',
-        text: result.message
-      });
-    }
-
-    window.location.href = result.redirect;
-
-  } catch (err) {
-    Swal.fire({
-      icon: 'error',
-      title: 'Network Error',
-      text: 'Please try again later'
-    });
-  }
-});
-</script>
-
 </body>
 </html>

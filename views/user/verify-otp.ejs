@@ -123,7 +123,7 @@
     <h4>Verify with OTP</h4>
     <p>We have sent a verification code to your email / phone number.</p>
 
-    <% if (typeof error !== 'undefined') { %>
+    <% if (error) { %>
       <div class="alert alert-danger py-1"><%= error %></div>
     <% } %>
 
@@ -183,7 +183,7 @@
 </script>
 <script>
   const RESEND_DELAY = 30; // seconds
-  const otpSentAt = <%= otpSentAt || Date.now() %>;
+  const otpSentAt = <%- JSON.stringify(otpSentAt ?? Date.now()) %>;
 
   const resendBtn = document.getElementById('resendBtn');
   const timerText = document.getElementById('timerText');

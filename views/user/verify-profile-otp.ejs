@@ -117,19 +117,19 @@
           We have sent a verification code to your email / phone number.
         </div>
 
-        <!-- ERROR -->
-        <% if (typeof error !== 'undefined') { %>
-          <div class="alert alert-danger py-2">
-            <%= error %>
-          </div>
-        <% } %>
+      <!-- ERROR -->
+      <% if (error) { %>
+        <div class="alert alert-danger py-2">
+          <%= error %>
+        </div>
+      <% } %>
 
-        <!-- SUCCESS -->
-        <% if (typeof success !== 'undefined') { %>
-          <div class="alert alert-success py-2">
-            <%= success %>
-          </div>
-        <% } %>
+      <!-- SUCCESS -->
+      <% if (success) { %>
+        <div class="alert alert-success py-2">
+          <%= success %>
+        </div>
+      <% } %>
 
         <form action="/user/profile/verify-otp" method="POST">
 

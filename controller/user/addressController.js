@@ -157,51 +157,6 @@ exports.getEditAddress = async (req, res) => {
   }
 };
 
-// exports.updateAddress = async (req, res) => {
-//   try {
-//     const userId = req.user._id;   
-//     const addressId = req.params.id;
-
-//     const makeDefault = req.body.is_default === true;
-
-//     if (makeDefault) {
-//       await Address.updateMany(
-//         { user_id: userId },
-//         { $set: { is_default: false } }
-//       );
-//     }
-
-//     const updated = await Address.findOneAndUpdate(
-//       { _id: addressId, user_id: userId },
-//       {
-//         first_name: req.body.first_name,
-//         last_name: req.body.last_name,
-//         building_name: req.body.building_name,
-//         address_line_1: req.body.address_line_1,
-//         address_line_2: req.body.address_line_2,
-//         city: req.body.city,
-//         state: req.body.state,
-//         country: req.body.country,
-//         postal_code: req.body.postal_code,
-//         email: req.body.email,
-//         phone_number: req.body.phone_number,
-//         is_default: makeDefault  
-//       },
-//       { new: true }
-//     );
-
-//     if (!updated) {
-//       return res.status(404).json({ success: false });
-//     }
-
-//     return res.json({ success: true });
-//   } catch (error) {
-//   console.error('UPDATE ADDRESS ERROR', error);
-//   return res
-//     .status(HttpStatus.INTERNAL_SERVER_ERROR)
-//     .json({ success: false });
-// }
-// };
 
 exports.updateAddress = async (req, res) => {
   try {
@@ -342,4 +297,37 @@ exports.deleteAddress = async (req, res) => {
     message: 'Server error'
   });
 }
+};
+
+exports.makeDefaultAddress = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    const addressId = req.params.id;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    await Address.updateMany(
+      { user_id: userId },
+      { $set: { is_default: false } }
+    );
+
+    const updated = await Address.findOneAndUpdate(
+      { _id: addressId, user_id: userId },
+      { $set: { is_default: true } },
+      { new: true }
+    );
+
+    if (!updated) {
+      return res.status(404).json({ success: false, message: 'Address not found' });
+    }
+
+    return res.json({ success: true });
+
+  } catch (error) {
+    res
+      .status(HttpStatus.INTERNAL_SERVER_ERROR)
+      .json({ message: 'Failed to add address' });
+  }
 };

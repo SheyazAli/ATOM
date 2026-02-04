@@ -103,6 +103,7 @@
           <th>Products</th>
           <th class="text-center">Featured</th>
           <th class="text-center">Actions</th>
+          <th class="text-center">Status</th>
         </tr>
       </thead>
 
@@ -148,7 +149,17 @@
                 <i class="bi bi-trash"></i>
               </button>
             </td>
-                      </tr>
+            <td class="text-center">
+              <div class="form-check form-switch d-inline-flex">
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  <%= cat.status ? 'checked' : '' %>
+                  onchange="toggleCategoryStatus('<%= cat.category_id %>', this.checked)"
+                >
+              </div>
+            </td>
+           </tr>
         <% }) %>
       </tbody>
     </table>
@@ -228,6 +239,52 @@ function deleteCategory(id) {
       });
   });
 }
+function toggleCategoryStatus(categoryId, isChecked) {
+
+  // UNLIST case (true → false)
+  if (!isChecked) {
+    Swal.fire({
+      title: 'Unlist category?',
+      text: 'All products under this category will be unlisted.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      confirmButtonText: 'Yes, unlist',
+      cancelButtonText: 'Cancel'
+    }).then(result => {
+      if (!result.isConfirmed) {
+        location.reload(); // revert toggle
+        return;
+      }
+
+      updateCategoryStatus(categoryId, false);
+    });
+
+  } else {
+    // LIST case
+    updateCategoryStatus(categoryId, true);
+  }
+}
+
+function updateCategoryStatus(categoryId, status) {
+  fetch(`/admin/categories/${categoryId}/status`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+
+    body: JSON.stringify({ status: !!status })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.success) {
+      Swal.fire('Updated', 'Category status updated', 'success')
+        .then(() => location.reload());
+    } else {
+      Swal.fire('Error', data.message || 'Failed to update');
+    }
+  });
+}
+
+
 
 </script>
 

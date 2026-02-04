@@ -71,7 +71,8 @@ exports.getAddProducts = async (req, res) => {
 
     res.render('admin/add-product', {
       categories,
-      currentPage: 'products'
+      currentPage: 'products',
+       error: req.query.error || null 
     });
 
   } catch (error) {

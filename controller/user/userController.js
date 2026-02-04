@@ -182,7 +182,6 @@ exports.putUpdatePassword = async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
-    // Store temporarily until OTP verification
     req.session.profileUpdate = {
       password: hashedPassword
     };
@@ -208,6 +207,12 @@ exports.putUpdatePassword = async (req, res) => {
 };
 
 exports.getUpdatePassword = (req, res) => {
+   res.set({
+    'Cache-Control': 'no-store, no-cache, must-revalidate, private',
+    Pragma: 'no-cache',
+    Expires: '0'
+  });
+
   res.render('user/update-password',{ error: null,activePage: 'profile' });
 };
 
@@ -216,13 +221,31 @@ exports.getProfileOtpPage = (req, res) => {
     return res.redirect('/user/profile');
   }
 
+  res.set({
+    'Cache-Control': 'no-store, no-cache, must-revalidate, private',
+    Pragma: 'no-cache',
+    Expires: '0'
+  });
+
+  const error = req.session.otpError || null;
+  const success = req.session.otpSuccess || null;
+
+  req.session.otpError = null;
+  req.session.otpSuccess = null;
+
   res.render('user/verify-profile-otp', {
     activePage: 'profile',
+    error,
+    success,
     otpSentAt: req.session.otpSentAt
   });
 };
 
 exports.postProfileOtp = async (req, res) => {
+   res.set({
+      'Cache-Control': 'no-store, no-cache, must-revalidate, private'
+    });
+
   const { otp } = req.body;
 
   if (!req.session.otp || !req.session.profileUpdate) {
@@ -236,67 +259,64 @@ exports.postProfileOtp = async (req, res) => {
   }
 
   if (req.session.otp !== otp) {
-    req.session.otpAttempts = (req.session.otpAttempts || 0) + 1;
+  req.session.otpAttempts = (req.session.otpAttempts || 0) + 1;
 
-    return res.render('user/verify-profile-otp', {
-      activePage: 'profile',
-      error: 'Invalid OTP',
-      otpSentAt: req.session.otpSentAt
-    });
+  req.session.otpError = 'Invalid OTP';
+  return res.redirect('/user/profile/verify-otp');
+}
 
-  }
-
-  // ✅ OTP VALID → UPDATE PROFILE
+  
   await User.findByIdAndUpdate(req.user._id, req.session.profileUpdate);
 
-  req.session.otp = null;
-  req.session.profileUpdate = null;
+    req.session.otp = null;
+    req.session.profileUpdate = null;
 
-  res.redirect('/user/profile');
+    return res.redirect('/user/profile');
 };
+
 
 exports.resendProfileOtp = async (req, res) => {
   try {
-    if (!req.session.profileUpdate) {
+    // 🚫 no cache
+    res.set({
+      'Cache-Control': 'no-store, no-cache, must-revalidate, private',
+      Pragma: 'no-cache',
+      Expires: '0'
+    });
+
+    if (!req.session.otp || !req.session.profileUpdate) {
       return res.redirect('/user/profile');
     }
 
-    const RESEND_DELAY = 90 * 1000;
+    const RESEND_DELAY = 30 * 1000;
 
     if (
       req.session.otpSentAt &&
       Date.now() - req.session.otpSentAt < RESEND_DELAY
     ) {
-      return res.render('user/verify-profile-otp', {
-        error: 'Please wait before requesting another OTP',
-        otpSentAt: req.session.otpSentAt
-      });
+      req.session.otpError =
+        'Please wait before requesting another OTP';
+
+      return res.redirect('/user/profile/verify-otp');
     }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    console.log("Profile resend OTP",otp)
+    console.log('Profile resend OTP:', otp);
+
     req.session.otp = otp;
     req.session.otpExpires = Date.now() + 2 * 60 * 1000;
     req.session.otpAttempts = 0;
     req.session.otpSentAt = Date.now();
 
-    const targetEmail =
-      req.session.profileUpdate.email || req.user.email;
+    await sendOtpMail(req.user.email, otp);
 
-    await sendOtpMail(targetEmail, otp);
+    req.session.otpSuccess = 'A new OTP has been sent';
 
-    res.render('user/verify-profile-otp', {
-      activePage: 'profile',
-      success: 'A new OTP has been sent.',
-      otpSentAt: req.session.otpSentAt
-    });
+    return res.redirect('/user/profile/verify-otp');
+
   } catch (error) {
     console.error('RESEND PROFILE OTP ERROR:', error);
-    res.render('user/verify-profile-otp', {
-      activePage: 'profile',
-      error: 'Failed to resend OTP. Please try again.',
-      otpSentAt: req.session.otpSentAt
-    });
+    return res.redirect('/user/profile');
   }
 };
 
@@ -393,15 +413,21 @@ exports.getOtpPage = (req, res) => {
       return res.redirect('/user/signup');
     }
 
+    const flash = req.session.flash || {};
+    delete req.session.flash;
+
     res.render('user/verify-otp', {
-      otpSentAt: req.session.otpSentAt
+      otpSentAt: Number(req.session.otpSentAt) || Date.now(),
+      error: flash.error || null,
+      success: flash.success || null
     });
 
-  } catch (error) {
-    console.error('GET OTP PAGE ERROR:', error);
+  } catch (err) {
+    console.error('GET OTP PAGE ERROR:', err);
     res.redirect('/user/signup');
   }
 };
+
 
  exports.postOtpPage = async (req, res) => {
   try {
@@ -518,20 +544,21 @@ exports.resendOtp = async (req, res) => {
       return res.redirect('/user/signup');
     }
 
-    const RESEND_DELAY = 90 * 1000;
+    const RESEND_DELAY = 30 * 1000;
 
     if (
       req.session.otpSentAt &&
       Date.now() - req.session.otpSentAt < RESEND_DELAY
     ) {
-      return res.render('user/verify-otp', {
-        error: 'Please wait before requesting another OTP',
-        otpSentAt: req.session.otpSentAt
-      });
+      req.session.flash = {
+        error: 'Please wait before requesting another OTP'
+      };
+      return res.redirect('/user/verify-otp');
     }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    console.log(otp)
+    console.log(otp);
+
     req.session.otp = otp;
     req.session.otpExpires = Date.now() + 2 * 60 * 1000;
     req.session.otpAttempts = 0;
@@ -539,19 +566,21 @@ exports.resendOtp = async (req, res) => {
 
     await sendOtpMail(req.session.signupData.email, otp);
 
-    res.render('user/verify-otp', {
-      success: 'A new OTP has been sent to your email',
-      otpSentAt: req.session.otpSentAt
-    });
+    req.session.flash = {
+      success: 'A new OTP has been sent to your email'
+    };
+
+    res.redirect('/user/verify-otp');
 
   } catch (error) {
     console.error('SIGNUP RESEND OTP ERROR:', error);
-    res.render('user/verify-otp', {
-      error: 'Unable to resend OTP. Try again.',
-      otpSentAt: req.session.otpSentAt
-    });
+    req.session.flash = {
+      error: 'Unable to resend OTP. Try again.'
+    };
+    res.redirect('/user/verify-otp');
   }
 };
+
 
 
 //GOOGLE SIGNUP
@@ -654,10 +683,28 @@ exports.postLogin = async (req, res) => {
 
 // FORGOT PASSWORD
 exports.getForgotPassword = async (req, res) => {
+  if (req.cookies.userToken) {
+    return res.redirect('/user/profile');
+  }
+  if (req.session.passwordResetDone) {
+    return res.redirect('/user/login');
+  }
+
+  res.set({
+    'Cache-Control': 'no-store, no-cache, must-revalidate, private',
+    Pragma: 'no-cache',
+    Expires: '0'
+  });
+
   res.render('user/forgot-password', { error: null });
 };
 
+
 exports.postForgotPassword = async (req, res) => {
+  res.set({
+      'Cache-Control': 'no-store, no-cache, must-revalidate, private'
+    });
+
   const { email } = req.body;
 
   const user = await User.findOne({ email });
@@ -677,17 +724,26 @@ exports.postForgotPassword = async (req, res) => {
   req.session.otp = otp;
   req.session.otpExpires = Date.now() + 5 * 60 * 1000;
   req.session.otpAttempts = 0;
-  req.session.otpSentAt = Date.now(); // ⏱️ REQUIRED
+  req.session.otpSentAt = Date.now(); 
 
   await sendOtpMail(user.email, otp);
 
-  res.redirect('/user/reset-password');
+  return res.redirect('/user/reset-password');
 };
 
 exports.getResetPassword = async (req, res) => {
+  if (req.cookies.userToken) {
+      return res.redirect('/user/profile');
+    }
+
   if (!req.session.resetPassword) {
     return res.redirect('/user/forgot-password');
   }
+  res.set({
+      'Cache-Control': 'no-store, no-cache, must-revalidate, private',
+      Pragma: 'no-cache',
+      Expires: '0'
+    });
 
   res.render('user/reset-password', {
     error: null,
@@ -706,7 +762,7 @@ exports.passwordResendOtp = async (req, res) => {
       return res.redirect('/user/forgot-password');
     }
 
-    const RESEND_DELAY = 90 * 1000;
+    const RESEND_DELAY = 30 * 1000;
 
     if (
       req.session.otpSentAt &&
@@ -782,11 +838,10 @@ exports.postResetPassword = async (req, res) => {
   await User.findByIdAndUpdate(req.session.resetPassword.userId, {
     password: hashedPassword
   });
+    req.session.otp = null;
+    req.session.resetPassword = null;
 
-  req.session.otp = null;
-  req.session.resetPassword = null;
-
-  res.redirect('/user/profile');
+    return res.redirect('/user/login');
 };
 
 
