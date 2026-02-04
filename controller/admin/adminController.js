@@ -283,7 +283,7 @@ exports.toggleCategoryStatus = async (req, res) => {
       console.log('STATUS PAYLOAD:', req.body.status, typeof req.body.status);
     const category = await Category.findOneAndUpdate(
       { category_id: id },
-      { $set: { status: Boolean(status) } }, // 🔥 FORCE BOOLEAN
+      { $set: { status: Boolean(status) } }, 
       { new: true }
     );
 
@@ -292,13 +292,12 @@ exports.toggleCategoryStatus = async (req, res) => {
     }
 
     if (status === false) {
-      // Unlist category → unlist all products
+
       await Product.updateMany(
         { category_id: id },
         { $set: { status: false } }
       );
     } else {
-      // List category → relist all products
       await Product.updateMany(
         { category_id: id },
         { $set: { status: true } }
@@ -333,7 +332,7 @@ exports.getUsers = async (req, res) => {
     };
 
     const users = await User.find(query)
-      .sort({ created_at: -1 }) // 
+      .sort({ created_at: -1 }) 
       .skip((page - 1) * limit)
       .limit(limit);
 

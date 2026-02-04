@@ -105,7 +105,6 @@ exports.patchEditProfile = async (req, res) => {
 
     if (emailChanged || phoneChanged) {
       const otp = Math.floor(100000 + Math.random() * 900000).toString();
-      console.log("Profile update ",otp)
 
       req.session.otp = otp;
       req.session.otpExpires = Date.now() + 2 * 60 * 1000;
@@ -187,7 +186,7 @@ exports.putUpdatePassword = async (req, res) => {
     };
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-      console.log("Update password OTP: ",otp)
+
     req.session.otp = otp;
     req.session.otpExpires = Date.now() + 2 * 60 * 1000;
     req.session.otpAttempts = 0;
@@ -301,7 +300,6 @@ exports.resendProfileOtp = async (req, res) => {
     }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    console.log('Profile resend OTP:', otp);
 
     req.session.otp = otp;
     req.session.otpExpires = Date.now() + 2 * 60 * 1000;
@@ -389,7 +387,6 @@ exports.postSignup = async (req, res) => {
     };
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    console.log(otp)
     req.session.otp = otp;
     req.session.otpExpires = Date.now() + 2 * 60 * 1000;
     req.session.otpSentAt = Date.now();
@@ -557,7 +554,6 @@ exports.resendOtp = async (req, res) => {
     }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    console.log(otp);
 
     req.session.otp = otp;
     req.session.otpExpires = Date.now() + 2 * 60 * 1000;
@@ -715,7 +711,6 @@ exports.postForgotPassword = async (req, res) => {
   }
 
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
-  console.log('RESET OTP:', otp);
 
   req.session.resetPassword = {
     userId: user._id
@@ -781,7 +776,6 @@ exports.passwordResendOtp = async (req, res) => {
     }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    console.log("passwordResendOtp ",otp)
 
     req.session.otp = otp;
     req.session.otpExpires = Date.now() + 5 * 60 * 1000;
