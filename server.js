@@ -31,7 +31,7 @@ app.use(methodOverride('_method'));
 
 app.use(cookieParser());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-app.use(express.static('uploads'));
+//app.use(express.static('uploads'));
 
 app.set('view engine', 'ejs');
 
