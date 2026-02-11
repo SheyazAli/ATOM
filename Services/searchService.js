@@ -2,10 +2,11 @@ exports.getSearchSuggestions = async (query) => {
   if (!query || query.length < 2) return [];
 
   const products = await Product.find({
-    name: { $regex: query, $options: 'i' }
+    title: { $regex: query, $options: 'i' }
   })
     .limit(8)
-    .select('name');
+    .select('title')
+    .lean();
 
-  return products.map(p => p.name);
+  return products.map(p => p.title);
 };
