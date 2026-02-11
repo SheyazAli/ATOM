@@ -10,7 +10,7 @@ const Coupon = require(__basedir + '/db/couponModel');
 const Order = require(__basedir + '/db/orderModel');
 const Variant = require(__basedir + '/db/variantModel');
 const HttpStatus = require(__basedir + '/constants/httpStatus');
-const { generateOrderNumber } = require(__basedir + '/Services/orderNumberService');
+const { generateOrderNumber } = require(__basedir + '/services/orderNumberService');
 const {  PAYMENT_STATUS, PAYMENT_FAILURE_REASONS} = require(__basedir + '/constants/paymentStatus')
 const pricingService = require(__basedir +'/services/pricingService');
 

@@ -14,8 +14,8 @@ const HttpStatus = require(__basedir +'/constants/httpStatus')
 const PDFDocument = require('pdfkit');
 const { processRefund } = require(__basedir +'/services/refundService');
 const { generateInvoicePDF } = require(__basedir +'/services/invoiceService');
-const { generateOrderNumber } = require(__basedir +'/Services/orderNumberService')
-const { validatePartialCancellation } = require(__basedir +'/Services/couponValidationService');
+const { generateOrderNumber } = require(__basedir +'/services/orderNumberService')
+const { validatePartialCancellation } = require(__basedir +'/services/couponValidationService');
 
 
 exports.placeOrderCOD = async (req, res) => {
