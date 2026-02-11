@@ -17,6 +17,7 @@ const HttpStatus = require(__basedir +'/constants/httpStatus')
 const mongoose = require('mongoose');
 const Wishlist = require(__basedir + '/db/WishlistModel')
 const couponService = require(__basedir + '/services/couponService');
+const pricingService = require(__basedir +'/services/pricingService');
 const searchService = require(__basedir +'/services/searchService');
 
 // HOME PAGE
@@ -276,7 +277,6 @@ exports.postProfileOtp = async (req, res) => {
 
 exports.resendProfileOtp = async (req, res) => {
   try {
-    // 🚫 no cache
     res.set({
       'Cache-Control': 'no-store, no-cache, must-revalidate, private',
       Pragma: 'no-cache',
@@ -1079,26 +1079,11 @@ exports.getCheckout = async (req, res) => {
         continue;
       }
 
-
-      // 🔹 PRICE LOGIC (ONLY ADDITION)
-      let finalPrice = item.price_snapshot;
-      let priceMessage = null;
-
-      if (
-        product.category_offer_price &&
-        product.category_offer_price < item.price_snapshot
-      ) {
-        finalPrice = product.category_offer_price;
-        priceMessage = 'Special price applied';
-      } else if (
-        product.category_offer_price &&
-        product.category_offer_price >= item.price_snapshot
-      ) {
-        priceMessage = 'Special category offer is not applied. You already have the best price';
-      }
-
-      const itemTotal = item.quantity * finalPrice;
-      subtotal += itemTotal;
+      const { finalPrice, priceMessage } =
+  pricingService.calculateItemPrice(product, item);
+  
+    const itemTotal = item.quantity * finalPrice;
+    subtotal += itemTotal;
 
       items.push({
         name: product.title,
@@ -1235,7 +1220,6 @@ exports.searchSuggestions = async (req, res) => {
       status: true
     };
 
-    // ✅ Apply category filter if present
     if (categoryFilter) {
       query.category_id = categoryFilter;
     }
