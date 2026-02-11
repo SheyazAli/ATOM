@@ -494,48 +494,23 @@ exports.stripeSuccess = async (req, res) => {
 
 exports.stripeCancel = async (req, res) => {
   try {
+    console.log("Stripe Cancel Hit");
+
     if (!req.user) {
-      return res.redirect('/user/cart');
+      return res.redirect('/user/login');
     }
 
-    const userId = req.user._id;
 
-    const cart = await Cart.findOne({ user_id: userId }).lean();
-    if (!cart || !cart.items.length) {
-      return res.redirect('/user/cart');
-    }
+    req.session.paymentFailReason = "PAYMENT_FAILED";
 
-    const address = await Address.findOne({
-      user_id: userId,
-      address_id: req.query.address_id
-    }).lean();
+    return res.redirect('/user/payment-failed');
 
-    let subtotal = 0;
-    cart.items.forEach(item => {
-      subtotal += item.price_snapshot * item.quantity;
-    });
-
-    const discount = cart.applied_coupon?.discount || 0;
-
-    return res
-      .status(HttpStatus.OK)
-      .render('user/payment-failed', {
-        cart,
-        address: address || null,
-        summary: {
-          subtotal,
-          discount,
-          total: Math.max(subtotal - discount, 0)
-        }
-      });
-
-  } catch (err) {
-    console.error('STRIPE CANCEL ERROR:', err);
-    return res
-      .status(HttpStatus.INTERNAL_SERVER_ERROR)
-      .render('user/500');
+  } catch (error) {
+    console.error("Stripe Cancel Error:", error);
+    return res.redirect('/user/checkout');
   }
 };
+
 
 exports.getPaymentFailed = async (req, res) => {
   try {
@@ -551,6 +526,15 @@ exports.getPaymentFailed = async (req, res) => {
       null;
 
     const cart = await Cart.findOne({ user_id: userId }).lean();
+
+    if (!cart || !cart.items || !cart.items.length) {
+      return res.render('user/payment-failed', {
+        cart: null,
+        address: null,
+        summary: null,
+        reason: "CART_EMPTY"
+      });
+    }
 
     const addressId = req.session.checkoutAddressId || null;
 
