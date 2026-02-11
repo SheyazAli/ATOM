@@ -12,6 +12,7 @@ const Variant = require(__basedir + '/db/variantModel');
 const HttpStatus = require(__basedir + '/constants/httpStatus');
 const { generateOrderNumber } = require(__basedir + '/Services/orderNumberService');
 const {  PAYMENT_STATUS, PAYMENT_FAILURE_REASONS} = require(__basedir + '/constants/paymentStatus')
+const pricingService = require(__basedir +'/services/pricingService');
 
 async function createOrderWithRetry(orderData, retries = 5) {
   for (let i = 0; i < retries; i++) {
@@ -309,10 +310,6 @@ exports.createStripeSession = async (req, res) => {
       const variant = await Variant.findById(item.variant_id);
 
       if (!variant || variant.stock < item.quantity) {
-        const product = await Product.findOne({
-          product_id: variant.product_id
-        }).lean();
-
         return res.json({
           success: false,
           reason: PAYMENT_FAILURE_REASONS.STOCK_ISSUE,
@@ -320,8 +317,25 @@ exports.createStripeSession = async (req, res) => {
         });
       }
 
-      subtotal += item.price_snapshot * item.quantity;
+      const product = await Product.findOne({
+        product_id: variant.product_id,
+        status: true
+      }).lean();
+
+      if (!product) {
+        return res.json({
+          success: false,
+          reason: PAYMENT_FAILURE_REASONS.PRODUCT_UNAVAILABLE,
+          redirect: `/user/payment-failed?reason=${PAYMENT_FAILURE_REASONS.PRODUCT_UNAVAILABLE}`
+        });
+      }
+
+      const { finalPrice } =
+        pricingService.calculateItemPrice(product, item);
+
+      subtotal += finalPrice * item.quantity;
     }
+
     let discount = 0;
 
     if (cart.applied_coupon?.coupon_id) {
@@ -379,7 +393,6 @@ exports.createStripeSession = async (req, res) => {
     res.json({ error: 'STRIPE_SESSION_FAILED' });
   }
 };
-
 
 exports.stripeSuccess = async (req, res) => {
   try {
