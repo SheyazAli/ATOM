@@ -251,10 +251,10 @@ input.addEventListener('input', async () => {
         q: query
       });
 
-      const categoryInput = document.querySelector('input[name="category"]');
-      if (categoryInput) {
-        params.append('category', categoryInput.value);
-      }
+      // const categoryInput = document.querySelector('input[name="category"]');
+      // if (categoryInput) {
+      //   params.append('category', categoryInput.value);
+      // }
 
     const res = await fetch(
       `/user/search-suggestions?${params.toString()}`,
@@ -278,10 +278,7 @@ input.addEventListener('input', async () => {
       `;
 
       row.onclick = () => {
-        input.value = item.name;
-        suggestionsBox.innerHTML = '';
-        suggestionsBox.style.display = 'none';
-        input.form.submit();
+        window.location.href = `/user/product/${item.id}`;
       };
 
       suggestionsBox.appendChild(row);

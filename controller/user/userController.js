@@ -854,7 +854,8 @@ exports.getProducts = async (req, res) => {
       size = [],
       color = []
     } = req.query;
-    category = [].concat(category);
+    // category = [].concat(category);
+    category = [].concat(category).filter(Boolean);
     size = [].concat(size);
     color = [].concat(color);
     search = search.trim();
@@ -879,10 +880,17 @@ exports.getProducts = async (req, res) => {
     const productQuery = {
       title: { $regex: search, $options: 'i' }
     };
+    const globalSearchQuery = {
+      title: { $regex: search, $options: 'i' }
+    };
 
-    if (category.length) {
-      productQuery.category_id = { $in: category };
-    }
+    const globalSearchCount = search
+      ? await Product.countDocuments(globalSearchQuery)
+      : 0;
+
+        if (category.length) {
+          productQuery.category_id = { $in: category };
+        }
 
     if (filteredProductIds) {
       if (!filteredProductIds.length) {
@@ -914,7 +922,13 @@ exports.getProducts = async (req, res) => {
     { $skip: skip },
     { $limit: limit }
   ]);
+      const filteredSearchCount = products.length;
 
+    const showClearFilterSuggestion =
+      search &&
+      (category.length > 0 || size.length > 0 || color.length > 0) &&
+      globalSearchCount > filteredSearchCount;
+      
     for (const product of products) {
       const variants = await Variant.find({
         product_id: product.product_id
@@ -938,7 +952,8 @@ exports.getProducts = async (req, res) => {
       sort,
       category,
       size,
-      color
+      color,
+      showClearFilterSuggestion
     });
 
   } catch (error) {
@@ -948,6 +963,7 @@ exports.getProducts = async (req, res) => {
       .render('user/500');
   }
 };
+
 exports.getProductDetails = async (req, res) => {
   try {
     const product = req.product;
@@ -1221,7 +1237,6 @@ exports.searchSuggestions = async (req, res) => {
   try {
     const q = req.query.q?.trim();
     const categoryFilter = req.query.category;
-
     if (!q || q.length < 2) {
       return res.json([]);
     }
@@ -1236,8 +1251,10 @@ exports.searchSuggestions = async (req, res) => {
     }
 
     const products = await Product.find(query)
-      .limit(8)
-      .select('title thumbnail category_id');
+      .sort({ title: 1 })  
+      .limit(10)            
+      .select('title thumbnail category_id product_id')
+      .lean();
 
     if (!products.length) {
       return res.json([]);
@@ -1256,6 +1273,7 @@ exports.searchSuggestions = async (req, res) => {
     });
 
     const suggestions = products.map(p => ({
+      id: p.product_id,
       name: p.title,
       image: p.thumbnail
         ? `/uploads/${p.thumbnail}`
