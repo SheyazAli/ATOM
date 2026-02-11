@@ -877,7 +877,6 @@ exports.getProducts = async (req, res) => {
     }
 
     const productQuery = {
-      // status: true,
       title: { $regex: search, $options: 'i' }
     };
 
@@ -892,17 +891,29 @@ exports.getProducts = async (req, res) => {
       productQuery.product_id = { $in: filteredProductIds };
     }
 
-    let sortOption = {};
-    if (sort === 'priceLow') sortOption.sale_price = 1;
-    if (sort === 'priceHigh') sortOption.sale_price = -1;
-    if (sort === 'az') sortOption.title = 1;
-    if (sort === 'za') sortOption.title = -1;
+    let sortStage = {};
 
-    const products = await Product.find(productQuery)
-      .sort(sortOption)
-      .skip(skip)
-      .limit(limit)
-      .lean();
+    if (sort === 'priceLow') sortStage = { effectivePrice: 1 };
+    else if (sort === 'priceHigh') sortStage = { effectivePrice: -1 };
+    else if (sort === 'az') sortStage = { title: 1 };
+    else if (sort === 'za') sortStage = { title: -1 };
+    else sortStage = { createdAt: -1 };
+    const products = await Product.aggregate([
+    { $match: productQuery },
+
+    {
+      $addFields: {
+        effectivePrice: 
+        {
+          $cond: [ {$and: [{ $gt: ['$sale_price', 0] },{ $lt: ['$sale_price', '$regular_price'] }]},'$sale_price','$regular_price']
+        }
+      }
+    },
+
+    { $sort: sortStage },
+    { $skip: skip },
+    { $limit: limit }
+  ]);
 
     for (const product of products) {
       const variants = await Variant.find({
